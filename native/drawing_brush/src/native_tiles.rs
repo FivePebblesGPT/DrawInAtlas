@@ -8,6 +8,9 @@ use godot::prelude::*;
 
 static NEXT_EDIT: AtomicU64 = AtomicU64::new(1);
 const MAX_ACTIVE_TILES: usize = 128;
+// Structural glyph imports may span thousands of small tiles. Bound both
+// descriptor count and resident bytes before copying any RGBA8 buffer.
+const MAX_STRUCTURAL_TILES: usize = 8192;
 const MAX_TILE_BYTES: usize = 2048 * 2048 * 4;
 const MAX_STORED_BYTES: usize = 256 * 1024 * 1024;
 const MAX_HISTORY: usize = 64;
@@ -932,6 +935,87 @@ impl TileStore {
         Ok(())
     }
 
+    /// Publish a newly derived raster source (or replace a parked version)
+    /// as one structural revision, without inserting a pixel Undo event.
+    /// Godot owns the semantic conversion event; Rust owns its raster bytes.
+    fn can_publish_structural_source(
+        &self,
+        layer: &str,
+        expected: u64,
+        count: usize,
+    ) -> Result<(), &'static str> {
+        if self.active.is_some() || self.revision != expected || expected >= i64::MAX as u64 {
+            return Err("Active edit, stale or overflowing structural source revision");
+        }
+        if layer.is_empty() || count > MAX_STRUCTURAL_TILES {
+            return Err("Invalid structural source identity or tile count");
+        }
+        let bytes = self
+            .stride_bytes()?
+            .checked_mul(count)
+            .ok_or("Structural source byte count overflow")?;
+        // Conservative peak: both the old parked source and new buffers
+        // can coexist until the entire replacement passes validation.
+        if self.bytes_used().saturating_add(bytes) > MAX_STORED_BYTES {
+            return Err("Structural source memory budget exceeded");
+        }
+        if !self.parked_layers.contains(layer)
+            && (self.authorized.iter().any(|id| id.layer == layer)
+                || self.tiles.keys().any(|id| id.layer == layer)
+                || self.undo.iter().chain(self.redo.iter()).any(|event| {
+                    event.layer == layer
+                        || event
+                            .before
+                            .keys()
+                            .chain(event.after.keys())
+                            .any(|id| id.layer == layer)
+                }))
+        {
+            return Err("Structural source cannot overwrite live native ownership");
+        }
+        Ok(())
+    }
+
+    fn publish_structural_source(
+        &mut self,
+        layer: &str,
+        expected: u64,
+        entries: Vec<(TileId, Vec<u8>)>,
+    ) -> Result<(), &'static str> {
+        self.can_publish_structural_source(layer, expected, entries.len())?;
+        let len = self.stride_bytes()?;
+        let mut prepared = HashMap::with_capacity(entries.len());
+        for (id, rgba) in entries {
+            if id.layer != layer
+                || id.x.unsigned_abs() > SAFE_COORD as u64
+                || id.y.unsigned_abs() > SAFE_COORD as u64
+                || rgba.len() != len
+                || prepared.contains_key(&id)
+            {
+                return Err("Invalid or duplicate structural source tile");
+            }
+            prepared.insert(
+                id,
+                Tile {
+                    rgba,
+                    generation: 0,
+                },
+            );
+        }
+        let ids = [layer.to_owned()];
+        if self.parked_layers.contains(layer) {
+            self.replace_parked_layers(expected, &ids)?;
+        } else {
+            self.advance_unreferenced_layers(expected, &ids, true)?;
+        }
+        for (id, tile) in prepared {
+            self.bytes_imported += tile.rgba.len() as u64;
+            self.authorized.insert(id.clone());
+            self.tiles.insert(id, tile);
+        }
+        Ok(())
+    }
+
     /// Park or restore a history-backed raster subtree as a reversible tree
     /// mutation. Canonical tile bytes, authorizations and Undo/Redo tokens are
     /// deliberately not released: history can only address a parked layer
@@ -1324,9 +1408,9 @@ impl DrawingNativeTiles {
             .is_ok()
     }
 
-    /// Checked semantic re-rasterization of previously parked native IDs.
-    /// The next glyph source is produced by Godot and imported lazily only
-    /// after the obsolete Rust source/history is selectively retired.
+    /// Retire parked IDs at a structural revision without publishing new
+    /// source tiles. Text rasterization uses publish_structural_source_revision
+    /// to replace old and new glyph sources atomically.
     #[func]
     fn replace_parked_layers_revision(&mut self, expected: i64, layers: PackedStringArray) -> bool {
         self.store.ffi_calls += 1;
@@ -1336,6 +1420,65 @@ impl DrawingNativeTiles {
         let ids: Vec<String> = layers.as_slice().iter().map(|id| id.to_string()).collect();
         self.store
             .replace_parked_layers(expected as u64, &ids)
+            .is_ok()
+    }
+
+    /// Bounded atomic import of all newly derived source tiles. Validate
+    /// descriptors and total memory before cloning any packed byte buffers.
+    #[func]
+    fn publish_structural_source_revision(
+        &mut self,
+        layer: GString,
+        expected: i64,
+        tiles: Array<Dictionary<Variant, Variant>>,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        let layer = layer.to_string();
+        if expected < 0
+            || self
+                .store
+                .can_publish_structural_source(&layer, expected as u64, tiles.len())
+                .is_err()
+        {
+            return false;
+        }
+        let Ok(len) = self.store.stride_bytes() else {
+            return false;
+        };
+        let mut descriptors = Vec::with_capacity(tiles.len());
+        let mut seen = HashSet::with_capacity(tiles.len());
+        for entry in tiles.iter_shared() {
+            let (Some(x), Some(y), Some(rgba)) = (
+                entry.get("tile_x").and_then(|v| v.try_to::<i64>().ok()),
+                entry.get("tile_y").and_then(|v| v.try_to::<i64>().ok()),
+                entry
+                    .get("bytes")
+                    .and_then(|v| v.try_to::<PackedByteArray>().ok()),
+            ) else {
+                return false;
+            };
+            if x.unsigned_abs() > SAFE_COORD as u64
+                || y.unsigned_abs() > SAFE_COORD as u64
+                || rgba.len() != len
+                || !seen.insert((x, y))
+            {
+                return false;
+            }
+            descriptors.push((
+                TileId {
+                    layer: layer.clone(),
+                    x,
+                    y,
+                },
+                rgba,
+            ));
+        }
+        let entries = descriptors
+            .into_iter()
+            .map(|(id, bytes)| (id, bytes.as_slice().to_vec()))
+            .collect();
+        self.store
+            .publish_structural_source(&layer, expected as u64, entries)
             .is_ok()
     }
 
@@ -3020,6 +3163,119 @@ mod tests {
         store.undo_or_redo(true).unwrap();
         store.undo_or_redo(false).unwrap();
         assert_eq!(store.read(&ink, false).unwrap().rgba, retained);
+    }
+
+    #[test]
+    fn structural_source_publication_is_atomic_and_keeps_unrelated_history() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let ink = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let mut ink_bytes = vec![0; 16 * 16 * 4];
+        ink_bytes[..4].copy_from_slice(&[17, 34, 51, 0]);
+        let (token, _) = store
+            .adopt_external("ink", 0, vec![(ink.clone(), vec![], ink_bytes.clone())])
+            .unwrap();
+        let glyph = TileId {
+            layer: "glyph".into(),
+            x: -2,
+            y: 1,
+        };
+        let other = TileId {
+            layer: "glyph".into(),
+            x: 1,
+            y: -1,
+        };
+        let mut glyph_bytes = vec![0; 16 * 16 * 4];
+        glyph_bytes[..4].copy_from_slice(&[64, 128, 192, 127]);
+        let memory = store.bytes_used();
+        let imported = store.bytes_imported;
+        assert!(
+            store
+                .publish_structural_source("glyph", 0, vec![(glyph.clone(), glyph_bytes.clone())])
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_structural_source("ink", 1, vec![(ink.clone(), glyph_bytes.clone())])
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_structural_source(
+                    "glyph",
+                    1,
+                    vec![
+                        (glyph.clone(), glyph_bytes.clone()),
+                        (other.clone(), vec![0; 1])
+                    ]
+                )
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_structural_source(
+                    "glyph",
+                    1,
+                    vec![
+                        (glyph.clone(), glyph_bytes.clone()),
+                        (glyph.clone(), glyph_bytes.clone())
+                    ]
+                )
+                .is_err()
+        );
+        assert_eq!(store.revision, 1);
+        assert_eq!(store.bytes_used(), memory);
+        assert_eq!(store.bytes_imported, imported);
+        assert!(!store.authorized.contains(&glyph));
+        assert!(store.history_matches(token, true));
+        store
+            .publish_structural_source("glyph", 1, vec![(glyph.clone(), glyph_bytes.clone())])
+            .unwrap();
+        assert_eq!(store.revision, 2);
+        assert_eq!(store.read(&glyph, false).unwrap().rgba, glyph_bytes);
+        assert!(store.authorized.contains(&glyph));
+        assert_eq!(store.undo.len(), 1);
+        assert!(store.history_matches(token, true));
+        store
+            .advance_parked_layers(2, &["glyph".into()], false, false)
+            .unwrap();
+        let active = store.begin("ink", 3, false).unwrap();
+        assert!(
+            store
+                .publish_structural_source("glyph", 3, vec![(other.clone(), glyph_bytes.clone())])
+                .is_err()
+        );
+        assert!(store.transaction_matches(active, 3, "ink"));
+        store.active = None;
+        assert!(
+            store
+                .publish_structural_source("glyph", 3, vec![(other.clone(), vec![1])])
+                .is_err()
+        );
+        assert!(store.parked_layers.contains("glyph"));
+        assert_eq!(store.read(&glyph, false).unwrap().rgba, glyph_bytes);
+        store
+            .publish_structural_source("glyph", 3, vec![(other.clone(), glyph_bytes.clone())])
+            .unwrap();
+        assert_eq!(store.revision, 4);
+        assert!(!store.parked_layers.contains("glyph"));
+        assert!(!store.authorized.contains(&glyph));
+        assert!(store.read(&glyph, false).is_none());
+        assert_eq!(store.read(&other, false).unwrap().rgba, glyph_bytes);
+        assert_eq!(store.read(&ink, false).unwrap().rgba, ink_bytes);
+        assert!(store.history_matches(token, true));
+        let wide = initialized(2048);
+        assert!(wide.can_publish_structural_source("large", 0, 16).is_ok());
+        assert!(wide.can_publish_structural_source("large", 0, 17).is_err());
+        assert!(
+            store
+                .can_publish_structural_source("large", 4, MAX_STRUCTURAL_TILES + 1)
+                .is_err()
+        );
     }
 
     #[test]

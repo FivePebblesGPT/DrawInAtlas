@@ -160,8 +160,15 @@ func _native_tree_sources_match(nodes: Dictionary, restore: bool) -> bool:
 		if not nodes.has(layer_id):
 			continue
 		var key: String = identity.substr(layer_id.length() + 1)
+		var node: DrawingLayerNode = nodes[layer_id]
+		# A semantic text node can share its ID with a parked raster from a
+		# future Redo. It has no live raster projection to compare or save.
+		# Actual raster restoration still validates the complete native bytes.
+		if node.kind == DrawingLayerNode.TEXT and node.tiles.is_empty() and \
+				_native_raster_store != null and bool(_native_raster_store.call("is_layer_parked", layer_id)):
+			continue
 		var source: Variant = _native_source_identities[identity]
-		var current: Variant = (nodes[layer_id] as DrawingLayerNode).tiles.get(key)
+		var current: Variant = node.tiles.get(key)
 		if restore:
 			var old_bytes: PackedByteArray = source.to_rgba8() if source != null else PackedByteArray()
 			var new_bytes: PackedByteArray = current.to_rgba8() if current != null else PackedByteArray()
@@ -2148,8 +2155,10 @@ func set_text(layer_id: String, content: String) -> DrawingResult:
 
 
 func rasterize_text(layer_id: String, expected_revision: int) -> DrawingResult:
-	if revision != expected_revision:
+	if revision != expected_revision or not _attached_native_revision_matches(expected_revision):
 		return DrawingResult.failure("STALE_REVISION", "Text changed before rasterization")
+	if has_unpublished_edit():
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Cannot convert text during a pending raster edit")
 	if not _nodes.has(layer_id) or _nodes[layer_id].kind != DrawingLayerNode.TEXT or not _editable(layer_id):
 		return DrawingResult.failure("LAYER", "Unavailable editable text layer")
 	var before: DrawingLayerNode = _nodes[layer_id].detached_copy()
@@ -2185,33 +2194,42 @@ func rasterize_text(layer_id: String, expected_revision: int) -> DrawingResult:
 			for channel: int in range(4):
 				rgba |= int(bytes[offset + channel]) << (channel * 8)
 			after.tiles[tile_key].set_rgba(local.x, local.y, rgba)
-	# A new semantic glyph source may reuse an ID that Rust parked when the
-	# *previous* text-to-raster conversion was undone. Its old canonical tiles
-	# and redo tokens no longer describe this source. Retire only that parked ID
-	# at one checked native revision boundary; preserve all other raster tokens.
-	# A current non-parked ID must still be provably unreferenced in Rust.
-	if _native_raster_store != null:
-		var native_revision: int = int(_native_raster_store.call("stats").get("revision", -1))
-		if native_revision > revision:
-			return DrawingResult.failure("STALE_REVISION", "Text conversion native store is ahead")
-		if native_revision == revision:
-			var ids: PackedStringArray = PackedStringArray([layer_id])
-			if bool(_native_raster_store.call("is_layer_parked", layer_id)):
-				if not bool(_native_raster_store.call(
-						"replace_parked_layers_revision", revision, ids)):
-					return DrawingResult.failure("NATIVE_STRUCTURE", "Parked text source could not be replaced")
-				for identity: String in _native_source_identities.keys():
-					if identity.begins_with(layer_id + ":"):
-						_native_source_identities.erase(identity)
-			else:
-				if not bool(_native_raster_store.call(
-						"advance_unreferenced_layers_revision", revision, ids, true)):
-					return DrawingResult.failure("NATIVE_STRUCTURE", "Text ID has live native ownership")
-			revision += 1
-		else:
-			# An already-behind store is reauthorized on the next native edit.
-			_advance_raster_structure_revision([layer_id])
+	# Publish the complete derived raster source before exposing the new tree.
+	# The structural event owns the semantic transition; Rust must not invent
+	# a second pixel-history entry. A parked predecessor is replaced atomically.
+	var native_store: Object = _native_raster_store
+	var provisional: bool = native_store == null
+	if native_store != null and not _attached_native_revision_matches(revision):
+		return DrawingResult.failure("STALE_REVISION", "Text conversion native revision diverged")
+	if provisional and tile_stride >= 16 and ClassDB.class_exists("DrawingNativeTiles"):
+		native_store = ClassDB.instantiate("DrawingNativeTiles")
+		if native_store == null or int(native_store.call("tile_abi_version")) != 1 \
+				or not native_store.call("configure", tile_stride, revision):
+			return DrawingResult.failure("NATIVE_STRUCTURE", "Text source bootstrap rejected")
+	if native_store != null:
+		if after.tiles.size() > 8192 or after.tiles.size() * tile_stride * tile_stride * 4 > MAX_NATIVE_HISTORY_TRANSFER_BYTES:
+			return DrawingResult.failure("RASTER_LIMIT", "Text tile source exceeds native budget")
+		var descriptors: Array[Dictionary] = []
+		for key: String in after.tiles:
+			var coordinates: PackedStringArray = key.split(",")
+			var cx: int = int(coordinates[0])
+			var cy: int = int(coordinates[1])
+			if not TILES.tile_coordinates_in_projection_range(cx, cy, tile_stride):
+				return DrawingResult.failure("COORD", "Text source exceeds signed native projection")
+			descriptors.append({"tile_x": cx, "tile_y": cy, "bytes": after.tiles[key].to_rgba8()})
+		if not native_store.call("publish_structural_source_revision", layer_id, revision, descriptors):
+			return DrawingResult.failure("NATIVE_STRUCTURE", "Text raster source publication rejected")
+		if provisional:
+			_native_raster_store = native_store
+			_native_source_identities.clear()
+		for identity: String in _native_source_identities.keys():
+			if identity.begins_with(layer_id + ":"):
+				_native_source_identities.erase(identity)
+		for key: String in after.tiles:
+			_remember_native_source(layer_id, key, after.tiles[key])
+		revision += 1
 	else:
+		# Retain the model-only path for synthetic sub-native tile strides.
 		_advance_raster_structure_revision([layer_id])
 	_nodes[layer_id] = after
 	for tile_key: String in after.tiles:

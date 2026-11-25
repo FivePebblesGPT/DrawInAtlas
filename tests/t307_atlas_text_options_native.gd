@@ -101,6 +101,34 @@ func run() -> void:
 	check(not doc.has_node(id), "hosted Undo removes text")
 	app._redo()
 	check(doc.has_node(id), "hosted Redo restores text")
+	# T-313: convert the privately owned semantic source before any Brush.
+	var semantic: PackedByteArray = render_bytes(app, view, false)
+	var raster_revision: int = doc.revision
+	var raster_history: int = doc.history_position()
+	app._rasterize_text()
+	await frames(5)
+	check(doc.inspect_node(id).kind == DrawingLayerNode.RASTER and doc.revision == raster_revision + 1 and
+		doc.history_position() == raster_history + 1, "hosted conversion publishes one structural edit")
+	var native_store: Object = doc._native_raster_store
+	var owned: bool = native_store != null and not doc.tile_keys(id).is_empty()
+	if owned:
+		for key: String in doc.tile_keys(id):
+			var coordinates: PackedStringArray = key.split(",")
+			var cx: int = int(coordinates[0])
+			var cy: int = int(coordinates[1])
+			var read: Dictionary = native_store.call("read_tile", id, cx, cy, false)
+			var tile: DrawingRasterTile = doc.request_chunk(id, key).value
+			owned = owned and bool(native_store.call("has_source", id, cx, cy, doc.revision)) and \
+				bool(read.get("ok", false)) and read.get("bytes") == tile.to_rgba8()
+	check(owned, "hosted glyph tiles are canonical in Rust before first paint")
+	check(render_bytes(app, view, false) == semantic, "hosted rasterization preserves exact composite")
+	app._undo()
+	check(doc.inspect_node(id).kind == DrawingLayerNode.TEXT and native_store != null and
+		bool(native_store.call("is_layer_parked", id)) and doc.snapshot_for_save().ok,
+		"hosted Undo parks source without blocking semantic persistence")
+	app._redo()
+	check(doc.inspect_node(id).kind == DrawingLayerNode.RASTER and render_bytes(app, view, false) == semantic,
+		"hosted Redo restores exact glyph source")
 	check(FileAccess.get_sha256(source_path) == digest and editor.edits.can_undo() == old_undo and editor.edits.is_dirty() == old_dirty, "private text edit preserves source and Atlas history")
 	print("T307_ATLAS: %d checks; %d failed" % [checks, failures])
 	if failures == 0:
