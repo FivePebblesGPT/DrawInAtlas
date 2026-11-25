@@ -601,6 +601,9 @@ jobs:
         shell: bash
         run: |
           source tools/ci_fail_late.sh
+          # T-323: local abandoned conversion sources must release native glyph residency.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t323_parked_text_reclamation.gd 2>&1 | tee /tmp/godot-t323-parked-text-reclamation.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t323-parked-text-reclamation.log --marker T323_PARKED_TEXT_RECLAMATION_PASSED || ci_fail_marker 'T323 parked text reclamation rejected'
           # T-322: native event lifetime follows the local and Atlas command owners.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t322_history_reclamation.gd 2>&1 | tee /tmp/godot-t322-history-reclamation.log
           python3 tools/check_godot_model_log.py /tmp/godot-t322-history-reclamation.log --marker T322_HISTORY_RECLAMATION_PASSED || ci_fail_marker 'T322 native history reclamation rejected'

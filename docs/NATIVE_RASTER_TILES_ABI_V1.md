@@ -840,3 +840,22 @@ branching use stack-tail order in the ordinary case. A stale attached native
 store deliberately remains untouched; reclamation does not silently rebase it.
 Parked structural sources and their structural snapshots retain the separate
 lifecycle rules documented above. See [T-322 evidence](evidence/T-322-2026-11-26-history-reclamation.md).
+
+### T-323: abandoned parked text sources
+
+`discard_parked_source(expected_revision, layer, source_count)` is a checked
+lifetime operation, not a content mutation. It requires an existing parked
+layer, current revision, matching complete resident/authorized source count,
+no active edit on that layer and no retained native history referencing it.
+It drops its tiles, authorization, parking and editability without changing
+revision, unrelated sources or an unrelated active edit. Rejection leaves
+all canonical data intact.
+
+The local command owner uses this only after permanently discarding an undone
+text-to-raster conversion and releasing its abandoned raster tokens. It must
+verify the retained raster snapshot, including any blank authorized sources,
+against the native bytes, and ensure the live layer is semantic text or absent.
+Only after successful reclamation may it remove matching projection identities.
+Corrupt/stale snapshots can leave unused sources resident; do not rebase or
+trust them to force reclamation. This is not general eviction of applied
+removed-layer snapshots or an external structural-history protocol.

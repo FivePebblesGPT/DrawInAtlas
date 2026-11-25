@@ -2332,6 +2332,38 @@ func _release_abandoned_raster_creation(event: Dictionary) -> void:
 		_sparse_reloads.erase(identity)
 
 
+## An undone text conversion retains a parked raster for Redo. Once its
+## command is abandoned, verify the complete snapshot and release only that
+## absent raster. An unrelated pending edit may remain reserved.
+func _release_abandoned_text_raster(event: Dictionary) -> void:
+	if event.get("kind") != "text_tree" or _native_raster_store == null or \
+			not _attached_native_revision_matches(revision):
+		return
+	var before: DrawingLayerNode = event.get("before") as DrawingLayerNode
+	var after: DrawingLayerNode = event.get("after") as DrawingLayerNode
+	var layer_id: String = event.get("layer", "")
+	if before == null or after == null or before.id != layer_id or after.id != layer_id or \
+			before.kind != DrawingLayerNode.TEXT or after.kind != DrawingLayerNode.RASTER or \
+			(_nodes.has(layer_id) and _nodes[layer_id].kind != DrawingLayerNode.TEXT) or \
+			not bool(_native_raster_store.call("is_layer_parked", layer_id)):
+		return
+	for key: String in after.tiles:
+		var tile: DrawingRasterTile = after.tiles[key]
+		if tile == null or tile.stride != tile_stride or not tile.has_canonical_storage() or \
+				not _native_source_identities.has(layer_id + ":" + key):
+			return
+	var identities: Array[String] = []
+	for identity: String in _native_source_identities:
+		if identity.begins_with(layer_id + ":"):
+			identities.append(identity)
+	if not _native_tree_sources_match({layer_id: after}, true) or \
+			not bool(_native_raster_store.call("discard_parked_source", revision, layer_id, identities.size())):
+		return
+	for identity: String in identities:
+		_native_source_identities.erase(identity)
+		_sparse_reloads.erase(identity)
+
+
 ## Only the command owner may abandon an event permanently. Tokens are unique
 ## across native stores; do not clear a whole stack or replay a detached delta.
 ## Rust checks the revision itself; avoid scanning the store's memory stats
@@ -2344,11 +2376,15 @@ func _release_discarded_history_delta(delta: DrawingDelta, applied: bool) -> voi
 
 
 func _drop_history_redo() -> void:
+	# Drop abandoned paint tokens before checking parked structural sources.
+	for index: int in range(_events.size() - 1, _cursor - 1, -1):
+		var event: Dictionary = _events[index]
+		if event.get("kind") == "content":
+			_release_discarded_history_delta(event["delta"] as DrawingDelta, false)
 	for index: int in range(_cursor, _events.size()):
 		var event: Dictionary = _events[index]
 		_release_abandoned_raster_creation(event)
-		if event.get("kind") == "content":
-			_release_discarded_history_delta(event["delta"] as DrawingDelta, false)
+		_release_abandoned_text_raster(event)
 	_events.resize(_cursor)
 	_content_states.resize(_cursor + 1)
 

@@ -941,6 +941,42 @@ impl TileStore {
         Ok(())
     }
 
+    /// Reclaim a parked source whose structural event has been abandoned.
+    /// The host verifies the retained snapshot; Rust independently requires
+    /// complete source cardinality and absence of any retained raster event.
+    fn discard_parked_source(&mut self, expected: u64, layer: &str, source_count: usize) -> bool {
+        if self.revision != expected
+            || !self.parked_layers.contains(layer)
+            || self.active.as_ref().is_some_and(|edit| edit.layer == layer)
+            || self.undo.iter().chain(self.redo.iter()).any(|event| {
+                event.layer == layer
+                    || event
+                        .before
+                        .keys()
+                        .chain(event.after.keys())
+                        .any(|id| id.layer == layer)
+            })
+            || self
+                .authorized
+                .iter()
+                .filter(|id| id.layer == layer)
+                .count()
+                != source_count
+            || self.tiles.keys().filter(|id| id.layer == layer).count() != source_count
+            || self
+                .tiles
+                .keys()
+                .any(|id| id.layer == layer && !self.authorized.contains(id))
+        {
+            return false;
+        }
+        self.tiles.retain(|id, _| id.layer != layer);
+        self.authorized.retain(|id| id.layer != layer);
+        self.parked_layers.remove(layer);
+        self.editable_layers.remove(layer);
+        true
+    }
+
     fn can_publish_subtree(
         &self,
         expected: u64,
@@ -1719,6 +1755,19 @@ impl DrawingNativeTiles {
         self.store
             .discard_empty_creation(expected, &layer.to_string(), source_count)
             .is_ok()
+    }
+
+    /// Release an abandoned parked source without advancing the revision.
+    #[func]
+    fn discard_parked_source(&mut self, expected: i64, layer: GString, source_count: i64) -> bool {
+        self.store.ffi_calls += 1;
+        let (Ok(expected), Ok(source_count)) =
+            (u64::try_from(expected), usize::try_from(source_count))
+        else {
+            return false;
+        };
+        self.store
+            .discard_parked_source(expected, &layer.to_string(), source_count)
     }
 
     /// Read-only retire preflight for a source-side cross-document move.
@@ -2813,6 +2862,39 @@ mod tests {
         assert!(store.history_matches(tokens[1], true));
         store.undo_or_redo(true).unwrap();
         assert_eq!(store.read(&key, false).unwrap().rgba, bytes);
+    }
+
+    #[test]
+    fn abandoned_parked_source_checks_reservation_and_complete_cardinality() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let glyph = TileId {
+            layer: "glyph".into(),
+            x: -2,
+            y: 1,
+        };
+        let rgba = vec![17; 16 * 16 * 4];
+        store
+            .publish_structural_source("glyph", 0, vec![(glyph.clone(), rgba.clone())])
+            .unwrap();
+        assert!(!store.discard_parked_source(1, "glyph", 1));
+        store
+            .advance_parked_layers(1, &["glyph".into()], false, false)
+            .unwrap();
+        let used = store.bytes_used();
+        assert!(!store.discard_parked_source(1, "glyph", 1));
+        assert!(!store.discard_parked_source(2, "glyph", 0));
+        assert_eq!(store.tiles[&glyph].rgba, rgba);
+        assert_eq!(store.bytes_used(), used);
+        let active = store.begin("ink", 2, false).unwrap();
+        assert!(store.discard_parked_source(2, "glyph", 1));
+        assert!(!store.tiles.contains_key(&glyph));
+        assert!(!store.authorized.contains(&glyph));
+        assert!(!store.parked_layers.contains("glyph"));
+        assert!(store.bytes_used() < used);
+        assert_eq!(store.revision, 2);
+        assert!(store.transaction_matches(active, 2, "ink"));
+        assert!(!store.discard_parked_source(2, "glyph", 1));
     }
 
     #[test]
