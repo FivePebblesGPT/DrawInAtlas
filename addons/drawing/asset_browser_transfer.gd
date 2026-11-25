@@ -115,16 +115,23 @@ static func _copy_to_new_file(source: String, target: String,
 			FileAccess.file_exists(target):
 		return DrawingResult.failure("EXISTS", "Destination exists or is not a safe directory")
 	var reader: FileAccess = FileAccess.open(source, FileAccess.READ)
-	if reader == null or reader.get_length() <= 0 or reader.get_length() > MAX_BYTES:
-		return DrawingResult.failure("FILE_LIMIT", "Source is missing, empty or oversized")
+	if reader == null:
+		return DrawingResult.failure("FILE_LIMIT", "Source is missing or unreadable")
+	var length: int = reader.get_length()
+	if length <= 0 or length > MAX_BYTES:
+		reader.close()
+		return DrawingResult.failure("FILE_LIMIT", "Source is empty or oversized")
 	var before: String = FileAccess.get_sha256(source)
-	var bytes: PackedByteArray = reader.get_buffer(reader.get_length())
+	var bytes: PackedByteArray = reader.get_buffer(length)
 	reader.close()
-	# An incoming .drawing can be valid JSON *after* Godot replaces malformed
-	# UTF-8. Never publish bytes the portable index must later reject. Perform
-	# this check on the captured copy, before creating a .pending file.
-	if bytes.get_string_from_utf8().to_utf8_buffer() != bytes:
-		return DrawingResult.failure("SOURCE_UTF8", "Portable Object source must be valid UTF-8")
+	if bytes.size() != length:
+		return DrawingResult.failure("STALE_SOURCE", "Source was truncated while copying")
+	# Validate the captured envelope before publishing the byte-for-byte copy.
+	# Legacy JSON still requires exact UTF-8; binary payloads use their own
+	# version, bounds and digest checks rather than a text conversion.
+	var envelope: DrawingResult = DrawingFileIO.parse_payload(bytes)
+	if not envelope.ok:
+		return envelope
 	var hashed: HashingContext = HashingContext.new()
 	hashed.start(HashingContext.HASH_SHA256)
 	hashed.update(bytes)

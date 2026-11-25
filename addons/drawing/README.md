@@ -132,10 +132,12 @@ scenes, autoloads, plugins or root `project.godot` are staged. See
 ## Standalone app integration (T-053)
 
 `DrawingFileIO` wraps the exact logical manifest and canonical per-tile bytes in
-`drawing-standalone-v1` `.drawing` single-file documents. It validates SHA-256
-and exact hidden-RGB pixels on reopen, maintains stable IDs and keeps signed
-chunk coordinates as strings to survive Godot JSON's floating numeric parser.
-It is a **standalone file codec**, distinct from the T-066 Atlas campaign generation format.
+versioned binary `.drawing` single-file documents (`DIADRAW2`, typed metadata,
+raw deduplicated RGBA8, bounded Zstandard compression). It validates SHA-256,
+exact hidden RGB and stable IDs. Legacy `drawing-standalone-v1` JSON/base64
+remains readable; explicit Save writes binary. The T-066 Atlas campaign and
+registry-owned revision encoding remain separate. See [file format and
+limits](../../docs/DRAWING_FILE_FORMAT.md).
 `tools/build_drawing_app.py` stages these canonical package files byte-for-byte
 into an independently runnable project. The untracked `drawing/addons/` staging
 folder must never be edited or committed. The `drawing_package_consumer` fixture
@@ -161,7 +163,7 @@ entries; undo/redo restores text editability and source layer ID. Missing fonts 
 unsupported glyphs use a visible replacement with an explicit warning.
 
 Standalone `DrawingFileIO` writes the referenced OFL Lato font binary, stable
-identity and SHA-256 inside the `.drawing` JSON envelope with the license;
+identity and SHA-256 inside the `.drawing` envelope with the license;
 reopen validates it before exposing the text. These files are relocatable as
 single documents. The multi-file campaign `Fonts/` contract is now supplied by T-066; this standalone file format remains independent, nor an instruction to embed unknown user-system font files without
 legal review. T-055 will integrate this same API with Atlas canvas; T-062 adds

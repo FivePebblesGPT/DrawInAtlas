@@ -198,16 +198,17 @@ input, not a physical Windows/Linux owner acceptance run.
 
 ## File format and boundaries
 
-The app's single-file `.drawing` schema `drawing-standalone-v1` wraps the shared
-`DrawingDocument.export_manifest()` tree, optional non-destructive image
-frame metadata, and inline base64 **straight RGBA8**
-chunks addressed by SHA-256 of dimension + format + original pixel bytes.
-Chunk coordinates are signed decimal strings on disk (no 64-bit truncation
-through JSON floats). Load validates the **whole** tree, every referenced blob,
-and each canonical fingerprint before showing the document. Missing/corrupt
-chunks fail closed; zero alpha's hidden RGB bytes are preserved. Files are
-currently capped at 128 MiB and 4096 chunks; writes use a same-directory
-`*.pending-<id>` then rename, preserving dirty state if the write fails.
+Standalone `.drawing` Save now writes the versioned `DIADRAW2` binary
+file with typed metadata, sparse deduplicated straight RGBA8, Zstandard
+compression and exact SHA-256 checks. Existing `drawing-standalone-v1`
+JSON/base64 files remain readable; explicit Save converts them to binary.
+The file preserves stable IDs, signed tile coordinates, hidden RGB, editable
+text and licensed font bytes, source metadata and the image frame. Load
+validates every referenced blob; missing/corrupt chunks fail closed.
+Stored and decoded bytes are capped at 128 MiB, with 4096 chunk references
+and 128 MiB expanded raster data. Writes use a same-directory pending file
+then rename, preserving dirty state on failure. See the [format specification
+and benchmark](../docs/DRAWING_FILE_FORMAT.md) for compatibility and limits.
 
 This is a **standalone-specific** format, not the planned Atlas campaign
 multi-file sparse manifest/chunk root, generational atomic publication,

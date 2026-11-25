@@ -26,7 +26,7 @@ static func _number_valid(value: Variant, nonnegative: bool) -> bool:
 
 
 static func save(document: DrawingDocument, path: String, name: String,
-		origin: Vector2i, bounds: Rect2i, version: int) -> DrawingResult:
+		origin: Vector2i, bounds: Rect2i, version: int, legacy: bool = false) -> DrawingResult:
 	if document == null or name.strip_edges().is_empty() or name.length() > 128 or \
 			"\n" in name or "\r" in name or \
 			version < 1 or not _frame_valid([origin.x, origin.y],
@@ -35,11 +35,12 @@ static func save(document: DrawingDocument, path: String, name: String,
 	var metadata: Dictionary = {"schema": SCHEMA, "source_id": document.id,
 		"name": name, "revision": version, "origin": [origin.x, origin.y],
 		"bounds": [bounds.position.x, bounds.position.y, bounds.size.x, bounds.size.y]}
-	return DrawingFileIO.save(document, path, {"object_source": metadata})
+	return DrawingFileIO.save(document, path, {"object_source": metadata}, legacy)
 
 
 ## Inspect the outer source identity/frame for an already SHA-verified Atlas
-## registry entry without expanding canonical pixel tiles. This is NOT an
+## registry entry without materializing canonical pixel tiles as a document.
+## Binary envelopes are bounded and unpacked before inspecting their metadata. This is NOT an
 ## authorization to edit, preview, import or place an Object: those paths must
 ## continue to use open(), which validates every referenced tile.
 static func inspect_metadata(path: String) -> DrawingResult:
@@ -47,8 +48,7 @@ static func inspect_metadata(path: String) -> DrawingResult:
 	if not envelope.ok:
 		return envelope
 	var parsed: Dictionary = envelope.value
-	if parsed.get("standalone_schema") != DrawingFileIO.SCHEMA or \
-			parsed.get("blob_encoding") != "base64-rgba8":
+	if not DrawingFileIO.is_supported_payload(parsed):
 		return DrawingResult.failure("SCHEMA", "Unsupported standalone Drawing file")
 	var manifest: Variant = parsed.get("document")
 	if not manifest is Dictionary or not manifest.get("id") is String or \

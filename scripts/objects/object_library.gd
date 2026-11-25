@@ -812,7 +812,7 @@ func _stage_asset(source: DrawingDocument, asset_id: String,
 	var absolute: String = _absolute(relative)
 	if FileAccess.file_exists(absolute):
 		return DrawingResult.failure("COLLISION", "Immutable object revision exists")
-	var written: DrawingResult = DrawingFileIO.save(source, absolute)
+	var written: DrawingResult = DrawingFileIO.save(source, absolute, {}, true)
 	if not written.ok:
 		return written
 	return DrawingResult.success({"id": asset_id, "name": label,

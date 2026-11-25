@@ -71,16 +71,21 @@ static func _open(index: DrawingAssetBrowserIndex, entry: Dictionary, budget: Di
 	digest.update(bytes)
 	if bytes.size() != length or digest.finish().hex_encode() != entry["sha256"] or not index.safe_to_open(entry):
 		return DrawingResult.failure("LINK_STALE", "Object source changed during authorization")
-	var source_text: String = bytes.get_string_from_utf8()
-	var parser: JSON = JSON.new()
-	if source_text.to_utf8_buffer() != bytes or parser.parse(source_text) != OK or not parser.data is Dictionary:
-		return DrawingResult.failure("LINK_FILE", "Invalid Object source")
-	var opened: DrawingResult = DrawingObjectEditorFile.decode_payload(parser.data, path)
+	var envelope: DrawingResult = DrawingFileIO.parse_payload(bytes, int(budget["bytes"]))
+	if not envelope.ok:
+		return DrawingResult.failure("LINK_LIMIT", "Linked source decoded byte budget exceeded") if envelope.code == "FILE_LIMIT" else envelope
+	var raster_cost: DrawingResult = DrawingFileIO.expanded_raster_bytes(envelope.value)
+	if not raster_cost.ok:
+		return raster_cost
+	var cost: int = maxi(length, maxi(DrawingFileIO.decoded_payload_size(bytes), int(raster_cost.value)))
+	if cost > int(budget["bytes"]):
+		return DrawingResult.failure("LINK_LIMIT", "Linked source expanded raster byte budget exceeded")
+	var opened: DrawingResult = DrawingObjectEditorFile.decode_payload(envelope.value, path)
 	if not opened.ok:
 		return opened
 	if opened.value["source_id"] != entry["id"] or opened.value["source_revision"] != entry["revision"]:
 		return DrawingResult.failure("LINK_STALE", "Object source identity changed")
-	budget["bytes"] = int(budget["bytes"]) - length
+	budget["bytes"] = int(budget["bytes"]) - cost
 	return opened
 
 

@@ -154,21 +154,15 @@ func _read_source(path: String, seen: Dictionary, target: Array[Dictionary],
 	if bytes.size() != length:
 		issues.append("Skipped truncated Object source")
 		return
-	# Godot's UTF-8 decoder replaces malformed sequences with U+FFFD.
-	# Bind the parsed metadata to exactly the bytes authorized by SHA-256.
-	var source_text: String = bytes.get_string_from_utf8()
-	if source_text.to_utf8_buffer() != bytes:
-		issues.append("Skipped invalid UTF-8 Object source: " + path.get_file())
-		return
 	var hashed: HashingContext = HashingContext.new()
 	hashed.start(HashingContext.HASH_SHA256)
 	hashed.update(bytes)
 	var digest: String = hashed.finish().hex_encode()
-	var json: JSON = JSON.new()
-	if json.parse(source_text) != OK or not json.data is Dictionary:
+	var envelope: DrawingResult = DrawingFileIO.parse_payload(bytes)
+	if not envelope.ok:
 		issues.append("Skipped invalid Object source: " + path.get_file())
 		return
-	var loaded: DrawingResult = DrawingObjectEditorFile.decode_payload(json.data, path)
+	var loaded: DrawingResult = DrawingObjectEditorFile.decode_payload(envelope.value, path)
 	if not loaded.ok:
 		issues.append("Skipped invalid Object source: " + path.get_file())
 		return

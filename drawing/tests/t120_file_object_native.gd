@@ -84,7 +84,8 @@ func run() -> void:
 	await frames(12)
 	var top: Control = app.top_bar
 	top._refresh_layout()
-	check(top._menus.size() == 9 and top._menus[0].visible and top._menus[1].visible,
+	check(top._menus.size() >= 2 and top._menus[0].text == "File" and top._menus[1].text == "Object" and
+		top._menus[0].visible and top._menus[1].visible,
 		"normal desktop shows File and Object as independent menu buttons")
 	check(top._menus[0].get_popup().item_count == 6 and top._menus[1].get_popup().item_count == 5,
 		"File has six and Object has five distinct commands")
