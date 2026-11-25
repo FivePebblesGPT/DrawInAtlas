@@ -2449,29 +2449,78 @@ func rasterize_text(layer_id: String, expected_revision: int) -> DrawingResult:
 	return DrawingResult.success(layer_id, revision)
 
 
-## Text-to-raster Undo/Redo can temporarily hide a layer that Rust already
-## owns. Park its canonical source/history rather than invalidating every
-## native token. Validate caller-owned tree snapshots before touching Rust;
-## an unowned text layer still takes the no-source structural revision bridge.
+## Text/raster history never falls back to Godot-only publication at a
+## supported stride. Park existing owned glyphs, or atomically adopt the
+## detached history source without branching unrelated native redo tokens.
 func _replay_text_raster_native(layer_id: String, expected: DrawingLayerNode,
 		target: DrawingLayerNode) -> DrawingResult:
-	if _native_raster_store == null:
-		return DrawingResult.success(false, revision)
-	var native_revision: int = int(_native_raster_store.call("stats").get("revision", -1))
-	if native_revision != revision:
+	if not _attached_native_revision_matches(revision):
 		return DrawingResult.failure("STALE_REVISION", "Text history native revision diverged")
+	if has_unpublished_edit():
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Cannot replay text during a pending raster edit")
 	var restore: bool = target.kind == DrawingLayerNode.RASTER
-	var source_nodes: Dictionary = {layer_id: target if restore else _nodes[layer_id]}
-	if not _native_tree_sources_match(source_nodes, restore):
-		return DrawingResult.failure("STALE_PIXEL", "Text history native RGBA8 source diverged")
-	var ids: PackedStringArray = PackedStringArray([layer_id])
-	if _native_raster_store.call("advance_parked_layers_revision", revision,
-			ids, restore, false):
-		return DrawingResult.success(true, revision + 1)
-	if _native_raster_store.call("advance_unreferenced_layers_revision", revision,
-			ids, false):
-		return DrawingResult.success(false, revision + 1)
-	return DrawingResult.failure("NATIVE_STRUCTURE", "Text history native layer transition rejected")
+	var raster: DrawingLayerNode = target if restore else _nodes[layer_id]
+	if raster.tiles.size() > 8192 or raster.tiles.size() * tile_stride * tile_stride * 4 > MAX_NATIVE_HISTORY_TRANSFER_BYTES:
+		return DrawingResult.failure("RASTER_LIMIT", "Text history source exceeds native budget")
+	# Validate backing storage before either the native parity check or packing.
+	for key: String in raster.tiles:
+		var coords: PackedStringArray = key.split(",")
+		var tile: DrawingRasterTile = raster.tiles[key]
+		if coords.size() != 2 or not coords[0].is_valid_int() or not coords[1].is_valid_int() or \
+				tile == null or tile.stride != tile_stride or not tile.has_canonical_storage():
+			return DrawingResult.failure("STALE_PIXEL", "Invalid text history source")
+		var cx: int = int(coords[0])
+		var cy: int = int(coords[1])
+		if key != "%d,%d" % [cx, cy] or not TILES.tile_coordinates_in_projection_range(cx, cy, tile_stride):
+			return DrawingResult.failure("COORD", "Text history exceeds signed native projection")
+	var store: Object = _native_raster_store
+	var provisional: bool = store == null
+	if provisional:
+		store = ClassDB.instantiate("DrawingNativeTiles")
+		if store == null or int(store.call("tile_abi_version")) != 1 or \
+				not bool(store.call("configure", tile_stride, revision)):
+			return DrawingResult.failure("NATIVE_STRUCTURE", "Text history source bootstrap rejected")
+	else:
+		if not _native_tree_sources_match({layer_id: raster}, restore):
+			return DrawingResult.failure("STALE_PIXEL", "Text history native RGBA8 source diverged")
+		# The parked/live owner must cover every visible raster tile, not just
+		# the subset already recorded in the source identity map.
+		var complete: bool = true
+		for key: String in raster.tiles:
+			if not _native_source_identities.has(layer_id + ":" + key):
+				complete = false
+				break
+		if complete and bool(store.call("advance_parked_layers_revision", revision,
+				PackedStringArray([layer_id]), restore, false)):
+			return DrawingResult.success(true, revision + 1)
+	# No live/parked authority may be overwritten by this fallback. The FFI
+	# verifies the ID is unreferenced before admitting any detached bytes.
+	if not restore:
+		if raster.tiles.size() != expected.tiles.size():
+			return DrawingResult.failure("STALE_PIXEL", "Detached text raster tile set diverged")
+		for key: String in raster.tiles:
+			var prior: DrawingRasterTile = expected.tiles.get(key)
+			var current: DrawingRasterTile = raster.tiles[key]
+			if prior == null or prior.stride != tile_stride or not prior.has_canonical_storage() or \
+					prior.to_rgba8() != current.to_rgba8():
+				return DrawingResult.failure("STALE_PIXEL", "Detached text raster bytes diverged")
+	var descriptors: Array[Dictionary] = []
+	for key: String in raster.tiles:
+		var coords: PackedStringArray = key.split(",")
+		descriptors.append({"layer": layer_id, "tile_x": int(coords[0]),
+			"tile_y": int(coords[1]), "bytes": raster.tiles[key].to_rgba8()})
+	if not bool(store.call("publish_text_history_source_revision", revision,
+			layer_id, descriptors, not restore and not descriptors.is_empty())):
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Detached text history source publication rejected")
+	if provisional:
+		_native_raster_store = store
+		_native_source_identities.clear()
+		_sparse_reloads.clear()
+	for key: String in raster.tiles:
+		_remember_native_source(layer_id, key, raster.tiles[key])
+	# A restored projection is detached again by the caller; rebind identities
+	# just as for an existing parked source.
+	return DrawingResult.success(not descriptors.is_empty(), revision + 1)
 
 
 func _replay_text_tree(event: Dictionary, undo_action: bool) -> DrawingResult:
@@ -2501,19 +2550,13 @@ func _replay_text_tree(event: Dictionary, undo_action: bool) -> DrawingResult:
 		if not metadata.ok:
 			return metadata
 		metadata_advanced = true
-	if kind_transition and _native_raster_store != null:
-		var native_revision: int = int(_native_raster_store.call("stats").get("revision", -1))
-		if native_revision > revision:
-			return DrawingResult.failure("STALE_REVISION", "Text history native store is ahead")
-		if native_revision == revision:
-			var bridge: DrawingResult = _replay_text_raster_native(layer_id, expected, target)
-			if not bridge.ok:
-				return bridge
-			native_bridged = true
-			parked = bool(bridge.value)
-		# Older previously-rebased consumers may already be behind the host
-		# revision. They cannot preserve an obsolete native timeline; leave
-		# that store untouched and let the normal checked rebase reauthorize it.
+	if kind_transition and (_native_raster_store != null or
+			(tile_stride >= 16 and ClassDB.class_exists("DrawingNativeTiles"))):
+		var bridge: DrawingResult = _replay_text_raster_native(layer_id, expected, target)
+		if not bridge.ok:
+			return bridge
+		native_bridged = true
+		parked = bool(bridge.value)
 	if target == null:
 		_nodes.erase(layer_id)
 		_nodes[parent_id].children.erase(layer_id)

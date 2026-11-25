@@ -1,5 +1,11 @@
 **2026-11-25 owner review — next Drawing sprint:** [review and ordered queue](DRAWING_UX_REVIEW_2026-11-25.md), T-302–T-312 engineering Done. T-250 is Manual Review pending explicit owner acceptance of the corrected build. T-148–T-152 native consolidation remains open; hosted beta4 CI on PR #23 head `da308376` passed (see review). Do not infer full approval.
 
+**[T-318](Tickets/T-318.md) P0 implementation Done (2026-11-25):**
+[Detached text raster history source admission](evidence/T-318-2026-11-25-text-history-source.md)
+acquires or parks glyph bytes atomically during structural Undo/Redo, rejects
+stale owners and preserves unrelated native redo. T-148 stays In Progress;
+T-250 stays Manual Review.
+
 **[T-317](Tickets/T-317.md) P0 implementation Done (2026-11-25):**
 [Bounded pristine physical sparse renderer residency](evidence/T-317-2026-11-25-sparse-eviction.md)
 restores verified pending descriptors and releases native/projection copies
@@ -596,6 +602,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | [T-315 · Authorize portable file raster sources immediately on Open](Tickets/T-315.md) | Done | P0 T-148 integration: [binary/legacy/Object Open at saved native revision, exact source parity and lifecycle](evidence/T-315-2026-11-25-native-file-sources.md). | [T-310](Tickets/T-310.md), [T-314](Tickets/T-314.md) |
 | [T-316 · Authorize verified physical sparse raster sources on first read](Tickets/T-316.md) | Done | P0 T-148 integration: [lazy native admission, structural replay and campaign generation](evidence/T-316-2026-11-25-native-sparse-sources.md). | [T-157](Tickets/T-157.md), [T-315](Tickets/T-315.md) |
 | [T-317 · Bound pristine physical sparse source residency during rendering](Tickets/T-317.md) | Done | P0 T-148 integration: [native clean-source release/re-admission and real renderer pressure](evidence/T-317-2026-11-25-sparse-eviction.md). | [T-316](Tickets/T-316.md) |
+| [T-318 · Acquire native text raster ownership during detached structural history replay](Tickets/T-318.md) | Done | P0 T-148 integration: [atomic detached glyph history admission and stale-owner fence](evidence/T-318-2026-11-25-text-history-source.md). | [T-313](Tickets/T-313.md), [T-314](Tickets/T-314.md) |
 | [T-273 · Align whole right-dock toggle with outer edge](Tickets/T-273.md) | Done | **P0 engineering:** [real X11 screenshots and behavioral input proof](evidence/T-273-2026-11-23-dock-edge.md); T-250 owner review unapproved | [T-251](Tickets/T-251.md) |
 | [T-274 · Compact native ColorPicker width and duplicate chrome](Tickets/T-274.md) | Done | **P0 engineering:** [native full-width picker, optional exact RGBA8, real X11 screenshots and Drawing/Atlas regression](evidence/T-274-2026-11-23-native-picker-composition.md); owner approval remains T-250 | [T-226](Tickets/T-226.md), [T-252](Tickets/T-252.md) |
 | [T-275 · Repair stale workspace CI/owner-gate test contracts](Tickets/T-275.md) | Done | **P1 CI engineering:** [T-063/T-072 canonical status dependencies and 73-check native workspace regression](evidence/T-275-2026-11-23-workspace-ci-gates.md); T-250 approval and other hosted CI gates remain open | [T-063](Tickets/T-063.md), [T-072](Tickets/T-072.md) |

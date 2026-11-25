@@ -162,6 +162,9 @@ jobs:
           # T-317: native pristine-source paging under real aggregate pressure.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t317_sparse_eviction.gd 2>&1 | tee /tmp/godot-t317-sparse-eviction.log
           python3 tools/check_godot_model_log.py /tmp/godot-t317-sparse-eviction.log --marker T317_SPARSE_EVICTION_PASSED || ci_fail_marker 'T317 sparse native eviction rejected'
+          # T-318: detached text history must acquire native raster ownership before replay.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t318_text_history_source.gd 2>&1 | tee /tmp/godot-t318-text-history-source.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t318-text-history-source.log --marker T318_TEXT_HISTORY_SOURCE_PASSED || ci_fail_marker 'T318 detached text native history rejected'
           # T-230: even the first legacy-pixel Undo/Redo in a detached document
           # must bootstrap Rust ownership before advancing the host timeline.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t230_detached_pixel_bootstrap.gd 2>&1 | tee /tmp/godot-t230-pixel-bootstrap.log

@@ -886,7 +886,28 @@ impl TileStore {
         layers: &[String],
         entries: Vec<(TileId, Vec<u8>)>,
     ) -> Result<(), &'static str> {
+        self.publish_subtree_with_history(expected, layers, entries, true, false)
+    }
+
+    /// History restoration is not a new branch: retain unrelated redo tokens.
+    /// An Undo to semantic text can adopt and park the detached glyph bytes
+    /// in the same revision, with no intermediate visible native source.
+    fn publish_subtree_with_history(
+        &mut self,
+        expected: u64,
+        layers: &[String],
+        entries: Vec<(TileId, Vec<u8>)>,
+        discard_redo: bool,
+        park: bool,
+    ) -> Result<(), &'static str> {
         self.can_publish_subtree(expected, layers, entries.len())?;
+        if park
+            && (layers.len() != 1
+                || entries.is_empty()
+                || self.parked_layers.len() >= MAX_ACTIVE_TILES)
+        {
+            return Err("Invalid detached history parking request");
+        }
         let names: HashSet<&str> = layers.iter().map(String::as_str).collect();
         let len = self.stride_bytes()?;
         let mut prepared = HashMap::with_capacity(entries.len());
@@ -907,11 +928,14 @@ impl TileStore {
                 },
             );
         }
-        self.advance_metadata(expected, true)?;
+        self.advance_metadata(expected, discard_redo)?;
         for (id, tile) in prepared {
             self.bytes_imported += tile.rgba.len() as u64;
             self.authorized.insert(id.clone());
             self.tiles.insert(id, tile);
+        }
+        if park {
+            self.parked_layers.insert(layers[0].clone());
         }
         Ok(())
     }
@@ -1579,8 +1603,41 @@ impl DrawingNativeTiles {
         layers: PackedStringArray,
         tiles: Array<Dictionary<Variant, Variant>>,
     ) -> bool {
+        self.publish_subtree_descriptors(expected, layers, tiles, true, false)
+    }
+
+    /// Restore a previously unreferenced text raster without creating a new
+    /// native pixel event or invalidating unrelated redo tokens.
+    #[func]
+    fn publish_text_history_source_revision(
+        &mut self,
+        expected: i64,
+        layer: GString,
+        tiles: Array<Dictionary<Variant, Variant>>,
+        park: bool,
+    ) -> bool {
+        let mut layers = PackedStringArray::new();
+        layers.push(&layer);
+        self.publish_subtree_descriptors(expected, layers, tiles, false, park)
+    }
+
+    fn publish_subtree_descriptors(
+        &mut self,
+        expected: i64,
+        layers: PackedStringArray,
+        tiles: Array<Dictionary<Variant, Variant>>,
+        discard_redo: bool,
+        park: bool,
+    ) -> bool {
         self.store.ffi_calls += 1;
         if expected < 0 || layers.is_empty() || layers.len() > MAX_ACTIVE_TILES {
+            return false;
+        }
+        if park
+            && (layers.len() != 1
+                || tiles.is_empty()
+                || self.store.parked_layers.len() >= MAX_ACTIVE_TILES)
+        {
             return false;
         }
         let ids: Vec<String> = layers.as_slice().iter().map(|id| id.to_string()).collect();
@@ -1626,9 +1683,15 @@ impl DrawingNativeTiles {
             .into_iter()
             .map(|(id, bytes)| (id, bytes.as_slice().to_vec()))
             .collect();
-        self.store
-            .publish_subtree(expected as u64, &ids, entries)
-            .is_ok()
+        if discard_redo && !park {
+            self.store
+                .publish_subtree(expected as u64, &ids, entries)
+                .is_ok()
+        } else {
+            self.store
+                .publish_subtree_with_history(expected as u64, &ids, entries, discard_redo, park)
+                .is_ok()
+        }
     }
 
     #[func]
@@ -3555,6 +3618,117 @@ mod tests {
                 .can_publish_subtree(3, &["new".into()], MAX_STRUCTURAL_TILES + 1)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn detached_text_history_admission_preserves_unrelated_redo() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let ink = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let glyph = TileId {
+            layer: "glyph".into(),
+            x: -2,
+            y: 3,
+        };
+        let mut bytes = vec![0; 16 * 16 * 4];
+        bytes[..4].copy_from_slice(&[19, 33, 55, 0]);
+        let (token, _) = store
+            .adopt_external("ink", 0, vec![(ink.clone(), vec![], bytes.clone())])
+            .unwrap();
+        store.undo_or_redo(true).unwrap();
+        let ids = ["glyph".into()];
+        let baseline = (store.revision, store.bytes_used(), store.bytes_imported);
+        assert!(store.history_matches(token, false));
+        assert!(
+            store
+                .publish_subtree_with_history(2, &ids, vec![], false, true)
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_subtree_with_history(
+                    2,
+                    &ids,
+                    vec![
+                        (glyph.clone(), bytes.clone()),
+                        (glyph.clone(), bytes.clone())
+                    ],
+                    false,
+                    true
+                )
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_subtree_with_history(2, &ids, vec![(glyph.clone(), vec![1])], false, false)
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_subtree_with_history(
+                    1,
+                    &ids,
+                    vec![(glyph.clone(), bytes.clone())],
+                    false,
+                    true
+                )
+                .is_err()
+        );
+        let tx = store.begin("ink", 2, false).unwrap();
+        assert!(
+            store
+                .publish_subtree_with_history(
+                    2,
+                    &ids,
+                    vec![(glyph.clone(), bytes.clone())],
+                    false,
+                    true
+                )
+                .is_err()
+        );
+        assert!(store.transaction_matches(tx, 2, "ink"));
+        store.active = None;
+        assert_eq!(
+            baseline,
+            (store.revision, store.bytes_used(), store.bytes_imported)
+        );
+        assert!(store.history_matches(token, false));
+        assert!(!store.authorized.contains(&glyph));
+        store
+            .publish_subtree_with_history(
+                2,
+                &ids,
+                vec![(glyph.clone(), bytes.clone())],
+                false,
+                true,
+            )
+            .unwrap();
+        assert_eq!(store.revision, 3);
+        assert!(store.parked_layers.contains("glyph"));
+        assert_eq!(store.read(&glyph, false).unwrap().rgba, bytes);
+        assert!(store.history_matches(token, false));
+        assert!(
+            store
+                .publish_subtree_with_history(
+                    3,
+                    &ids,
+                    vec![(glyph.clone(), bytes.clone())],
+                    false,
+                    false
+                )
+                .is_err()
+        );
+        store.advance_parked_layers(3, &ids, true, false).unwrap();
+        assert!(!store.parked_layers.contains("glyph"));
+        assert!(store.history_matches(token, false));
+        store.undo_or_redo(false).unwrap();
+        assert_eq!(store.read(&ink, false).unwrap().rgba, bytes);
+        assert_eq!(store.read(&glyph, false).unwrap().rgba, bytes);
+        assert_eq!(store.revision, 5);
     }
 
     #[test]

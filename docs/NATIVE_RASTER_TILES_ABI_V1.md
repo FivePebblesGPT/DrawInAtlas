@@ -714,3 +714,29 @@ may prevent trimming. Non-render reads and active edits do not trim; the
 existing 256 MiB cap still rejects over-budget admissions. Godot projection,
 decoder, renderer frame cache and other process memory are not included.
 See [T-317 evidence](evidence/T-317-2026-11-25-sparse-eviction.md).
+
+### Detached text raster history source (T-318)
+
+`publish_text_history_source_revision(expected_revision, layer, tiles, park)`
+is an additive v1 method. Descriptors have the existing subtree fields
+`layer`, `tile_x`, `tile_y`, `bytes`; every descriptor must belong to the named
+layer and contain a complete RGBA8 tile. Like subtree publication it rejects
+stale/active/overflowing revisions, existing native ownership (including
+parked IDs and retained history), malformed or duplicate descriptors, more
+than 8,192 tiles, and more than 256 MiB of aggregate native data. Parking also
+requires at least one tile and space for another parked identity. Unlike new
+subtree publication, the atomic `r → r+1` history admission preserves unrelated
+native Redo as well as Undo and creates no pixel token. No intermediate live
+source is exposed when `park` is true.
+
+The text-tree replay consumer validates storage and signed projection before
+reading or packing it. Existing complete native sources use the original
+checked park/unpark path. For detached Undo it compares the live glyph tiles
+with the structural snapshot before admission; for detached Redo the saved
+snapshot is the source. A provisional owner is attached only on success and
+restored source identities are rebound to the installed projection. Stale
+attached owners fail closed; no automatic rebase/detachment is attempted.
+Unsupported synthetic strides retain their prior model-only path. This does
+not supply a native semantic-text history or authenticate an intentionally
+mutated detached Redo snapshot when the original native source is gone.
+See [T-318 evidence](evidence/T-318-2026-11-25-text-history-source.md).
