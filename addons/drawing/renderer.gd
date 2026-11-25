@@ -276,7 +276,8 @@ static func _composite_raster(document: DrawingDocument, layer_id: String,
 				if shared_chunks.has(shared_key):
 					tile = shared_chunks[shared_key] as DrawingRasterTile
 				else:
-					var fetched: DrawingResult = document._resolve_chunk(layer_id, key)
+					var fetched: DrawingResult = document._resolve_chunk_for_render(layer_id, key) \
+						if preview == null else document._resolve_chunk(layer_id, key)
 					if not fetched.ok:
 						return fetched
 					tile = fetched.value as DrawingRasterTile

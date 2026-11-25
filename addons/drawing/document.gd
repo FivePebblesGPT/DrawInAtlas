@@ -73,6 +73,13 @@ var _resolving_chunks: Dictionary[String, bool] = {}
 ## Physical sparse manifests opt in to checked native admission at first read.
 ## Portable decode instead adopts all validated sources as one provisional store.
 var _native_lazy_admission: bool = false
+## Only verified first-read physical sources are candidates. Weak tile
+## identity prevents a cache entry from retaining a detached or replaced tile.
+## The original callable/ref/digest is the re-admission authority.
+var _sparse_reloads: Dictionary[String, Dictionary] = {}
+const SPARSE_RENDER_HIGH_WATER_BYTES: int = 192 * 1024 * 1024
+const SPARSE_RENDER_TARGET_BYTES: int = 128 * 1024 * 1024
+const SPARSE_RENDER_EVICTION_SCAN: int = 256
 
 
 ## Once Rust is attached, no direct raster publisher may fall back to a
@@ -100,6 +107,7 @@ func _native_store_for_edit(expected: int) -> Object:
 			if not _native_raster_store.call("rebase_external_revision", native_revision, revision):
 				return null
 			_native_source_identities.clear()
+			_sparse_reloads.clear()
 	return _native_raster_store
 
 
@@ -160,6 +168,7 @@ func _advance_nonraster_revision(discard_redo: bool = true) -> void:
 	if not _native_raster_store.call("advance_metadata_revision", previous, discard_redo):
 		_native_raster_store = null
 		_native_source_identities.clear()
+		_sparse_reloads.clear()
 
 
 ## Public metadata and semantic operations acquire the native revision *before*
@@ -329,7 +338,9 @@ func _native_source_matches(layer_id: String, key: String, tile: Variant) -> boo
 
 
 func _remember_native_source(layer_id: String, key: String, tile: Variant) -> void:
-	_native_source_identities[layer_id + ":" + key] = tile
+	var identity: String = layer_id + ":" + key
+	_sparse_reloads.erase(identity)
+	_native_source_identities[identity] = tile
 
 
 
@@ -653,6 +664,9 @@ func _erase_subtree(node_id: String) -> void:
 	for suffix: String in _pending_tiles.keys():
 		if suffix.begins_with(node_id + ":"):
 			_pending_tiles.erase(suffix)
+	for suffix: String in _sparse_reloads.keys():
+		if suffix.begins_with(node_id + ":"):
+			_sparse_reloads.erase(suffix)
 	for suffix: String in _known_refs.keys():
 		if suffix.begins_with(node_id + ":"):
 			_known_refs.erase(suffix)
@@ -733,6 +747,15 @@ func request_chunk_at(layer_id: String, cx: int, cy: int) -> DrawingResult:
 	return request_chunk(layer_id, "%d,%d" % [cx, cy])
 
 
+## Rendering may reclaim verified cache entries before fetching a missing
+## source. Keep the ordinary resolver (including its subclass overrides)
+## unchanged for transactional and instrumented consumers.
+func _resolve_chunk_for_render(layer_id: String, key: String) -> DrawingResult:
+	if _native_lazy_admission and _pending_tiles.has(layer_id + ":" + key):
+		_trim_sparse_render_sources(tile_stride * tile_stride * 4)
+	return _resolve_chunk(layer_id, key)
+
+
 func _resolve_chunk(layer_id: String, key: String) -> DrawingResult:
 	if not _nodes.has(layer_id) or _nodes[layer_id].kind != DrawingLayerNode.RASTER:
 		return DrawingResult.failure("LAYER", "Missing raster layer")
@@ -776,10 +799,76 @@ func _resolve_chunk(layer_id: String, key: String) -> DrawingResult:
 			var admitted: DrawingResult = _admit_sparse_native_source(layer_id, key, decoded, bytes)
 			if not admitted.ok:
 				return admitted
+			_sparse_reloads[lookup] = {"pending": current.duplicate(), "tile": weakref(decoded)}
 		_nodes[layer_id].tiles[key] = decoded
 		_pending_tiles.erase(lookup)
 	var resident: DrawingRasterTile = _nodes[layer_id].tiles.get(key)
 	return DrawingResult.success(resident, revision)
+
+
+## Quiescent renderer misses may release pristine physical source cache
+## entries. Editing, full subtree export and history replay must retain all
+## resolved identities, so their ordinary _resolve_chunk calls never trim.
+## No source callback, revision, dirty marker or display epoch change occurs
+## here; a successful release restores exactly the previous pending record.
+func _trim_sparse_render_sources(incoming_bytes: int) -> void:
+	if _sparse_reloads.is_empty() or _native_raster_store == null or not _resolving_chunks.is_empty():
+		return
+	var stats: Dictionary = _native_raster_store.call("stats")
+	var resident_bytes: int = int(stats.get("bytes_used", 0))
+	if resident_bytes + incoming_bytes <= SPARSE_RENDER_HIGH_WATER_BYTES or \
+			int(stats.get("revision", -1)) != revision or has_unpublished_edit():
+		return
+	# Recorded structural snapshots may require their exact resident layout
+	# when parked/restored. Keep all their layers, including late promotions.
+	var protected: Dictionary[String, bool] = {}
+	for event: Dictionary in _events:
+		if event.get("kind") == "structure":
+			if event.get("op") == "remove":
+				for owner: String in event["nodes"]:
+					protected[owner] = true
+			elif event.get("op") == "create":
+				protected[String(event["id"])] = true
+		elif event.get("kind") == "text_tree":
+			protected[String(event["layer"])] = true
+	# FIFO among eligible sources. Rotate temporarily protected entries so
+	# repeated misses can find other victims without an unbounded scan.
+	var candidates: Array[String] = []
+	for identity: String in _sparse_reloads:
+		candidates.append(identity)
+		if candidates.size() >= SPARSE_RENDER_EVICTION_SCAN:
+			break
+	for identity: String in candidates:
+		if resident_bytes + incoming_bytes <= SPARSE_RENDER_TARGET_BYTES:
+			break
+		var entry: Dictionary = _sparse_reloads[identity]
+		_sparse_reloads.erase(identity)
+		var layer_id: String = identity.get_slice(":", 0)
+		var key: String = identity.substr(layer_id.length() + 1)
+		var tile: DrawingRasterTile = (entry["tile"] as WeakRef).get_ref() as DrawingRasterTile
+		if tile == null or not _nodes.has(layer_id) or not is_same(_nodes[layer_id].tiles.get(key), tile) or \
+				not _native_source_matches(layer_id, key, tile) or _dirty_tiles.has(identity) or _pending_tiles.has(identity):
+			continue
+		var pending: Dictionary = entry["pending"]
+		if _known_refs.get(identity) != {"ref": pending["ref"], "sha256": pending["sha256"]} or \
+				not (pending["fetch"] as Callable).is_valid():
+			continue
+		if protected.has(layer_id) or not tile.has_canonical_storage():
+			_sparse_reloads[identity] = entry
+			continue
+		var bytes: PackedByteArray = tile.to_rgba8()
+		var coords: PackedStringArray = key.split(",")
+		if DrawingRasterTile.digest_rgba8(bytes, tile_stride) != pending["sha256"] or \
+				not bool(_native_raster_store.call("release_pristine_source", layer_id,
+					int(coords[0]), int(coords[1]), revision, bytes)):
+			# In-place mutation must remain visible to the Save fence; never
+			# hide it behind a pristine lazy reference. Rust also pins tokens.
+			_sparse_reloads[identity] = entry
+			continue
+		_pending_tiles[identity] = pending
+		_nodes[layer_id].tiles.erase(key)
+		_native_source_identities.erase(identity)
+		resident_bytes -= bytes.size()
 
 
 ## Source admission is not an edit. All callbacks and digest checks have
@@ -1054,6 +1143,7 @@ func _publish_dense_clear_tiles(layer_id: String, expected: int,
 	if provisional:
 		_native_raster_store = native_store
 		_native_source_identities.clear()
+		_sparse_reloads.clear()
 	return _install_prepared_native_tile_edit(layer_id, expected, expected + 1,
 		checked, true, int(adopted.get("history_token", 0)))
 
@@ -1386,6 +1476,7 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 	if not current_store:
 		_native_raster_store = replay_store
 		_native_source_identities.clear()
+		_sparse_reloads.clear()
 	for key: String in replacement_bytes:
 		if detached.has(key) and not detached[key].is_empty():
 			_nodes[delta.layer_id].tiles[key] = detached[key]
@@ -1588,6 +1679,7 @@ func _install_prepared_edit(layer_id: String, expected: int,
 		if provisional_store:
 			_native_raster_store = native_store
 			_native_source_identities.clear()
+			_sparse_reloads.clear()
 	else:
 		result.delta = DrawingDelta.from_owned_maps(layer_id, before, after) if owned_history_maps \
 			else DrawingDelta.new(layer_id, before, after)
@@ -2334,6 +2426,7 @@ func rasterize_text(layer_id: String, expected_revision: int) -> DrawingResult:
 		if provisional:
 			_native_raster_store = native_store
 			_native_source_identities.clear()
+			_sparse_reloads.clear()
 		for identity: String in _native_source_identities.keys():
 			if identity.begins_with(layer_id + ":"):
 				_native_source_identities.erase(identity)
@@ -2640,6 +2733,7 @@ func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool 
 			if provisional:
 				_native_raster_store = store
 				_native_source_identities.clear()
+				_sparse_reloads.clear()
 			for layer: String in imported_rasters:
 				for key: String in prepared[layer].tiles:
 					_remember_native_source(layer, key, prepared[layer].tiles[key])

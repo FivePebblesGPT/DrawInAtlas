@@ -687,5 +687,30 @@ Undo restores a pending subtree, a subsequent Redo verifies any newly resolved
 source against the original digest and native authority, parks it, and only
 then promotes the event's pending descriptor to a detached resident snapshot.
 No ABI or sparse format version changes. The 256 MiB native aggregate cap
-also applies to read-only sparse admissions; no native eviction policy is yet
-implemented. See [T-316 evidence](evidence/T-316-2026-11-25-native-sparse-sources.md).
+also applies to read-only sparse admissions; T-317 adds a bounded renderer
+release path below. See [T-316 evidence](evidence/T-316-2026-11-25-native-sparse-sources.md).
+
+
+### Pristine physical source release (T-317)
+
+`release_pristine_source(layer, x, y, revision, expected_rgba8)` is an
+additive v1 method. Rust rejects stale revisions, active transactions, parked
+layers, nonzero generations, unauthorized/missing or byte-different sources,
+and every tile mentioned by retained Undo/Redo. Success erases only that
+source's bytes and authorization; no revision or history changes. Only the
+physical-document owner can establish that a durable ref and digest exist;
+this method alone is not a persistence guarantee.
+
+The document retains the verified provider/ref/digest with weak tile identity.
+Quiescent renderer misses above 192 MiB aggregate native bytes (including the
+incoming tile) scan up to 256 FIFO candidates toward 128 MiB. Dirty sources,
+changed refs, replaced identities and local structural snapshots are excluded.
+The Godot projection is removed only after Rust release; its original pending
+descriptor is restored for ordinary digest-checked re-admission. A failed
+release never hides a corrupted projection. No logical change occurs, and a
+frame-local immutable reference may continue displaying the verified bytes.
+This is not a hard 192 MiB cap: pinned/nonreloadable sources and the scan cap
+may prevent trimming. Non-render reads and active edits do not trim; the
+existing 256 MiB cap still rejects over-budget admissions. Godot projection,
+decoder, renderer frame cache and other process memory are not included.
+See [T-317 evidence](evidence/T-317-2026-11-25-sparse-eviction.md).

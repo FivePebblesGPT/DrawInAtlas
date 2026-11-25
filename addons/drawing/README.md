@@ -98,7 +98,9 @@ Physical `DrawingBundleManifest.decode()` now opts in to same-revision native
 source admission on first successful fetch (T-316). No pixel reads occur at
 Open. Portable `.drawing` decode still initializes all sources together
 (T-315). Sparse read-only admission consumes the native aggregate budget;
-rejection leaves the source pending, and native eviction remains future work.
+rejection leaves the source pending. T-317 trims verified pristine source
+residency on quiescent renderer misses; source refs/digests are preserved
+and dirty, history-owned, changed and active-edit sources stay pinned.
 
 Undo/redo replays compact raster deltas for an independent document. Since
 T-054, `DrawingDocument` also owns an ordered local history with optional

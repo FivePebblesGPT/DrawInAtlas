@@ -159,6 +159,9 @@ jobs:
           # T-316: verified sparse physical sources enter native authority on first read.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t316_native_sparse_sources.gd 2>&1 | tee /tmp/godot-t316-sparse-sources.log
           python3 tools/check_godot_model_log.py /tmp/godot-t316-sparse-sources.log --marker T316_NATIVE_SPARSE_PASSED || ci_fail_marker 'T316 sparse native source admission rejected'
+          # T-317: native pristine-source paging under real aggregate pressure.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t317_sparse_eviction.gd 2>&1 | tee /tmp/godot-t317-sparse-eviction.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t317-sparse-eviction.log --marker T317_SPARSE_EVICTION_PASSED || ci_fail_marker 'T317 sparse native eviction rejected'
           # T-230: even the first legacy-pixel Undo/Redo in a detached document
           # must bootstrap Rust ownership before advancing the host timeline.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t230_detached_pixel_bootstrap.gd 2>&1 | tee /tmp/godot-t230-pixel-bootstrap.log

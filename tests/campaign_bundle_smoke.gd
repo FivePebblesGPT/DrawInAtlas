@@ -86,6 +86,16 @@ func _run() -> void:
 				_check(store != null and bool(store.call("has_source", layer, int(coords[0]), int(coords[1]), sparse.revision)) and
 					sparse._native_source_matches(layer, key, sparse._nodes[layer].tiles.get(key)),
 					"first campaign pixel read immediately authorizes native source")
+				var manifest: Dictionary = sparse.export_manifest().value
+				sparse._trim_sparse_render_sources(DrawingDocument.SPARSE_RENDER_HIGH_WATER_BYTES + 1)
+				_check(sparse._pending_tiles.size() == 1 and not bool(store.call("has_source", layer, int(coords[0]), int(coords[1]), sparse.revision)),
+					"physical campaign clean source can be released")
+				_check(sparse.export_manifest().ok and sparse.export_manifest().value == manifest,
+					"released physical campaign source keeps its durable reference")
+				_check(sparse.read_pixel(layer, -514, -515).value == 0x0038220c,
+					"physical campaign re-admits exact hidden RGB through its blob provider")
+				sparse._trim_sparse_render_sources(DrawingDocument.SPARSE_RENDER_HIGH_WATER_BYTES + 1)
+				_check(sparse._pending_tiles.size() == 1, "save next generation while source remains pending")
 			_check(not sparse.is_dirty() and sparse.history_length() == 0,
 				"source admission does not change the campaign savepoint or local history")
 		var blank: DrawingResult = loaded.registry.document_at("world", "ground", 1)
@@ -94,6 +104,10 @@ func _run() -> void:
 		var again: DrawingResult = AtlasCampaignBundle.save(loaded.campaign, loaded.registry, loaded.library, path)
 		_check(again.ok, "save second generation unchanged " + again.message)
 		if again.ok:
+			if snapshot.ok and snapshot.value != null and ClassDB.class_exists("DrawingNativeTiles"):
+				var paged: DrawingDocument = snapshot.value
+				_check(paged.read_pixel(layer, -514, -515).value == 0x0038220c and not paged.is_dirty(),
+					"released source still resolves after generation publication")
 			var reloaded: AtlasStoreResult = AtlasCampaignBundle.load(path)
 			_check(reloaded.error == OK and reloaded.generation != loaded.generation, "new root generation loads independently")
 			_check(not reloaded.recovered, "new head loads without fallback")

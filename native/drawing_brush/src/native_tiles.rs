@@ -253,6 +253,31 @@ impl TileStore {
         self.bytes_imported += rgba.len() as u64;
         Ok(())
     }
+    /// Release only a pristine source that the document proves is reloadable.
+    /// The caller retains the verified physical descriptor, not these bytes.
+    /// This never changes revision, editability, or either history stack.
+    fn release_pristine_source(&mut self, id: &TileId, revision: u64, expected: &[u8]) -> bool {
+        if self.revision != revision
+            || self.active.is_some()
+            || self.parked_layers.contains(&id.layer)
+            || !self.authorized.contains(id)
+            || !self
+                .tiles
+                .get(id)
+                .is_some_and(|tile| tile.generation == 0 && tile.rgba == expected)
+            || self
+                .undo
+                .iter()
+                .chain(self.redo.iter())
+                .any(|event| event.before.contains_key(id) || event.after.contains_key(id))
+        {
+            return false;
+        }
+        self.tiles.remove(id);
+        self.authorized.remove(id);
+        true
+    }
+
     fn begin(
         &mut self,
         layer: &str,
@@ -1854,6 +1879,30 @@ impl DrawingNativeTiles {
                 bytes.as_slice(),
             )
             .is_ok()
+    }
+
+    /// The physical source descriptor is owned by DrawingDocument. Require
+    /// exact committed bytes and reject all edited/parked/history-owned tiles.
+    #[func]
+    fn release_pristine_source(
+        &mut self,
+        layer: GString,
+        x: i64,
+        y: i64,
+        revision: i64,
+        expected: PackedByteArray,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        revision >= 0
+            && self.store.release_pristine_source(
+                &TileId {
+                    layer: layer.to_string(),
+                    x,
+                    y,
+                },
+                revision as u64,
+                expected.as_slice(),
+            )
     }
 
     #[func]
@@ -3949,6 +3998,63 @@ mod tests {
         assert_eq!(s.read(&id, false).unwrap().rgba[0..4], [0, 0, 0, 0]);
         assert_eq!(s.read(&other, false).unwrap().rgba[0..4], [0, 0, 0, 0]);
     }
+    #[test]
+    fn pristine_release_is_revision_and_history_fenced() {
+        let mut store = initialized(16);
+        let id = TileId {
+            layer: "ink".into(),
+            x: -1,
+            y: 2,
+        };
+        let other = TileId {
+            layer: "ink".into(),
+            x: 5,
+            y: -3,
+        };
+        let mut bytes = vec![0; 16 * 16 * 4];
+        bytes[..4].copy_from_slice(&0x00112233_u32.to_le_bytes());
+        store.import(id.clone(), 0, &bytes).unwrap();
+        store.import(other.clone(), 0, &bytes).unwrap();
+        assert!(!store.release_pristine_source(&id, 1, &bytes));
+        assert!(!store.release_pristine_source(&id, 0, &[]));
+        let tx = store.begin("ink", 0, false).unwrap();
+        assert!(!store.release_pristine_source(&id, 0, &bytes));
+        store.active = None;
+        let mut replacement = bytes.clone();
+        replacement[..4].copy_from_slice(&0xff987654_u32.to_le_bytes());
+        let (token, _) = store
+            .apply_external_tiles(
+                "ink",
+                0,
+                vec![(id.clone(), bytes.clone(), replacement.clone())],
+                true,
+            )
+            .unwrap();
+        assert_ne!(token, tx);
+        assert!(!store.release_pristine_source(&id, 1, &replacement));
+        // Independently prove that even a generation-zero descriptor pinned
+        // by history cannot be released.
+        store.tiles.get_mut(&id).unwrap().generation = 0;
+        assert!(!store.release_pristine_source(&id, 1, &replacement));
+        store.parked_layers.insert("ink".into());
+        assert!(!store.release_pristine_source(&other, 1, &bytes));
+        store.parked_layers.clear();
+        let before = store.bytes_used();
+        assert!(store.release_pristine_source(&other, 1, &bytes));
+        assert_eq!(store.bytes_used(), before - bytes.len());
+        assert!(!store.authorized.contains(&other));
+        assert!(store.read(&other, false).is_none());
+        assert_eq!(store.revision, 1);
+        assert!(store.history_matches(token, true));
+        store.import(other.clone(), 1, &bytes).unwrap();
+        assert_eq!(store.read(&other, false).unwrap().rgba, bytes);
+        store.undo_or_redo(true).unwrap();
+        assert_eq!(store.read(&id, false).unwrap().rgba, bytes);
+        assert!(store.history_matches(token, false));
+        store.undo_or_redo(false).unwrap();
+        assert_eq!(store.read(&id, false).unwrap().rgba, replacement);
+    }
+
     #[test]
     fn missing_source_masks_and_budget_fail_closed() {
         let mut s = initialized(16);
