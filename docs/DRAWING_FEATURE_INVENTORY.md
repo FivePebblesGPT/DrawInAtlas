@@ -176,7 +176,7 @@ Every row is an independent scope choice and rationale. The labels `Both` and `P
 
 ## T-073 implementation ledger — scope approval is not delivery (2026-11-02)
 
-**Source of authority:** the 99 comparison rows above are the owner's **47 Essential / 34 Later / 18 Skip** priorities. Do not reclassify or delete them when an engineering ticket finishes. `[[T-059]]` retains the separate **hands-on final UX gate**; this documentation ledger is not owner acceptance. `[[DRAW_MODULE_UI_SPEC]]` remains a **proposed** workspace composition under `[[T-063]]`, whereas the dedicated Object Editor tab (`[[T-062]]`) and a dock-peer Asset Browser requirement (`[[T-065]]`) are **accepted requirements**. The tab is implemented; the Asset Browser dock is still blocked on T-063.
+**Source of authority:** the 99 comparison rows above reflect the owner's amended **48 Essential / 33 Later / 18 Skip** priorities (original **47 Essential / 34 Later / 18 Skip**, with JPEG export promoted on 2026-11-25). Do not reclassify or delete them when an engineering ticket finishes; an explicit owner scope update is required. `[[T-059]]` retains the separate **hands-on final UX gate**; this documentation ledger is not owner acceptance. `[[DRAW_MODULE_UI_SPEC]]` remains a **proposed** workspace composition under `[[T-063]]`, whereas the dedicated Object Editor tab (`[[T-062]]`) and a dock-peer Asset Browser requirement (`[[T-065]]`) are **accepted requirements**. The tab is implemented; the Asset Browser dock is still blocked on T-063.
 
 ### First slice: bounded T-053 witness (implemented and tested)
 
@@ -188,7 +188,7 @@ Every row is an independent scope choice and rationale. The labels `Both` and `P
 | [x] Lossless portable witness | Save/reopen `.drawing` with exact RGBA8 including hidden RGB at zero alpha, same document/group/layer IDs | `drawing/tests/standalone_smoke.gd` |
 | [x] One shared Object Editor shell | A dedicated tab edits an independent source, without Atlas drawing engine copies | `drawing/tests/object_editor_ui_smoke.gd`; Atlas publication/rebinding separately in `tests/object_editor_smoke.gd` (T-062) |
 
-**Do not expand the minimum witness retroactively:** the first four checks justify T-053's completed vertical slice; the Object Editor integration was added later under T-062. Completion of these checks does **not** close the 47 Essential items or T-059.
+**Do not expand the minimum witness retroactively:** the first four checks justify T-053's completed vertical slice; the Object Editor integration was added later under T-062. Completion of these checks does **not** close the Essential baseline or T-059.
 
 ### Remaining complete-baseline work (bounded follow-on tickets)
 

@@ -25,6 +25,7 @@ class ApprovedScopeAndProposedUXTests(unittest.TestCase):
             "## Atlas-specific features", 1
         )[0]
         counts = {"Essential": 0, "Later": 0, "Skip": 0}
+        jpeg_priorities: list[str] = []
         for line in matrix.splitlines():
             if not line.startswith("|") or line.startswith("|---"):
                 continue
@@ -34,7 +35,18 @@ class ApprovedScopeAndProposedUXTests(unittest.TestCase):
             category = columns[2].split(" ", 1)[0]
             self.assertIn(category, counts, line)
             counts[category] += 1
-        self.assertEqual(counts, {"Essential": 47, "Later": 34, "Skip": 18})
+            if columns[0] == "JPEG export":
+                jpeg_priorities.append(columns[2])
+        # Preserve the original 99 scope rows; the owner explicitly promoted
+        # JPEG export from Later to Essential on 2026-11-25 (T-305).
+        self.assertEqual(counts, {"Essential": 48, "Later": 33, "Skip": 18})
+        self.assertEqual(len(jpeg_priorities), 1)
+        self.assertEqual(jpeg_priorities[0].split(" ", 1)[0], "Essential")
+        self.assertIn("2026-11-25 owner update; originally Later", jpeg_priorities[0])
+        self.assertIn("48 Essential / 33 Later / 18 Skip", INVENTORY)
+        review = (DOCS / "DRAWING_UX_REVIEW_2026-11-25.md").read_text(encoding="utf-8")
+        self.assertIn("JPEG export required, previously Later", review)
+        self.assertIn("T-305", review)
         self.assertIn("OWNER-APPROVED FEATURE INVENTORY", INVENTORY)
         self.assertIn("Owner sign-off (2026-11-02)", INVENTORY)
 

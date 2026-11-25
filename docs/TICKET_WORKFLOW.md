@@ -31,7 +31,7 @@ A ticket that **requires later owner acceptance** may be `Blocked` or `In Progre
 - Web-only T-044 is archived at `docs/Archive/Web/T-044.md`; the active ticket path remains as a compatibility pointer, with status Archived.
 
 ## Scope snapshot
-The explicit [Drawing feature inventory](DRAWING_FEATURE_INVENTORY.md) is **approved**: 47 Essential, 34 Later, 18 Skip. This does not make the complete baseline Done. `T-053` still first proves the standalone minimum witness; `T-059` later gates manual UX acceptance.
+The explicit [Drawing feature inventory](DRAWING_FEATURE_INVENTORY.md) is **approved**: 48 Essential, 33 Later, 18 Skip after the 2026-11-25 JPEG export promotion (originally 47 Essential, 34 Later, 18 Skip). This does not make the complete baseline Done. `T-053` still first proves the standalone minimum witness; `T-059` later gates manual UX acceptance.
 
 ## Keep engineering checkpoints independently reviewable
 
