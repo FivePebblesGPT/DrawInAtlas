@@ -1,0 +1,80 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ERROR: T068_DAB_FAILED: original once-covered pixel count
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_dab_geometry_smoke.gd:17)
+       [1] _run (res://tests/drawing_dab_geometry_smoke.gd:62)
+ERROR: T068_DAB_FAILED: original once-covered pixel count
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_dab_geometry_smoke.gd:17)
+       [1] _run (res://tests/drawing_dab_geometry_smoke.gd:62)
+ERROR: T068_DAB_FAILED: original once-covered pixel count
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_dab_geometry_smoke.gd:17)
+       [1] _run (res://tests/drawing_dab_geometry_smoke.gd:62)
+ERROR: T068_DAB_FAILED: original once-covered pixel count
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_dab_geometry_smoke.gd:17)
+       [1] _run (res://tests/drawing_dab_geometry_smoke.gd:62)
+ERROR: T068_DAB_FAILED: original once-covered pixel count
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_dab_geometry_smoke.gd:17)
+       [1] _run (res://tests/drawing_dab_geometry_smoke.gd:62)
+ERROR: T068_DAB_FAILED: original once-covered pixel count
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_dab_geometry_smoke.gd:17)
+       [1] _run (res://tests/drawing_dab_geometry_smoke.gd:62)
+ERROR: T068_DAB_FAILED: original once-covered pixel count
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_dab_geometry_smoke.gd:17)
+       [1] _run (res://tests/drawing_dab_geometry_smoke.gd:62)
+ERROR: T068_DAB_FAILED: original once-covered pixel count
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_dab_geometry_smoke.gd:17)
+       [1] _run (res://tests/drawing_dab_geometry_smoke.gd:62)
+ERROR: T068_DAB_FAILED: original once-covered pixel count
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_dab_geometry_smoke.gd:17)
+       [1] _run (res://tests/drawing_dab_geometry_smoke.gd:62)
+ERROR: T068_DAB_FAILED: original once-covered pixel count
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_dab_geometry_smoke.gd:17)
+       [1] _run (res://tests/drawing_dab_geometry_smoke.gd:62)
+ERROR: T068_DAB_FAILED: original once-covered pixel count
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_dab_geometry_smoke.gd:17)
+       [1] _run (res://tests/drawing_dab_geometry_smoke.gd:62)
+ERROR: T068_DAB_FAILED: original once-covered pixel count
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_dab_geometry_smoke.gd:17)
+       [1] _run (res://tests/drawing_dab_geometry_smoke.gd:62)
+ERROR: T068_DAB_FAILED: original once-covered pixel count
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_dab_geometry_smoke.gd:17)
+       [1] _run (res://tests/drawing_dab_geometry_smoke.gd:62)
+ERROR: T068_DAB_FAILED: original once-covered pixel count
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_dab_geometry_smoke.gd:17)
+       [1] _run (res://tests/drawing_dab_geometry_smoke.gd:62)
+ERROR: T068_DAB_FAILED: original once-covered pixel count
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_dab_geometry_smoke.gd:17)
+       [1] _run (res://tests/drawing_dab_geometry_smoke.gd:62)
+T068_DAB_FAILED checks=125 failures=15

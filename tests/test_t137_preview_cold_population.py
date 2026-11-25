@@ -64,9 +64,22 @@ class PreviewColdPopulationContracts(unittest.TestCase):
             "committed red pixel appears in final framebuffer",
             "preview cancellation removes only detached pixels",
             "Undo removes blue without changing committed red",
-            "Redo restores blue source pixel",
+            "Redo completes bounded cold display repopulation",
+            "Redo restores exact canonical source and visible framebuffer pixel",
         ):
             self.assertIn(term, self.native)
+
+    def test_native_redo_requires_settlement_and_source_frame_parity(self) -> None:
+        # The Redo comparison must not pass on a stale cold display tile.
+        redo = self.native.split('check(doc.redo().ok, "Redo source transaction")', 1)[1]
+        self.assertLess(redo.index('var redo_settled: bool = false'),
+                        redo.index('check(redo_settled, "Redo completes bounded cold display repopulation")'))
+        self.assertLess(redo.index('check(redo_settled,'),
+                        redo.index('"Redo restores exact canonical source and visible framebuffer pixel"'))
+        final_pixel = redo.split('check(redo_settled,', 1)[1].split('"Redo restores exact canonical', 1)[0]
+        self.assertIn('doc.read_pixel(layer, 0, 260)', final_pixel)
+        self.assertIn('pixel(canvas, Vector2(0.5, 260.5))', final_pixel)
+        self.assertIn('cold_tiles_deferred', redo)
 
     def test_existing_ci_inventory_and_fail_closed_logs(self) -> None:
         required = self.workflow.split("id: ci_t086_viewport_cache_model", 1)[1].split(
@@ -81,14 +94,14 @@ class PreviewColdPopulationContracts(unittest.TestCase):
             self.assertIn(text, required)
         for text in (
             "res://tests/t137_preview_cold_population_native.gd",
-            "T137_NATIVE_PASSED checks=18 failures=0",
+            "T137_NATIVE_PASSED checks=19 failures=0",
             "--marker T137_NATIVE_PASSED",
             "/tmp/t137-preview-cold-native.log",
         ):
             self.assertIn(text, self.native_ci)
         ids = re.findall(r"^\s+id: (ci_[a-z0-9_]+)\s*$", self.workflow, re.M)
         self.assertEqual((len(ids), len(set(ids))), (46, 46))
-        for marker, count in (("T137_COLD_PASSED", 15), ("T137_NATIVE_PASSED", 18)):
+        for marker, count in (("T137_COLD_PASSED", 15), ("T137_NATIVE_PASSED", 19)):
             good = f"{marker} checks={count} failures=0\n"
             self.assertFalse(verify_log(good, marker)[0])
             for bad in (good + good, good.replace("failures=0", "failures=1"),

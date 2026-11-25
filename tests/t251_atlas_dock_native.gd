@@ -29,6 +29,12 @@ func click(point: Vector2) -> void:
 		await frames(3)
 
 
+## T-273: a real right-edge click, independent of the rendered button rect.
+func edge_target(workspace: Control) -> Vector2:
+	var dock: Rect2 = workspace.inspector.get_global_rect()
+	return Vector2(dock.end.x - 10.0, dock.position.y + 28.0)
+
+
 func check_bounds(workspace: Control, minimized: bool) -> void:
 	var toggle: Button = workspace.dock_toggle
 	var dock: Rect2 = workspace.inspector.get_global_rect()
@@ -75,6 +81,13 @@ func run() -> void:
 	var before_dirty: bool = workspace.current_document().is_dirty()
 	var count: int = workspace.dock_views.size()
 	check_bounds(workspace, false)
+	await click(edge_target(workspace))
+	check(bool(workspace.dock_layout.container_info("right")["minimized"]),
+		"T-273: Atlas right-edge click minimizes canonical Drawing dock")
+	if bool(workspace.dock_layout.container_info("right")["minimized"]):
+		await click(edge_target(workspace))
+		check(not bool(workspace.dock_layout.container_info("right")["minimized"]),
+			"T-273: Atlas right-edge click re-expands without changing owner")
 	await click(workspace.dock_toggle.get_global_rect().get_center())
 	check(bool(workspace.dock_layout.container_info("right")["minimized"]),
 		"Atlas host can minimize the shared Drawing dock")

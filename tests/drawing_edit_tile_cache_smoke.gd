@@ -21,6 +21,18 @@ func _check(condition: bool, label: String) -> void:
 		push_error("T068_TILE_CACHE_FAILED: " + label)
 
 
+func _read_pixels(document: DrawingDocument, layer: String,
+		bounds: Rect2i) -> Dictionary[Vector2i, int]:
+	var pixels: Dictionary[Vector2i, int] = {}
+	for y: int in range(bounds.position.y, bounds.end.y):
+		for x: int in range(bounds.position.x, bounds.end.x):
+			var pixel: DrawingResult = document.read_pixel(layer, x, y)
+			if not pixel.ok:
+				return {}
+			pixels[Vector2i(x, y)] = int(pixel.value)
+	return pixels
+
+
 func _lazy_fetch(_ref: String) -> Variant:
 	_lazy_calls += 1
 	if not _lazy_available:
@@ -47,6 +59,10 @@ func _run() -> void:
 		"seed exact source pixels across four signed tiles")
 	var original: int = int(document.read_pixel(layer, -1, -1).value)
 	var source_revision: int = document.revision
+	var sampled_bounds: Rect2i = Rect2i(-8, -8, 16, 16)
+	var source_pixels: Dictionary[Vector2i, int] = _read_pixels(document, layer, sampled_bounds)
+	_check(source_pixels.size() == sampled_bounds.get_area(),
+		"snapshot source pixels across the native tile boundary")
 	var edit: DrawingEditSession = document.begin_edit(layer, source_revision).value
 	var stroke: PackedVector2Array = PackedVector2Array([Vector2(-0.5, -0.5),
 		Vector2(-0.5, -0.5)])
@@ -56,18 +72,25 @@ func _run() -> void:
 	_check(count > 0 and edit.paint_path(stroke, 0x80808042, 8.0).ok \
 		and edit.change_count() == count, "repeat stroke retains once-per-pixel semantics")
 	_check(document.revision == source_revision and
-		int(document.read_pixel(layer, -1, -1).value) == original,
-		"staging leaves the source pixels and revision unchanged")
+		_read_pixels(document, layer, sampled_bounds) == source_pixels,
+		"staging leaves all source pixels and the revision unchanged")
 	var changed: DrawingResult = edit.commit()
-	_check(changed.ok and changed.delta != null and changed.delta.after.size() == count,
-		"commit publishes exact touched-pixel count")
+	_check(changed.ok and document.revision == source_revision + 1,
+		"native commit publishes exactly one source revision")
+	var published_pixels: Dictionary[Vector2i, int] = _read_pixels(document, layer, sampled_bounds)
+	var changed_pixels: int = 0
+	for point: Vector2i in source_pixels:
+		if source_pixels[point] != published_pixels.get(point, -1):
+			changed_pixels += 1
+	_check(published_pixels.size() == source_pixels.size() and changed_pixels == count,
+		"native committed pixels match the exact staged touched-pixel count")
 	_check(edit._source_tiles.is_empty(), "commit clears source cache references")
 	_check(int(document.read_pixel(layer, -1, -1).value) == \
 		DrawingEditSession._blend(0x80808042, original), "straight-alpha blend exact")
-	_check(document.undo().ok and int(document.read_pixel(layer, -1, -1).value) == original,
-		"undo restores pre-cache source including hidden RGB")
-	_check(document.redo().ok and int(document.read_pixel(layer, -1, -1).value) \
-		== DrawingEditSession._blend(0x80808042, original), "redo reapplies exact bytes")
+	_check(document.undo().ok and _read_pixels(document, layer, sampled_bounds) == source_pixels,
+		"undo restores all pre-cache source pixels including hidden RGB")
+	_check(document.redo().ok and _read_pixels(document, layer, sampled_bounds) == published_pixels,
+		"redo reapplies exact committed RGBA8 over all cached tiles")
 
 	var blank: DrawingDocument = DrawingDocument.new("null-source", 16)
 	var blank_layer: String = String(blank.create_layer(DrawingLayerNode.RASTER, "Blank").value)
@@ -155,14 +178,37 @@ func _run() -> void:
 
 	var far: DrawingDocument = DrawingDocument.new("signed-anchor", 16)
 	var far_layer: String = String(far.create_layer(DrawingLayerNode.RASTER, "Far").value)
-	var anchor: int = 9007199254740993
-	var far_edit: DrawingEditSession = far.begin_edit(far_layer, far.revision,
-		Transform2D.IDENTITY, anchor, -anchor).value
-	_check(far_edit.paint_path(PackedVector2Array([Vector2(-0.5, -0.5)]),
-		0xaa112233, 3.0).ok and far_edit.commit().ok,
-		"signed 64-bit anchors allow pixel-accurate cached reads")
-	_check(int(far.read_pixel(far_layer, anchor - 1, -anchor - 1).value) == 0xaa112233,
-		"far signed pixel remains exact")
+	var unsafe_anchor: int = 9007199254740993
+	var far_revision: int = far.revision
+	var unsafe_start: DrawingResult = far.begin_edit(far_layer, far_revision,
+		Transform2D.IDENTITY, unsafe_anchor, -unsafe_anchor)
+	_check(unsafe_start.ok, "public gesture retains legacy wide signed anchor scope")
+	if unsafe_start.ok:
+		var unsafe_edit: DrawingEditSession = unsafe_start.value as DrawingEditSession
+		var unsafe_stage: DrawingResult = unsafe_edit.paint_path(
+			PackedVector2Array([Vector2(-0.5, -0.5)]), 0xaa112233, 3.0)
+		var unsafe_commit: DrawingResult = unsafe_edit.commit() if unsafe_stage.ok else unsafe_stage
+		_check(not unsafe_commit.ok and far.revision == far_revision and
+			int(far.read_pixel(far_layer, unsafe_anchor - 1, -unsafe_anchor - 1).value) == 0,
+			"out-of-projection native publication rejects without source mutation")
+		unsafe_edit.cancel()
+	var anchor: int = 1125899906842625
+	var far_start: DrawingResult = far.begin_edit(far_layer, far_revision,
+		Transform2D.IDENTITY, anchor, -anchor)
+	_check(far_start.ok, "legal large signed anchor opens a native edit")
+	if far_start.ok:
+		var far_edit: DrawingEditSession = far_start.value as DrawingEditSession
+		_check(far_edit.paint_path(PackedVector2Array([Vector2(-0.5, -0.5)]),
+			0xaa112233, 3.0).ok and far_edit.commit().ok and far.revision == far_revision + 1,
+			"legal signed anchor publishes exact RGBA8 through native tiles")
+		_check(int(far.read_pixel(far_layer, anchor - 1, -anchor - 1).value) == 0xaa112233,
+			"far signed pixel remains exact")
+		_check(far.undo().ok and int(far.read_pixel(far_layer,
+			anchor - 1, -anchor - 1).value) == 0,
+			"far signed undo restores original transparent pixel")
+		_check(far.redo().ok and int(far.read_pixel(far_layer,
+			anchor - 1, -anchor - 1).value) == 0xaa112233,
+			"far signed redo restores the exact committed pixel")
 
 	print("T068_TILE_CACHE_%s checks=%d failures=%d" % [
 		"PASSED" if failures == 0 else "FAILED", checks, failures])

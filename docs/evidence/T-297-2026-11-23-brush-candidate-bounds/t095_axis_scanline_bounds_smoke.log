@@ -1,0 +1,5 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+T095_AXIS_SCANLINE_RESULT checks=278 failures=0
+T095_AXIS_SCANLINE_PASSED

@@ -1,0 +1,6 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+T095_BLEND_PROFILE samples=114688 original_us=13424 optimized_us=8436
+T095_BLEND_SUMMARY checks=4 failures=0
+T095_BLEND_PASSED

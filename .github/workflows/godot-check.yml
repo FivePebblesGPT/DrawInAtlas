@@ -12,17 +12,17 @@ jobs:
         with:
           # Godot cannot import LFS pointer text as textures.
           lfs: true
-      - name: Install Godot 4.8-beta3 (standard, non-.NET)
+      - name: Install Godot 4.8-beta4 (standard, non-.NET)
         uses: chickensoft-games/setup-godot@v2
         with:
-          version: 4.8.0-beta3
+          version: 4.8.0-beta4
           use-dotnet: false
           include-templates: true
       - name: Verify the exact beta engine
         shell: bash
         timeout-minutes: 10
         run: |
-          godot --version | grep -E '^4\.8\.beta3\.official\.'
+          godot --version | grep -Fx '4.8.beta4.official.b070e63b1'
           # All runnable consumers require native classes before their first import.
           make test TOOLCHAIN=system
       - name: Enforce explicit types in owned GDScript and skill examples
@@ -837,6 +837,54 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_fill_frontier_smoke.gd 2>&1 | tee /tmp/godot-t068-frontier.log
           grep -q 'T068_FRONTIER_PASSED' /tmp/godot-t068-frontier.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T068_FRONTIER_FAILED:' /tmp/godot-t068-frontier.log; then exit 1; fi
+          # T-289: invalid fill seeds/colors must never resolve a lazy source.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t289_fill_preflight.gd 2>&1 | tee /tmp/godot-t289-fill-preflight.log
+          grep -Fxq 'T289_FILL_PREFLIGHT_PASSED checks=23 failures=0' /tmp/godot-t289-fill-preflight.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t289-fill-preflight.log --marker T289_FILL_PREFLIGHT_PASSED
+          # T-290: invalid bulk shapes/regions must not load lazy source or flatten Brush.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t290_bulk_edit_preflight.gd 2>&1 | tee /tmp/godot-t290-bulk-preflight.log
+          grep -Fxq 'T290_BULK_PREFLIGHT_PASSED checks=28 failures=0' /tmp/godot-t290-bulk-preflight.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t290-bulk-preflight.log --marker T290_BULK_PREFLIGHT_PASSED
+          # T-291: masked-out fill seeds cannot resolve lazy chunks or flatten Brush.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t291_masked_fill_seed_preflight.gd 2>&1 | tee /tmp/godot-t291-masked-fill.log
+          grep -Fxq 'T291_MASKED_FILL_PASSED checks=33 failures=0' /tmp/godot-t291-masked-fill.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t291-masked-fill.log --marker T291_MASKED_FILL_PASSED
+          # T-292: no frontier source reads or publication beyond valid local signed bounds.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t292_fill_frontier_bounds.gd 2>&1 | tee /tmp/godot-t292-fill-frontier.log
+          grep -Fxq 'T292_FRONTIER_PASSED checks=38 failures=0' /tmp/godot-t292-fill-frontier.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t292-fill-frontier.log --marker T292_FRONTIER_PASSED
+          # T-293: globally unpublishable signed seed/frontier cannot fetch lazy pixels.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t293_fill_native_projection.gd 2>&1 | tee /tmp/godot-t293-projection.log
+          grep -Fxq 'T293_PROJECTION_PASSED checks=41 failures=0' /tmp/godot-t293-projection.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t293-projection.log --marker T293_PROJECTION_PASSED
+          # T-294: native signed projection preflights all bulk edits before lazy reads.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t294_bulk_native_projection.gd 2>&1 | tee /tmp/godot-t294-bulk-projection.log
+          grep -Fxq 'T294_BULK_PROJECTION_PASSED checks=71 failures=0' /tmp/godot-t294-bulk-projection.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t294-bulk-projection.log --marker T294_BULK_PROJECTION_PASSED
+          # T-295: invalid signed Brush pixels cannot read lazy source or flatten Brush.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t295_brush_native_projection.gd 2>&1 | tee /tmp/godot-t295-brush-projection.log
+          grep -Fxq 'T295_BRUSH_PROJECTION_PASSED checks=50 failures=0' /tmp/godot-t295-brush-projection.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t295-brush-projection.log --marker T295_BRUSH_PROJECTION_PASSED
+          # T-296: invalid native signed Delete may not load lazy tiles or flatten Brush.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t296_clear_native_projection.gd 2>&1 | tee /tmp/godot-t296-clear-projection.log
+          grep -Fxq 'T296_CLEAR_PROJECTION_PASSED checks=50 failures=0' /tmp/godot-t296-clear-projection.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t296-clear-projection.log --marker T296_CLEAR_PROJECTION_PASSED
+          # T-297: absurd finite Brush radii may not wrap candidate bounds or skip a clipped dab.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t297_brush_candidate_bounds.gd 2>&1 | tee /tmp/godot-t297-brush-bounds.log
+          grep -Fxq 'T297_BRUSH_BOUNDS_PASSED checks=113 failures=0' /tmp/godot-t297-brush-bounds.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t297-brush-bounds.log --marker T297_BRUSH_BOUNDS_PASSED
+          # T-299: disjoint/empty selections cannot flatten an accepted Brush on no-op bulk edits.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t299_masked_bulk_noop.gd 2>&1 | tee /tmp/godot-t299-masked-bulk.log
+          grep -Fxq 'T299_MASKED_BULK_PASSED checks=40 failures=0' /tmp/godot-t299-masked-bulk.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t299-masked-bulk.log --marker T299_MASKED_BULK_PASSED
+          # T-300: masked interior holes must not flatten Brush even when bounds overlap.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t300_masked_overlap_noop.gd 2>&1 | tee /tmp/godot-t300-mask-overlap.log
+          grep -Fxq 'T300_MASK_OVERLAP_PASSED checks=62 failures=0' /tmp/godot-t300-mask-overlap.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t300-mask-overlap.log --marker T300_MASK_OVERLAP_PASSED
+          # T-301: selected pixels outside polygon geometry cannot flatten pending Brush.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t301_polygon_selection_noop.gd 2>&1 | tee /tmp/godot-t301-polygon-selection.log
+          grep -Fxq 'T301_POLYGON_SELECTION_PASSED checks=39 failures=0' /tmp/godot-t301-polygon-selection.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t301-polygon-selection.log --marker T301_POLYGON_SELECTION_PASSED
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_fill_verified_stage_smoke.gd 2>&1 | tee /tmp/godot-t068-verified-stage.log
           grep -q 'T068_VERIFIED_STAGE_PASSED' /tmp/godot-t068-verified-stage.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T068_VERIFIED_STAGE_FAILED:' /tmp/godot-t068-verified-stage.log; then exit 1; fi

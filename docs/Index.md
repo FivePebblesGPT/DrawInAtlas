@@ -1,4 +1,199 @@
+**2026-11-25 owner review — next Drawing sprint:** [review and ordered queue](DRAWING_UX_REVIEW_2026-11-25.md), T-302–T-312 Ready. Prior dock/ColorPicker corrections received positive feedback, but missing tools, export, color, text, object, panels, storage and layer/icon polish remain. T-250 is Blocked pending corrections and explicit owner acceptance. T-148–T-152 native consolidation remains open; hosted beta4 CI on PR #23 head `da308376` passed (see review). Do not infer full approval.
+
+**[T-301](Tickets/T-301.md) P1 implementation Done (2026-11-24):**
+[True polygon interior vs selected-pixel bounded preflight](evidence/T-301-2026-11-24-polygon-selection.md)
+keeps accepted deferred Brush and lazy source untouched when a selected pixel
+lies inside polygon bounds but outside its painted geometry. Native beta4
+fail-first 3/39, passing 39/39 and eight adjacent 573/573 checks; T-068/T-148,
+hosted CI and owner approval remain open.
+
+**[T-300](Tickets/T-300.md) P1 implementation Done (2026-11-24):**
+[Bounded exact selection-mask overlap preflight](evidence/T-300-2026-11-24-masked-overlap.md)
+prevents masked interior holes and boolean subtraction from flattening a
+pending Brush on no-op bulk edits. Real beta4 Rust fail-first 13/59,
+corrected 62/62 and 652/652 neighboring checks pass. T-068/T-148,
+hosted CI and owner review remain open.
+
+**[T-299](Tickets/T-299.md) P1 implementation Done (2026-11-24):**
+[Disjoint/empty selection bulk no-ops preserve accepted deferred Brush](evidence/T-299-2026-11-24-masked-bulk.md)
+without materialization, lazy I/O or history changes. Real Godot beta4 native
+fail-first 8/40, corrected 40/40, adjacent 480/480; T-068/T-148 and
+hosted/owner gates remain open.
+
+**[T-298](Tickets/T-298.md) P1 implementation Done (2026-11-24):**
+[T-095 native tile-publisher stride selection](evidence/T-298-2026-11-24-brush-stride.md)
+uses canonical pixel-key Brush/Erase publication for valid synthetic strides
+below Rust's 16px minimum, instead of failing after correct previews.
+The existing T-095 on-demand native test now passes 632/632, the adjacent
+tile-key oracle passes 33,037/33,037, and supported native strides retain
+tile-local history. T-095 physical owner review, T-068/T-148 and hosted CI
+remain open.
+
+**[T-297](Tickets/T-297.md) P1 implementation Done (2026-11-23):**
+[Brush candidate-window numeric overflow guard](evidence/T-297-2026-11-23-brush-candidate-bounds.md)
+clips floating bounds before integer conversion and preserves small clipped
+strokes with huge finite widths. Original 48/113 fail-first, corrected 113/113,
+neighboring native geometry and history regressions green. T-095's pre-existing
+stride-3 test and T-068/T-148, hosted CI and owner gates remain open.
+
+**[T-296](Tickets/T-296.md) P1 implementation Done (2026-11-23):**
+[Native Delete signed projection preflight](evidence/T-296-2026-11-23-clear-native-projection.md)
+rejects globally unpublishable clear regions before lazy chunk access or
+flattening a deferred Brush. Real beta4 Rust fail-first 15/50 failures,
+corrected 50/50 plus eight neighboring native/Atlas checks pass.
+T-148/T-068, hosted CI and T-250 owner approval remain open.
+
+**[T-295](Tickets/T-295.md) P1 implementation Done (2026-11-23):**
+[native signed Brush per-pixel preflight](evidence/T-295-2026-11-23-brush-native-projection.md)
+rejects globally unpublishable swept Brush/mixed pixel edits before lazy
+source reads or deferred Brush materialization. Fail-first 30/50 failures,
+corrected 50/50, neighboring pixel/geometry and Atlas X11 checks pass.
+T-068/T-148, hosted CI and T-250 owner review remain open.
+
+**[T-294](Tickets/T-294.md) P1 implementation Done (2026-11-23):**
+[bulk edit global native projection guard](evidence/T-294-2026-11-23-bulk-native-projection.md)
+rejects unpublishable signed rectangle, byte-region and polygon edits before
+lazy-source access or deferred Brush materialization. Real beta4 Rust witness
+71/71 and eight adjacent native suites 301/301 pass. T-148/T-068 and
+hosted/owner review gates remain open.
+
+**[T-293](Tickets/T-293.md) P1 implementation Done (2026-11-23):**
+[native global signed flood-fill projection guard](evidence/T-293-2026-11-23-native-fill-projection.md)
+rejects unpublishable ±2⁵² seeds/frontier neighbors before lazy reads,
+with 18-failure native baseline, corrected 41/41, independent mutation
+controls and 283/283 adjacent native checks. T-148/T-068 and hosted/owner
+gates remain open.
+
+**[T-292](Tickets/T-292.md) P1 implementation Done (2026-11-23):**
+[signed-boundary flood-fill frontiers now exclude unpublishable neighbors before
+lazy source reads](evidence/T-292-2026-11-23-fill-frontier.md).
+Fail-first 10/22 failures, corrected 38/38, eight adjacent native suites
+283/283 pass. T-148/T-068, hosted CI and T-250 owner review remain open.
+
+**[T-291](Tickets/T-291.md) P1 implementation Done (2026-11-23):**
+[selection-excluded flood-fill seeds now bypass lazy source reads without
+flattening a valid deferred Brush](evidence/T-291-2026-11-23-masked-seed-preflight.md).
+Fail-first catches 10/33 failures, corrected 33/33 and seven neighboring
+native suites 250/250 pass. T-148/T-068, hosted CI and T-250 remain open.
+
+**[T-290](Tickets/T-290.md) P1 implementation Done (2026-11-23):**
+[bulk rectangle/byte-region/polygon preflight now preserves deferred Brush and
+avoids lazy-source side effects on invalid input](evidence/T-290-2026-11-23-bulk-preflight.md).
+Fail-first reproduced eight failures; 28/28 corrected Rust-backed checks and
+adjacent fill/history regressions pass. T-148/T-068 and hosted/owner gates
+remain open.
+
+**[T-289](Tickets/T-289.md) P1 implementation Done (2026-11-23):**
+[early flood-fill seed/RGBA8 validation prevents invalid requests from
+invoking arbitrary lazy-source loaders](evidence/T-289-2026-11-23-fill-preflight.md).
+The real native fail-first fixture reported 13/23 failures; corrected 23/23,
+161 neighboring native checks and strict required-CI coverage pass. T-068
+performance/portability, hosted CI and T-250 owner gates remain open.
+
+**[T-288](Tickets/T-288.md) P1 validation Done (2026-11-23):**
+[T-068 native fill-to-frame runner builds/registers Rust before profiling](evidence/T-288-2026-11-23-native-fill-frame.md),
+with exact post-frame canonical RGBA8 coverage instead of retired pixel
+history maps, and actual pinned beta4 engine/hash provenance. Two 21-trial
+software-X11 profiles pass all 770 native checks; hosted CI, physical
+latency, Windows and T-250 owner review remain separate gates.
+
+**[T-287](Tickets/T-287.md) P1 validation Done (2026-11-23):**
+[local fast-CI replay now rejects unmodeled workflow and job configuration](evidence/T-287-2026-11-23-workflow-envelope.md),
+including alternate runners, root/job env/defaults, triggers, matrix/containers
+and extra jobs. Fourteen fail-first negative cases were detected, and 50
+focused/neighboring Python tests pass; the 46 live check scripts remain intact.
+This is not a hosted beta4 CI pass or T-250 owner review.
+
+**[T-286](Tickets/T-286.md) P1 validation Done (2026-11-23):**
+[local fast-CI replay now rejects non-replayable step metadata](evidence/T-286-2026-11-23-ci-replay-metadata.md),
+including unsupported working directory/environment, duplicate condition
+keys and malformed YAML constructs. Fail-first caught eight violations;
+47 focused and neighboring Python tests pass, with all 46 live workflow
+checks still recognized. Hosted CI and T-250 owner signoff remain open.
+
+**[T-285](Tickets/T-285.md) P1 implementation Done (2026-11-23):**
+[repeat Godot beta4 Linux native export normalization](evidence/T-285-2026-11-23-reexport-normalization.md)
+now accepts a second identical engine-emitted native library only after
+exact-tree, stage-digest and ELF/PCK/native preflight, with final inspection
+and late-error rollback. All 29 packaging and 45 neighboring Python checks
+pass; hosted export templates and owner/Windows acceptance remain open.
+
+**[T-284](Tickets/T-284.md) P1 validation Done (2026-11-23):**
+[deterministic T-124 queued Brush predecessor under native mouse-up drain](evidence/T-284-2026-11-23-queued-brush-backlog.md)
+uses 840 accepted input samples (more than the single synchronous release
+budget), prevents a null-session fault injector crash and passes four 78-check
+beta4 runs, real X11 20-check parity, and neighboring pending-edit checks.
+The older hosted beta3 T-124 failure is not evidence of a beta4 production
+regression; hosted CI and physical owner review remain unverified.
+
+**[T-283](Tickets/T-283.md) P1 validation Done (2026-11-23):**
+[T-137 native cold-preview/Redo fast-CI contract](evidence/T-283-2026-11-23-cold-preview-ci-contract.md)
+now matches the 19-check settled Redo witness and preserves strict fail-closed
+logs; real beta4 T-137 15/19 and adjacent T-086 153 checks pass. T-086
+hardware/hosted-CI and T-250 owner acceptance remain open.
+
+**[T-282](Tickets/T-282.md) P1 validation Done (2026-11-23):**
+[native verified-source mixed flood-fill staging and complete-history witness](evidence/T-282-2026-11-23-verified-stage.md)
+now passes 36/36 Rust-backed beta4 checks, retaining immutable-source,
+fill-budget, stale-revision, signed-seam and unsafe-publication rules. Both
+pixel-oracle mutation controls fail as expected; full hosted CI, T-068
+performance/portability and T-250 owner signoff remain separate gates.
+
+**[T-281](Tickets/T-281.md) P1 validation Done (2026-11-23):**
+[native lazy flood-fill tile-cache committed-pixel/Undo/Redo witness](evidence/T-281-2026-11-23-native-fill-cache.md)
+now passes 39/39 Rust-backed beta4 checks, including masked and unmasked
+seams, exact hidden RGB, large signed native bounds and two mutation controls.
+The independent verified-staging fill test remains red (8/29); T-068 and
+hosted CI remain open. No T-250 owner acceptance is inferred.
+
+**[T-280](Tickets/T-280.md) P1 validation Done (2026-11-23):**
+[native axis-sweep Geometry2D full-region publication/Undo/Redo oracle](evidence/T-280-2026-11-23-axis-native-geometry.md)
+now passes 241/241 Rust-backed beta4 checks across 34 directional/masked
+sweeps; pixel/mask mutation controls fail as expected. Two independent
+T-068 flood-fill witnesses still fail, so T-068 and hosted CI remain open.
+
+**[T-279](Tickets/T-279.md) P1 validation Done (2026-11-23):**
+[native T-068 stationary-dab Geometry2D oracle and signed publication witness](evidence/T-279-2026-11-23-dab-native-geometry.md)
+now passes 112/112 Rust-backed beta4 checks with exact reference geometry,
+committed RGBA8, full-region Undo/Redo and unsafe projection rejection.
+The independent axis-sweep fixture still fails 34/137; T-068/hosted CI
+remain unapproved.
+
+**[T-278](Tickets/T-278.md) P1 validation Done (2026-11-23):**
+[native T-068 tile-cache publication and signed anchor witness](evidence/T-278-2026-11-23-native-tile-cache.md)
+now passes 38/38 real Rust-backed Godot beta4 checks with exact committed
+RGBA8/Undo/Redo snapshots and rejected unsafe signed publication. The
+separate T-068 geometry/sweep CI failures remain unresolved.
+
+**[T-277](Tickets/T-277.md) P1 validation Done (2026-11-23):**
+[required-native T-068 Skia live-oracle parity repair](evidence/T-277-2026-11-23-skia-native-oracle.md)
+regenerates all 16 cases at legal signed anchors and matches the immutable
+beta2 pixels/coverage exactly. Other T-068 native smokes remain red, so the
+entire T-068/hosted-CI gate is **not** green.
+
 # Ticket Kanban Index
+
+**[T-276](Tickets/T-276.md) P1 validation Done (2026-11-23):**
+[T-066 native-signed save/commit boundary CI fixture correction](evidence/T-276-2026-11-23-signed-ci-contract.md)
+separates rejected unsafe direct edits from rejected corrupted cold saves;
+97-check real Godot beta4 bundle test and adjacent native boundaries pass.
+The wider hosted CI and T-250 owner gate remain open.
+
+**[T-275](Tickets/T-275.md) P1 engineering Done (2026-11-23):**
+[stale T-063/T-072 CI ticket-state assertions and narrow Canvas test repair](evidence/T-275-2026-11-23-workspace-ci-gates.md)
+validated canonical manual-review dependencies without pretending T-056/T-065
+are Ready or approved; real Godot beta4 T-063 X11 73-check witness passed.
+**T-250 still requires explicit owner signoff**, and unrelated fast CI failures remain.
+
+**[T-273](Tickets/T-273.md) P0 engineering Done (2026-11-23):**
+[outer-right-edge dock toggle and chevron correction](evidence/T-273-2026-11-23-dock-edge.md)
+passed standalone X11 92-check, Atlas 19-check, flyout 138/10-check witnesses;
+real expanded/minimized/floating/HiDPI screenshots were **opened and reviewed**.
+**[T-274](Tickets/T-274.md) P0 engineering Done (2026-11-23):**
+[full-width native ColorPicker and opt-in exact RGBA8](evidence/T-274-2026-11-23-native-picker-composition.md)
+validated real Drawing/Atlas pointer, scroll, colors/history and visual
+inspection at expanded/minimized/floating/HiDPI. **T-250 is Manual Review**:
+engineering prerequisites complete, but explicit owner signoff is absent.
 
 **[T-272](Tickets/T-272.md) engineering Done (2026-11-23):**
 [UI-only assertion cleanup and actual visual-inspection evidence](evidence/T-272-2026-11-23-visual-test-audit.md)
@@ -345,7 +540,7 @@ Do **not** infer signoff from software tests or prior product scope. T-096 was m
 | [T-038 · Broader code-only review](Tickets/T-038.md) | Manual Review | Completed scope; see ticket evidence | [T-033](Tickets/T-033.md), [T-034](Tickets/T-034.md), [T-035](Tickets/T-035.md), [T-036](Tickets/T-036.md) |
 | [T-039 · Player projection and privacy contract](Tickets/T-039.md) | Blocked | Completed scope; see ticket evidence | [E-003](Epics/E-003.md), [E-004](Epics/E-004.md), [E-006](Epics/E-006.md), [E-SAVE](Epics/E-SAVE.md), [T-250](Tickets/T-250.md) |
 
-| [T-250 · Owner manual review of Drawing before Atlas](Tickets/T-250.md) | Manual Review | **P0 owner action now needed:** all four corrections Done, require hands-on approval with hardware and concept comparison. Atlas delivery remains blocked | [T-251](Tickets/T-251.md), [T-252](Tickets/T-252.md), [T-253](Tickets/T-253.md), [T-254](Tickets/T-254.md) |
+| [T-250 · Owner manual review of Drawing before Atlas](Tickets/T-250.md) | Blocked | **2026-11-25 owner feedback:** prior fixes look good so far; T-302–T-312 corrective work and explicit owner acceptance remain open; no Atlas release signoff | [T-251](Tickets/T-251.md), [T-252](Tickets/T-252.md), [T-253](Tickets/T-253.md), [T-254](Tickets/T-254.md), [T-273](Tickets/T-273.md), [T-274](Tickets/T-274.md), [T-302](Tickets/T-302.md), [T-303](Tickets/T-303.md), [T-304](Tickets/T-304.md), [T-305](Tickets/T-305.md), [T-306](Tickets/T-306.md), [T-307](Tickets/T-307.md), [T-308](Tickets/T-308.md), [T-309](Tickets/T-309.md), [T-310](Tickets/T-310.md), [T-311](Tickets/T-311.md), [T-312](Tickets/T-312.md) |
 
 ## 4. Other ready backlog
 
@@ -353,6 +548,46 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 
 | Ticket | Status | Scope / next gate | Hard dependencies |
 | --- | --- | --- | --- |
+| [T-302 · Expose standalone Bucket tool](Tickets/T-302.md) | Ready | **P1 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); No Bucket tool in the standalone toolbar. | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
+| [T-303 · Add raster Shapes tool and contextual options](Tickets/T-303.md) | Ready | **P1 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); No shape tool in standalone Drawing. | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
+| [T-304 · Simplify Selection menu, shortcut captions and snapping chrome](Tickets/T-304.md) | Ready | **P1 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); Rectangle selection and Move selected pixels duplicate toolbar tools in Selection; selection modes need Selection > Selection mode; shortcut labels need distinct color; Snap (8 px) toggle should be removed. | [T-063](Tickets/T-063.md), [T-090](Tickets/T-090.md) |
+| [T-305 · Export PNG, WebP and JPEG with format-specific settings](Tickets/T-305.md) | Ready | **P1 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); No ability to export common image formats with respective export options. | [T-053](Tickets/T-053.md), [T-120](Tickets/T-120.md) |
+| [T-306 · Verify end-to-end sRGB artwork color pipeline](Tickets/T-306.md) | Ready | **P1 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); Ensure the application uses sRGB color space. | [T-052](Tickets/T-052.md), [T-190](Tickets/T-190.md) |
+| [T-307 · Text Options panel, live text preview and menu commands](Tickets/T-307.md) | Ready | **P1 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); Need a Text Options panel with real-time text preview and common text options accessible from the menu bar. | [T-058](Tickets/T-058.md), [T-063](Tickets/T-063.md) |
+| [T-308 · Restore Object Editor background and standalone asset drag/drop](Tickets/T-308.md) | Ready | **P1 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); Asset Browser lists contents, but Object Editor lacks a background and objects cannot be dragged onto the canvas. | [T-062](Tickets/T-062.md), [T-093](Tickets/T-093.md), [T-109](Tickets/T-109.md) |
+| [T-309 · Restore individual hidden panels from Window menu](Tickets/T-309.md) | Ready | **P1 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); Closing a floating window hides its panels; only Show hidden floating panels restores them all. Window > Float selected dock group is unwanted convenience chrome. | [T-081](Tickets/T-081.md), [T-082](Tickets/T-082.md), [T-225](Tickets/T-225.md) |
+| [T-310 · Versioned binary .drawing document and measured storage optimization](Tickets/T-310.md) | Ready | **P1 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); Binary .drawing file format and space usage optimizations requested. | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md), [T-066](Tickets/T-066.md), [T-067](Tickets/T-067.md) |
+| [T-311 · Interactive layer-group disclosure and structural indentation](Tickets/T-311.md) | Ready | **P1 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); Layers panel uses text-based group markers and whitespace indentation instead of clickable expand/collapse buttons and actual button indentation. | [T-089](Tickets/T-089.md) |
+| [T-312 · Unify panel icon texture filtering](Tickets/T-312.md) | Ready | **P2 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); Popup panel icons use nearest-neighbor while other states use bilinear filtering; owner notes nearest-neighbor looks stylish. | [T-225](Tickets/T-225.md), [T-254](Tickets/T-254.md) |
+| [T-273 · Align whole right-dock toggle with outer edge](Tickets/T-273.md) | Done | **P0 engineering:** [real X11 screenshots and behavioral input proof](evidence/T-273-2026-11-23-dock-edge.md); T-250 owner review unapproved | [T-251](Tickets/T-251.md) |
+| [T-274 · Compact native ColorPicker width and duplicate chrome](Tickets/T-274.md) | Done | **P0 engineering:** [native full-width picker, optional exact RGBA8, real X11 screenshots and Drawing/Atlas regression](evidence/T-274-2026-11-23-native-picker-composition.md); owner approval remains T-250 | [T-226](Tickets/T-226.md), [T-252](Tickets/T-252.md) |
+| [T-275 · Repair stale workspace CI/owner-gate test contracts](Tickets/T-275.md) | Done | **P1 CI engineering:** [T-063/T-072 canonical status dependencies and 73-check native workspace regression](evidence/T-275-2026-11-23-workspace-ci-gates.md); T-250 approval and other hosted CI gates remain open | [T-063](Tickets/T-063.md), [T-072](Tickets/T-072.md) |
+| [T-276 · Repair T-066 native-signed campaign-save CI fixture](Tickets/T-276.md) | Done | **P1 validation:** [97-check native-signed edit and corrupted save projection proof](evidence/T-276-2026-11-23-signed-ci-contract.md); broader CI/native architecture and T-250 owner gates remain open | [T-066](Tickets/T-066.md), [T-158](Tickets/T-158.md), [T-159](Tickets/T-159.md), [T-202](Tickets/T-202.md) |
+| [T-277 · Repair T-068 Skia live oracle under native ownership](Tickets/T-277.md) | Done | **P1 validation:** [16-case live native exact parity against immutable beta2 fixture](evidence/T-277-2026-11-23-skia-native-oracle.md); other T-068 smokes and hosted CI remain red | [T-158](Tickets/T-158.md), [T-160](Tickets/T-160.md), [T-276](Tickets/T-276.md) |
+| [T-278 · Repair T-068 source-tile cache native publication smoke](Tickets/T-278.md) | Done | **P1 validation:** [38/38 real native tile-cache reads/Undo/Redo and signed projection protection](evidence/T-278-2026-11-23-native-tile-cache.md); stationary-dab fixture repaired in T-279; axis-sweep remains red | [T-158](Tickets/T-158.md), [T-160](Tickets/T-160.md), [T-277](Tickets/T-277.md) |
+| [T-279 · Restore stationary-dab Geometry2D oracle on native tiles](Tickets/T-279.md) | Done | **P1 validation:** [112/112 signed native-geometry and full-region Undo/Redo checks](evidence/T-279-2026-11-23-dab-native-geometry.md); axis-sweep and hosted CI remain red | [T-277](Tickets/T-277.md), [T-278](Tickets/T-278.md) |
+| [T-280 · Restore native axis-sweep Geometry2D and complete-region Undo/Redo oracle](Tickets/T-280.md) | Done | **P1 validation:** [241/241 native axis, mask, committed RGBA8 and Unsafe-rejection checks](evidence/T-280-2026-11-23-axis-native-geometry.md); separate fill and hosted CI gates remain open | [T-277](Tickets/T-277.md), [T-278](Tickets/T-278.md) |
+| [T-301 · Preserve pending Brush across polygon/selection geometric no-ops](Tickets/T-301.md) | Done | **P1 implementation:** [3-failure native baseline, 39/39 corrected and 573/573 neighboring checks](evidence/T-301-2026-11-24-polygon-selection.md); T-068/T-148 and hosted/owner gates remain open | [T-300](Tickets/T-300.md) |
+| [T-300 · Preserve deferred Brush across masked interior bulk no-ops](Tickets/T-300.md) | Done | **P1 implementation:** [13-failure baseline, 62/62 native and 652/652 neighboring checks](evidence/T-300-2026-11-24-masked-overlap.md); T-068/T-148, hosted/owner gates remain open | [T-299](Tickets/T-299.md) |
+| [T-299 · Preserve deferred Brush on selection-excluded bulk no-ops](Tickets/T-299.md) | Done | **P1 implementation:** [8-failure baseline, 40/40 real native and 480/480 neighboring checks](evidence/T-299-2026-11-24-masked-bulk.md); T-068/T-148/hosted and T-250 owner gates remain open | [T-153](Tickets/T-153.md), [T-290](Tickets/T-290.md) |
+| [T-298 · Select canonical Brush publisher for unsupported native tile strides](Tickets/T-298.md) | Done | **P1 implementation:** [10-failure native regression, 632/632 source-reference and 33,037/33,037 tile-key cache checks](evidence/T-298-2026-11-24-brush-stride.md); T-095 owner hardware/hosted and T-068/T-148 gates remain open | [T-153](Tickets/T-153.md) |
+| [T-297 · Reject Brush candidate-window integer overflow before raster staging](Tickets/T-297.md) | Done | **P1 implementation:** [48/113 original failures, 113/113 corrected clipped/unclipped Brush and Undo/Redo checks](evidence/T-297-2026-11-23-brush-candidate-bounds.md); T-095 stride-3 and T-068/T-148 hosted/owner gates remain open | [T-153](Tickets/T-153.md) |
+| [T-296 · Preflight native Delete projection before lazy I/O](Tickets/T-296.md) | Done | **P1 implementation:** [15-failure real-native baseline, 50/50 signed Delete/Brush/Undo/Redo and eight neighboring suites](evidence/T-296-2026-11-23-clear-native-projection.md); T-148/T-068/hosted/owner gates open | [T-153](Tickets/T-153.md) |
+| [T-295 · Preflight native Brush per-pixel projection before lazy I/O](Tickets/T-295.md) | Done | **P1 implementation:** [30-failure native baseline, 50/50 signed Brush/mixed-gesture/Undo/Redo and neighboring regression evidence](evidence/T-295-2026-11-23-brush-native-projection.md); T-148/T-068/hosted/owner gates open | [T-153](Tickets/T-153.md) |
+| [T-294 · Preflight native bulk edit global projection before lazy I/O](Tickets/T-294.md) | Done | **P1 implementation:** [44-failure native baseline, 71/71 signed bulk/Brush/Undo/Redo and 301/301 neighbors](evidence/T-294-2026-11-23-bulk-native-projection.md); T-148/T-068/hosted/owner gates open | [T-153](Tickets/T-153.md) |
+| [T-293 · Preflight native global flood-fill projection before lazy I/O](Tickets/T-293.md) | Done | **P1 implementation:** [18-failure native baseline, 41/41 exact signed endpoint/Undo/Redo and 283/283 neighbors](evidence/T-293-2026-11-23-native-fill-projection.md); T-148/T-068/hosted/owner gates open | [T-153](Tickets/T-153.md) |
+| [T-292 · Bound flood-fill frontiers before lazy source reads](Tickets/T-292.md) | Done | **P1 implementation:** [10-failure native baseline, 38/38 signed edge fill, 283/283 neighboring native and required-CI witness](evidence/T-292-2026-11-23-fill-frontier.md); T-148/T-068/owner/hosted gates open | [T-153](Tickets/T-153.md) |
+| [T-291 · Skip selection-excluded fill seeds before lazy reads](Tickets/T-291.md) | Done | **P1 implementation:** [10-failure native pre-fix, 33/33 fixed, 250/250 neighboring native and required-CI witness](evidence/T-291-2026-11-23-masked-seed-preflight.md); T-148/T-068/owner/hosted gates open | [T-153](Tickets/T-153.md) |
+| [T-290 · Preflight bulk raster regions before deferred Brush and lazy I/O](Tickets/T-290.md) | Done | **P1 implementation:** [8-failure native pre-fix, 28/28 fixed, 323 neighboring native checks and strict required-CI marker](evidence/T-290-2026-11-23-bulk-preflight.md); T-148/T-068/owner/hosted gates remain open | [T-153](Tickets/T-153.md) |
+| [T-289 · Reject invalid flood-fill seeds/colors before lazy reads](Tickets/T-289.md) | Done | **P1 implementation:** [13-failure native pre-fix, 23/23 fixed, 161 neighboring native checks and required-CI strict marker](evidence/T-289-2026-11-23-fill-preflight.md); T-068/hardware/hosted gates remain open | [T-153](Tickets/T-153.md) |
+| [T-288 · Restore native Rust fill-to-frame CI and beta4 profiler provenance](Tickets/T-288.md) | Done | **P1 validation:** [native build and registration, exact 96/96 fill, two 21-trial X11 processes 770/770, mutation and engine-hash contracts](evidence/T-288-2026-11-23-native-fill-frame.md); T-068/T-094/owner gates open | [T-153](Tickets/T-153.md) |
+| [T-287 · Reject non-replayable workflow and job metadata in local fast CI](Tickets/T-287.md) | Done | **P1 validation:** [14 fail-first envelope violations, 50/50 replay/CI/owner-evidence Python contracts](evidence/T-287-2026-11-23-workflow-envelope.md); hosted CI and owner review remain open | [T-122](Tickets/T-122.md), [T-286](Tickets/T-286.md) |
+| [T-286 · Reject non-replayable step metadata in local fast CI](Tickets/T-286.md) | Done | **P1 validation:** [8 fail-first metadata violations, 47/47 strict replay/CI/owner-evidence Python contracts](evidence/T-286-2026-11-23-ci-replay-metadata.md); hosted CI and owner review remain open | [T-122](Tickets/T-122.md) |
+| [T-285 · Normalize repeat beta4 Linux native release exports](Tickets/T-285.md) | Done | **P1 implementation:** [29 native-package plus 45 adjacent PCK/CI/portability tests](evidence/T-285-2026-11-23-reexport-normalization.md); exact two-native inventory, stage digest, late rollback, hosted/owner gates remain open | [T-201](Tickets/T-201.md), [T-212](Tickets/T-212.md) |
+| [T-284 · Make T-124 queued Brush CI backlog deterministic](Tickets/T-284.md) | Done | **P1 validation:** [840 input samples force deferred second gesture, 4 × 78/78 headless, 20/20 native X11, fail-closed short-path mutation](evidence/T-284-2026-11-23-queued-brush-backlog.md); hosted/owner T-085/T-250 gates remain open | [T-124](Tickets/T-124.md), [T-262](Tickets/T-262.md) |
+| [T-283 · Repair T-137 cold-preview fast-CI Redo contract](Tickets/T-283.md) | Done | **P1 validation:** [15/15 model, 19/19 X11 settled Redo, 153/153 T-086 neighbor, strict CI contracts](evidence/T-283-2026-11-23-cold-preview-ci-contract.md); owner/hosted/hardware gates open | [T-137](Tickets/T-137.md), [T-266](Tickets/T-266.md) |
+| [T-282 · Restore verified-source mixed fill staging on native tile history](Tickets/T-282.md) | Done | **P1 validation:** [36/36 native immutable-source fill, full-region commit/Undo/Redo, signed seam and mutation controls](evidence/T-282-2026-11-23-verified-stage.md); hosted CI/performance and owner gates remain open | [T-281](Tickets/T-281.md), [T-278](Tickets/T-278.md) |
+| [T-281 · Restore native lazy flood-fill tile-cache and full-region history witness](Tickets/T-281.md) | Done | **P1 validation:** [39/39 native lazy fill, signed seam, masked/unmasked Undo/Redo and mutation controls](evidence/T-281-2026-11-23-native-fill-cache.md); verified-stage and hosted CI remain open | [T-278](Tickets/T-278.md), [T-280](Tickets/T-280.md) |
 | [T-272 · Remove appearance-only UI test assertions; require visual inspection](Tickets/T-272.md) | Done | Appearance-only oracles retired; real screenshots inspected, 50 native logs and 33 Python checks pass; [full audit](evidence/T-272-2026-11-23-visual-test-audit.md). Original dock/ColorPicker UX remains for owner T-250 | — |
 | [T-251 · Fix dock toggle placement/overlap](Tickets/T-251.md) | Done | **P0 owner correction complete:** [native/Atlas focus, geometry and scale evidence](evidence/T-251-2026-11-22-dock-toggle.md); T-250 owner review still pending | [T-222](Tickets/T-222.md) |
 | [T-252 · Commit deliberate recent colors and remove Restore previous](Tickets/T-252.md) | Done | **P0 correction complete:** [color gesture and native/Atlas evidence](evidence/T-252-2026-11-22-recent-colors.md); T-250 owner review outstanding | [T-226](Tickets/T-226.md) |

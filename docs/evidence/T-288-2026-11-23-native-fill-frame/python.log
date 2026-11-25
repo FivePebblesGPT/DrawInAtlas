@@ -1,0 +1,13 @@
+test_engine_provenance_rejects_wrong_version_build_or_hash (tests.test_t068_fill_process_profile.FillProfileTests.test_engine_provenance_rejects_wrong_version_build_or_hash) ... ok
+test_live_self_process (tests.test_t068_fill_process_profile.FillProfileTests.test_live_self_process) ... ok
+test_paired_run_medians_are_not_pooled (tests.test_t068_fill_process_profile.FillProfileTests.test_paired_run_medians_are_not_pooled) ... ok
+test_parse_rss_hwm_and_swap (tests.test_t068_fill_process_profile.FillProfileTests.test_parse_rss_hwm_and_swap) ... ok
+test_reject_xvfb_wrapper_even_when_command_contains_script (tests.test_t068_fill_process_profile.FillProfileTests.test_reject_xvfb_wrapper_even_when_command_contains_script) ... ok
+test_witness_rejects_bad_counts_failures_and_missing_samples (tests.test_t068_fill_process_profile.FillProfileTests.test_witness_rejects_bad_counts_failures_and_missing_samples) ... ok
+test_missing_or_reordered_native_preflight_is_rejected (tests.test_t288_fill_native_ci.FillNativeCiTests.test_missing_or_reordered_native_preflight_is_rejected) ... ok
+test_real_on_demand_workflow_builds_registered_native_engine (tests.test_t288_fill_native_ci.FillNativeCiTests.test_real_on_demand_workflow_builds_registered_native_engine) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.006s
+
+OK

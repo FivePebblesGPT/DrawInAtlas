@@ -1,0 +1,135 @@
+test_engine_copy_is_normalized_only_if_it_matches_the_stage (test_t201_linux_native_package.LinuxNativeExportTests.test_engine_copy_is_normalized_only_if_it_matches_the_stage) ... ok
+test_exported_launch_rejects_unregistered_abi_even_when_main_loads (test_t201_linux_native_package.LinuxNativeExportTests.test_exported_launch_rejects_unregistered_abi_even_when_main_loads) ... ok
+test_exported_native_symlink_rejected_even_when_target_matches (test_t201_linux_native_package.LinuxNativeExportTests.test_exported_native_symlink_rejected_even_when_target_matches) ... ok
+test_interrupted_copy_removes_only_owned_temporary (test_t201_linux_native_package.LinuxNativeExportTests.test_interrupted_copy_removes_only_owned_temporary)
+A failed native copy leaves no partial library or staging files. ... ok
+test_late_distribution_rejection_rolls_back_new_native (test_t201_linux_native_package.LinuxNativeExportTests.test_late_distribution_rejection_rolls_back_new_native) ... ok
+test_missing_mismatched_and_extra_native_files_fail_closed (test_t201_linux_native_package.LinuxNativeExportTests.test_missing_mismatched_and_extra_native_files_fail_closed) ... ok
+test_noncanonical_resource_name_rejects_without_native_publication (test_t201_linux_native_package.LinuxNativeExportTests.test_noncanonical_resource_name_rejects_without_native_publication)
+Invalid PCK names must fail during preflight, not after .so installation. ... ok
+test_noncritical_resource_corruption_rejects_without_native_publication (test_t201_linux_native_package.LinuxNativeExportTests.test_noncritical_resource_corruption_rejects_without_native_publication)
+A bad packed asset cannot install a valid native ELF or mutate the export. ... ok
+test_package_rejected_stage_preserves_export (test_t201_linux_native_package.LinuxNativeExportTests.test_package_rejected_stage_preserves_export)
+Pre-packaging rejection must not publish the native library. ... ok
+test_package_release_keeps_native_bytes_and_launch_isolation (test_t201_linux_native_package.LinuxNativeExportTests.test_package_release_keeps_native_bytes_and_launch_isolation) ... ok
+test_preflight_cross_filesystem_native_fallback (test_t201_linux_native_package.LinuxNativeExportTests.test_preflight_cross_filesystem_native_fallback)
+The native source can be on another filesystem than the export. ... ok
+test_rejected_export_does_not_leave_partially_installed_library (test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_export_does_not_leave_partially_installed_library)
+Invalid ELF/PCK and unexpected files must fail without any publication. ... ok
+test_rejected_package_preserves_foreign_temporary_directory (test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_package_preserves_foreign_temporary_directory)
+Unexpected directories must not hide the original validation error. ... ok
+test_rejected_package_preserves_foreign_temporary_file (test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_package_preserves_foreign_temporary_file)
+Cleanup cannot unlink a temp-looking file owned by another process. ... ok
+test_rejected_package_preserves_foreign_temporary_symlink (test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_package_preserves_foreign_temporary_symlink)
+An unexpected symlink must be refused without being removed. ... ok
+test_rejected_special_entries_leave_export_unchanged (test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_special_entries_leave_export_unchanged)
+A complete native projection must not authorize extra filesystem nodes. ... ok
+test_repeated_export_rejects_changed_engine_copy_without_mutation (test_t201_linux_native_package.LinuxNativeExportTests.test_repeated_export_rejects_changed_engine_copy_without_mutation) ... FAIL
+test_repeated_export_restores_engine_copy_on_late_failure (test_t201_linux_native_package.LinuxNativeExportTests.test_repeated_export_restores_engine_copy_on_late_failure) ... FAIL
+test_repeated_godot_export_normalizes_identical_engine_copy (test_t201_linux_native_package.LinuxNativeExportTests.test_repeated_godot_export_normalizes_identical_engine_copy)
+A second beta4 export must not invalidate an already packaged release. ... ERROR
+test_stage_identity_cannot_be_spoofed_by_comments_or_other_sections (test_t201_linux_native_package.LinuxNativeExportTests.test_stage_identity_cannot_be_spoofed_by_comments_or_other_sections)
+Only effective [application] settings authorize standalone packaging. ... ok
+test_stage_permits_generated_godot_and_drawing_subdirectories (test_t201_linux_native_package.LinuxNativeExportTests.test_stage_permits_generated_godot_and_drawing_subdirectories)
+Allowed empty source and Godot cache folders remain supported. ... ok
+test_stage_rejects_special_files_even_in_allowed_subtrees (test_t201_linux_native_package.LinuxNativeExportTests.test_stage_rejects_special_files_even_in_allowed_subtrees)
+is_file-only inventory silently ignored FIFOs and Unix sockets. ... ok
+test_stage_rejects_undeclared_directories (test_t201_linux_native_package.LinuxNativeExportTests.test_stage_rejects_undeclared_directories)
+No source-stage entry can escape the Drawing allowlisted hierarchy. ... ok
+test_stage_rejects_unix_sockets_in_allowed_subtrees (test_t201_linux_native_package.LinuxNativeExportTests.test_stage_rejects_unix_sockets_in_allowed_subtrees)
+Unix sockets are not staged resources, even under cache directories. ... ok
+test_staged_project_inside_export_root_is_rejected_without_publication (test_t201_linux_native_package.LinuxNativeExportTests.test_staged_project_inside_export_root_is_rejected_without_publication)
+Regression for CI exporting ELF/PCK beside its staged project. ... ok
+test_symlinks_and_unregistered_stage_rejected (test_t201_linux_native_package.LinuxNativeExportTests.test_symlinks_and_unregistered_stage_rejected) ... ok
+test_unrelated_pack_is_rejected_before_native_publication (test_t201_linux_native_package.LinuxNativeExportTests.test_unrelated_pack_is_rejected_before_native_publication) ... ok
+test_wrong_packed_project_rejects_before_native_publication (test_t201_linux_native_package.LinuxNativeExportTests.test_wrong_packed_project_rejects_before_native_publication)
+The staged Drawing project cannot authorize an unrelated exported ECFG. ... ok
+
+======================================================================
+ERROR: test_repeated_godot_export_normalizes_identical_engine_copy (test_t201_linux_native_package.LinuxNativeExportTests.test_repeated_godot_export_normalizes_identical_engine_copy)
+A second beta4 export must not invalidate an already packaged release.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tools/package_linux_export.py", line 89, in package
+    inspect_distribution(distribution, "linux")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tools/benchmarks/t068_release_gate.py", line 438, in inspect_distribution
+    files = inspect_distribution_entries(directory, platform)
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tools/benchmarks/t068_release_gate.py", line 204, in inspect_distribution_entries
+    raise ReleaseError(f"Unexpected export file: {name}")
+tools.benchmarks.t068_release_gate.ReleaseError: Unexpected export file: libdrawing_brush.so
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t201_linux_native_package.py", line 113, in test_repeated_godot_export_normalizes_identical_engine_copy
+    self.assertEqual(package.package(self.stage, self.output), shipped)
+                     ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tools/package_linux_export.py", line 91, in package
+    raise PackageError(f"Invalid Linux distribution after packaging: {exc}") from exc
+tools.package_linux_export.PackageError: Invalid Linux distribution after packaging: Unexpected export file: libdrawing_brush.so
+
+======================================================================
+FAIL: test_repeated_export_rejects_changed_engine_copy_without_mutation (test_t201_linux_native_package.LinuxNativeExportTests.test_repeated_export_rejects_changed_engine_copy_without_mutation)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tools/package_linux_export.py", line 89, in package
+    inspect_distribution(distribution, "linux")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tools/benchmarks/t068_release_gate.py", line 438, in inspect_distribution
+    files = inspect_distribution_entries(directory, platform)
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tools/benchmarks/t068_release_gate.py", line 204, in inspect_distribution_entries
+    raise ReleaseError(f"Unexpected export file: {name}")
+tools.benchmarks.t068_release_gate.ReleaseError: Unexpected export file: libdrawing_brush.so
+
+The above exception was the direct cause of the following exception:
+
+tools.package_linux_export.PackageError: Invalid Linux distribution after packaging: Unexpected export file: libdrawing_brush.so
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t201_linux_native_package.py", line 127, in test_repeated_export_rejects_changed_engine_copy_without_mutation
+    with self.assertRaisesRegex(package.PackageError, "Engine-copied native library differs"):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: "Engine-copied native library differs" does not match "Invalid Linux distribution after packaging: Unexpected export file: libdrawing_brush.so"
+
+======================================================================
+FAIL: test_repeated_export_restores_engine_copy_on_late_failure (test_t201_linux_native_package.LinuxNativeExportTests.test_repeated_export_restores_engine_copy_on_late_failure)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tools/package_linux_export.py", line 89, in package
+    inspect_distribution(distribution, "linux")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/unittest/mock.py", line 1169, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/unittest/mock.py", line 1173, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/unittest/mock.py", line 1234, in _execute_mock_call
+    result = effect(*args, **kwargs)
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t201_linux_native_package.py", line 145, in fail_after_normalization
+    return real_inspect(path, platform)
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tools/benchmarks/t068_release_gate.py", line 438, in inspect_distribution
+    files = inspect_distribution_entries(directory, platform)
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tools/benchmarks/t068_release_gate.py", line 204, in inspect_distribution_entries
+    raise ReleaseError(f"Unexpected export file: {name}")
+tools.benchmarks.t068_release_gate.ReleaseError: Unexpected export file: libdrawing_brush.so
+
+The above exception was the direct cause of the following exception:
+
+tools.package_linux_export.PackageError: Invalid Linux distribution after packaging: Unexpected export file: libdrawing_brush.so
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t201_linux_native_package.py", line 148, in test_repeated_export_restores_engine_copy_on_late_failure
+    with self.assertRaisesRegex(package.PackageError, "injected late distribution failure"):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: "injected late distribution failure" does not match "Invalid Linux distribution after packaging: Unexpected export file: libdrawing_brush.so"
+
+----------------------------------------------------------------------
+Ran 28 tests in 4.295s
+
+FAILED (failures=2, errors=1)

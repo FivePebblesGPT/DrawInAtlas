@@ -1,0 +1,41 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ERROR: T068_AXIS_SWEEP_FAILED: expected coverage before commit (-15.25, 0.5) -> (24.75, 0.5) width=8.0 mask=true
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_axis_sweep_smoke.gd:19)
+       [1] _case (res://tests/drawing_axis_sweep_smoke.gd:80)
+       [2] _run (res://tests/drawing_axis_sweep_smoke.gd:151)
+ERROR: T068_AXIS_SWEEP_FAILED: exact original Geometry2D pixels and RGBA8 (-15.25, 0.5) -> (24.75, 0.5) width=8.0 mask=true
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_axis_sweep_smoke.gd:19)
+       [1] _case (res://tests/drawing_axis_sweep_smoke.gd:90)
+       [2] _run (res://tests/drawing_axis_sweep_smoke.gd:151)
+ERROR: T068_AXIS_SWEEP_FAILED: full exact RGBA8 after redo (-15.25, 0.5) -> (24.75, 0.5) width=8.0 mask=true
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_axis_sweep_smoke.gd:19)
+       [1] _case (res://tests/drawing_axis_sweep_smoke.gd:96)
+       [2] _run (res://tests/drawing_axis_sweep_smoke.gd:151)
+ERROR: T068_AXIS_SWEEP_FAILED: expected coverage before commit (0.5, -16.25) -> (0.5, 21.5) width=8.0 mask=true
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_axis_sweep_smoke.gd:19)
+       [1] _case (res://tests/drawing_axis_sweep_smoke.gd:80)
+       [2] _run (res://tests/drawing_axis_sweep_smoke.gd:152)
+ERROR: T068_AXIS_SWEEP_FAILED: exact original Geometry2D pixels and RGBA8 (0.5, -16.25) -> (0.5, 21.5) width=8.0 mask=true
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_axis_sweep_smoke.gd:19)
+       [1] _case (res://tests/drawing_axis_sweep_smoke.gd:90)
+       [2] _run (res://tests/drawing_axis_sweep_smoke.gd:152)
+ERROR: T068_AXIS_SWEEP_FAILED: full exact RGBA8 after redo (0.5, -16.25) -> (0.5, 21.5) width=8.0 mask=true
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_axis_sweep_smoke.gd:19)
+       [1] _case (res://tests/drawing_axis_sweep_smoke.gd:96)
+       [2] _run (res://tests/drawing_axis_sweep_smoke.gd:152)
+T068_AXIS_SWEEP_FAILED checks=241 failures=6

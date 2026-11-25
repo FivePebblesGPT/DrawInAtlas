@@ -1,0 +1,89 @@
+test_changes_to_execution_semantics_are_rejected (tests.test_t286_ci_replay_metadata.StrictReplayStepMetadata.test_changes_to_execution_semantics_are_rejected) ...
+  test_changes_to_execution_semantics_are_rejected (tests.test_t286_ci_replay_metadata.StrictReplayStepMetadata.test_changes_to_execution_semantics_are_rejected) (metadata='        working-directory: drawing\n') ... FAIL
+  test_changes_to_execution_semantics_are_rejected (tests.test_t286_ci_replay_metadata.StrictReplayStepMetadata.test_changes_to_execution_semantics_are_rejected) (metadata='        timeout-minutes: 15\n') ... FAIL
+  test_changes_to_execution_semantics_are_rejected (tests.test_t286_ci_replay_metadata.StrictReplayStepMetadata.test_changes_to_execution_semantics_are_rejected) (metadata='        defaults:\n          run:\n            working-directory: drawing\n') ... FAIL
+  test_changes_to_execution_semantics_are_rejected (tests.test_t286_ci_replay_metadata.StrictReplayStepMetadata.test_changes_to_execution_semantics_are_rejected) (metadata='        if: ${{ false }}\n') ... FAIL
+  test_changes_to_execution_semantics_are_rejected (tests.test_t286_ci_replay_metadata.StrictReplayStepMetadata.test_changes_to_execution_semantics_are_rejected) (metadata='        continue-on-error: false\n') ... FAIL
+  test_changes_to_execution_semantics_are_rejected (tests.test_t286_ci_replay_metadata.StrictReplayStepMetadata.test_changes_to_execution_semantics_are_rejected) (metadata='        strategy: {}\n') ... FAIL
+test_optional_bash_shell_and_ordinary_step_comments_remain_allowed (tests.test_t286_ci_replay_metadata.StrictReplayStepMetadata.test_optional_bash_shell_and_ordinary_step_comments_remain_allowed) ... ok
+test_real_workflow_still_replays_46_checks_without_changes (tests.test_t286_ci_replay_metadata.StrictReplayStepMetadata.test_real_workflow_still_replays_46_checks_without_changes) ... ok
+test_unknown_step_level_construct_fails_closed (tests.test_t286_ci_replay_metadata.StrictReplayStepMetadata.test_unknown_step_level_construct_fails_closed) ...
+  test_unknown_step_level_construct_fails_closed (tests.test_t286_ci_replay_metadata.StrictReplayStepMetadata.test_unknown_step_level_construct_fails_closed) (metadata='        <<: *shared\n') ... FAIL
+  test_unknown_step_level_construct_fails_closed (tests.test_t286_ci_replay_metadata.StrictReplayStepMetadata.test_unknown_step_level_construct_fails_closed) (metadata='        ? ambiguous\n') ... FAIL
+
+======================================================================
+FAIL: test_changes_to_execution_semantics_are_rejected (tests.test_t286_ci_replay_metadata.StrictReplayStepMetadata.test_changes_to_execution_semantics_are_rejected) (metadata='        working-directory: drawing\n')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t286_ci_replay_metadata.py", line 45, in test_changes_to_execution_semantics_are_rejected
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_changes_to_execution_semantics_are_rejected (tests.test_t286_ci_replay_metadata.StrictReplayStepMetadata.test_changes_to_execution_semantics_are_rejected) (metadata='        timeout-minutes: 15\n')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t286_ci_replay_metadata.py", line 45, in test_changes_to_execution_semantics_are_rejected
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_changes_to_execution_semantics_are_rejected (tests.test_t286_ci_replay_metadata.StrictReplayStepMetadata.test_changes_to_execution_semantics_are_rejected) (metadata='        defaults:\n          run:\n            working-directory: drawing\n')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t286_ci_replay_metadata.py", line 45, in test_changes_to_execution_semantics_are_rejected
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_changes_to_execution_semantics_are_rejected (tests.test_t286_ci_replay_metadata.StrictReplayStepMetadata.test_changes_to_execution_semantics_are_rejected) (metadata='        if: ${{ false }}\n')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t286_ci_replay_metadata.py", line 45, in test_changes_to_execution_semantics_are_rejected
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_changes_to_execution_semantics_are_rejected (tests.test_t286_ci_replay_metadata.StrictReplayStepMetadata.test_changes_to_execution_semantics_are_rejected) (metadata='        continue-on-error: false\n')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t286_ci_replay_metadata.py", line 45, in test_changes_to_execution_semantics_are_rejected
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_changes_to_execution_semantics_are_rejected (tests.test_t286_ci_replay_metadata.StrictReplayStepMetadata.test_changes_to_execution_semantics_are_rejected) (metadata='        strategy: {}\n')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t286_ci_replay_metadata.py", line 45, in test_changes_to_execution_semantics_are_rejected
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unknown_step_level_construct_fails_closed (tests.test_t286_ci_replay_metadata.StrictReplayStepMetadata.test_unknown_step_level_construct_fails_closed) (metadata='        <<: *shared\n')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t286_ci_replay_metadata.py", line 51, in test_unknown_step_level_construct_fails_closed
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unknown_step_level_construct_fails_closed (tests.test_t286_ci_replay_metadata.StrictReplayStepMetadata.test_unknown_step_level_construct_fails_closed) (metadata='        ? ambiguous\n')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t286_ci_replay_metadata.py", line 51, in test_unknown_step_level_construct_fails_closed
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.006s
+
+FAILED (failures=8)

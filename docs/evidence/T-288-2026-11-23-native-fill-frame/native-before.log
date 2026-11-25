@@ -1,0 +1,89 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3626)
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill coverage 32/0
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:188)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill coverage 32/1
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:188)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill coverage 32/2
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:188)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill coverage 32/3
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:188)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill coverage 32/4
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:188)
+T068_FILL_FRAME_CASE {"cpu_dispatch":{"max_ms":23.518,"median_ms":20.587,"min_ms":18.621,"p95_ms":23.518,"samples_ms":[18.621,19.019,20.587,20.837,23.518]},"event_to_frame_post_draw":{"max_ms":59.043,"median_ms":39.011,"min_ms":36.785,"p95_ms":59.043,"samples_ms":[36.785,38.814,39.011,41.235,59.043]},"pixels":1024,"size":32,"trials":5}
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill coverage 64/0
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:188)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill coverage 64/1
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:188)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill coverage 64/2
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:188)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill coverage 64/3
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:188)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill coverage 64/4
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:188)
+T068_FILL_FRAME_CASE {"cpu_dispatch":{"max_ms":90.345,"median_ms":73.021,"min_ms":67.232,"p95_ms":90.345,"samples_ms":[67.232,68.652,73.021,77.763,90.345]},"event_to_frame_post_draw":{"max_ms":109.379,"median_ms":96.137,"min_ms":85.838,"p95_ms":109.379,"samples_ms":[85.838,86.798,96.137,98.029,109.379]},"pixels":4096,"size":64,"trials":5}
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill coverage 96/0
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:188)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill coverage 96/1
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:188)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill coverage 96/2
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:188)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill coverage 96/3
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:188)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill coverage 96/4
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:188)
+T068_FILL_FRAME_CASE {"cpu_dispatch":{"max_ms":200.077,"median_ms":178.985,"min_ms":173.501,"p95_ms":200.077,"samples_ms":[173.501,173.879,178.985,189.378,200.077]},"event_to_frame_post_draw":{"max_ms":218.725,"median_ms":198.398,"min_ms":192.052,"p95_ms":218.725,"samples_ms":[192.052,192.781,198.398,210.699,218.725]},"pixels":9216,"size":96,"trials":5}
+T068_FILL_FRAME_FAILED checks=96 failures=15

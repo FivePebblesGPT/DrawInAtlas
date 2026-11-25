@@ -26,6 +26,10 @@ var _covered_rows: Dictionary[int, Dictionary] = {}
 var _source_tiles: Dictionary[String, Variant] = {}
 ## Immutable session storage stride. -1 selects the general signed-divide path.
 var _stage_tile_shift: int = -1
+## The native pixel publisher cannot address document pixels beyond ±2^52.
+## Most sessions are at ordinary anchors: calculate this once so a hot Brush
+## scanline does not run a four-sided projection check for every covered pixel.
+var _check_native_pixel_projection: bool = false
 ## Hard Brush pixels arrive in spatial runs. A stable per-session tile-key
 ## cache avoids allocating the same "x,y" String for every covered pixel.
 ## Cache the *tile indices*, not the pixel offsets, so signed/irregular
@@ -209,6 +213,19 @@ func _init(target: DrawingDocument, layer: String, source_revision: int,
 	view_transform = transform
 	anchor_x = origin_x
 	anchor_y = origin_y
+	# The direct tile publisher requires the native tile ABI. Small synthetic
+	# strides remain valid documents, but must use canonical pixel-key edits.
+	_brush_tile_publish = document.tile_stride >= 16 and document.tile_stride <= 2048
+	var native_publisher: bool = document._native_raster_store != null or (
+		document.tile_stride >= 16 and document.tile_stride <= 2048
+		and ClassDB.class_exists("DrawingNativeTiles"))
+	var projection_limit: int = DrawingDocument.TILES.MAX_PROJECTION_PIXEL_COORD
+	var maximum_local: int = 1073741823
+	_check_native_pixel_projection = native_publisher and (
+		anchor_x < -projection_limit + maximum_local
+		or anchor_x > projection_limit - maximum_local
+		or anchor_y < -projection_limit + maximum_local
+		or anchor_y > projection_limit - maximum_local)
 	# A script-only gesture must reserve its history owner even when created
 	# directly rather than through DrawingDocument.begin_edit(). The document
 	# holds only a weak handle and releases closed/abandoned sessions.
@@ -624,10 +641,22 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 		internal_brush: bool = false) -> DrawingResult:
 	if not internal_brush:
 		_stationary_dab_valid = false
-	if _clear_deferred:
-		_materialize_clear_preview()
 	if _closed:
 		return DrawingResult.failure("CLOSED", "Gesture is already finished")
+	if rgba < 0 or rgba > 0xffffffff:
+		return DrawingResult.failure("RGBA", "RGBA8 must contain four channels")
+	if x <= -1073741824 or x >= 1073741824 or y <= -1073741824 or y >= 1073741824:
+		return DrawingResult.failure("COORD_RANGE", "Gesture view-relative pixel exceeds safe bounds")
+	if selection != null and not selection.allows(Vector2i(x, y)):
+		return _brush_stage_ok if internal_brush else DrawingResult.success()
+	# Reject globally unpublishable pixels before invoking a lazy provider or
+	# flattening a previously accepted deferred Brush/clear preview. This also
+	# covers one-pixel Brush calls, not just the public bulk-edit APIs.
+	if _check_native_pixel_projection and not DrawingDocument.TILES.pixel_coordinates_in_projection_range(
+			anchor_x + x, anchor_y + y):
+		return DrawingResult.failure("COORD_RANGE", "Pixel exceeds native document projection")
+	if _clear_deferred:
+		_materialize_clear_preview()
 	if internal_brush and _brush_tile_publish and not _hokusai_deferred:
 		return _stage_brush_tile(x, y, rgba, selection, once, blend, verified_source)
 	if not internal_brush:
@@ -637,12 +666,6 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 	# covered pixel; only a session with native deferred edits needs a flush.
 	if _hokusai_deferred:
 		_materialize_hokusai_preview()
-	if rgba < 0 or rgba > 0xffffffff:
-		return DrawingResult.failure("RGBA", "RGBA8 must contain four channels")
-	if x <= -1073741824 or x >= 1073741824 or y <= -1073741824 or y >= 1073741824:
-		return DrawingResult.failure("COORD_RANGE", "Gesture view-relative pixel exceeds safe bounds")
-	if selection != null and not selection.allows(Vector2i(x, y)):
-		return _brush_stage_ok if internal_brush else DrawingResult.success()
 	var global_x: int = anchor_x + x
 	var global_y: int = anchor_y + y
 	var covered_row: Dictionary = {}
@@ -790,6 +813,66 @@ func _stage_brush_tile(x: int, y: int, rgba: int, selection: DrawingSelection,
 	return _brush_stage_ok
 
 
+## A bulk operation must validate its *entire* candidate rectangle before
+## materializing deferred Brush/Erase history or invoking a lazy source loader.
+## Size/budget validation belongs to each caller and precedes this check.
+func _bulk_area_in_view_range(area: Rect2i) -> bool:
+	var last_x: int = int(area.position.x) + int(area.size.x) - 1
+	var last_y: int = int(area.position.y) + int(area.size.y) - 1
+	return area.position.x > -1073741824 and last_x < 1073741824 \
+		and area.position.y > -1073741824 and last_y < 1073741824
+
+
+## Before any lazy tile fetch or deferred Brush materialization, reject an
+## entire bulk edit that cannot be published by the attached/native tile path.
+## Non-native documents retain their wider historical signed anchor range.
+func _bulk_area_in_native_projection(area: Rect2i) -> bool:
+	if document._native_raster_store == null and not (
+			document.tile_stride >= 16 and document.tile_stride <= 2048
+			and ClassDB.class_exists("DrawingNativeTiles")):
+		return true
+	var first_x: int = anchor_x + int(area.position.x)
+	var first_y: int = anchor_y + int(area.position.y)
+	var last_x: int = first_x + int(area.size.x) - 1
+	var last_y: int = first_y + int(area.size.y) - 1
+	return DrawingDocument.TILES.pixel_coordinates_in_projection_range(first_x, first_y) \
+		and DrawingDocument.TILES.pixel_coordinates_in_projection_range(last_x, last_y)
+
+
+## Prove a selected bulk region is empty before touching deferred brushes or
+## lazy sources. Complex mask/boolean overlaps use a bounded exact probe;
+## uncertain large areas fall through to the existing per-pixel selection.
+func _bulk_selection_excludes_area(area: Rect2i, selection: DrawingSelection) -> bool:
+	return selection != null and selection.enabled \
+		and not selection.allows_any_in_area(area)
+
+
+## Polygon bounding boxes can overlap selected pixels that lie entirely
+## outside the filled shape. Prove the true intersection empty only for a
+## bounded candidate window; large/uncertain cases retain normal staging.
+func _polygon_selection_excludes_pixels(area: Rect2i, points: PackedVector2Array,
+		selection: DrawingSelection) -> bool:
+	if selection == null or not selection.enabled or selection.inverted:
+		return false
+	var overlap: Rect2i = area.intersection(selection.bounds)
+	if not overlap.has_area():
+		return true
+	if overlap.size.x > DrawingSelection.MAX_BULK_OVERLAP_PROBES \
+			or overlap.size.y > DrawingSelection.MAX_BULK_OVERLAP_PROBES / overlap.size.x:
+		return false
+	# Point-in-polygon itself scales with vertex count: cap the full work,
+	# not just the selected raster candidate count.
+	var candidate_count: int = overlap.size.x * overlap.size.y
+	if points.size() > 65536 / candidate_count:
+		return false
+	for y: int in range(overlap.position.y, overlap.end.y):
+		for x: int in range(overlap.position.x, overlap.end.x):
+			if selection.allows(Vector2i(x, y)) and Geometry2D.is_point_in_polygon(
+					Vector2(x + 0.5, y + 0.5), points):
+				return false
+	return true
+
+
 ## Exact canonical bytes, optionally including nonzero RGB when alpha is zero.
 ## A region is always view-relative, and bounded before allocating/staging changes.
 func apply_region(area: Rect2i, rgba8: PackedByteArray,
@@ -800,6 +883,12 @@ func apply_region(area: Rect2i, rgba8: PackedByteArray,
 		return DrawingResult.failure("REGION_LIMIT", "Region is empty or over pixel budget")
 	if rgba8.size() != area.size.x * area.size.y * 4:
 		return DrawingResult.failure("RGBA", "Region bytes must be tightly packed RGBA8")
+	if not _bulk_area_in_view_range(area):
+		return DrawingResult.failure("COORD_RANGE", "Region exceeds safe view-relative pixel coordinates")
+	if not _bulk_area_in_native_projection(area):
+		return DrawingResult.failure("COORD_RANGE", "Region exceeds native document projection")
+	if _bulk_selection_excludes_area(area, selection):
+		return DrawingResult.success(change_count())
 	_materialize_hokusai_preview()
 	# A failed mixed edit must restore the already accepted deferred Brush, not
 	# an empty pre-materialization snapshot. Materialize before rollback state.
@@ -821,8 +910,18 @@ func apply_region(area: Rect2i, rgba8: PackedByteArray,
 
 func fill_rect(area: Rect2i, rgba: int, selection: DrawingSelection = null,
 		max_pixels: int = 1048576) -> DrawingResult:
+	if _closed:
+		return DrawingResult.failure("CLOSED", "Gesture is already finished")
 	if area.size.x <= 0 or area.size.y <= 0 or area.size.x > max_pixels or area.size.y > max_pixels / area.size.x:
 		return DrawingResult.failure("REGION_LIMIT", "Rectangle is empty or over pixel budget")
+	if rgba < 0 or rgba > 0xffffffff:
+		return DrawingResult.failure("RGBA", "RGBA8 must contain four channels")
+	if not _bulk_area_in_view_range(area):
+		return DrawingResult.failure("COORD_RANGE", "Rectangle exceeds safe view-relative pixel coordinates")
+	if not _bulk_area_in_native_projection(area):
+		return DrawingResult.failure("COORD_RANGE", "Rectangle exceeds native document projection")
+	if _bulk_selection_excludes_area(area, selection):
+		return DrawingResult.success(change_count())
 	_materialize_hokusai_preview()
 	# A failed mixed edit must restore the already accepted deferred Brush, not
 	# an empty pre-materialization snapshot. Materialize before rollback state.
@@ -861,6 +960,12 @@ func clear_rect(area: Rect2i, selection: DrawingSelection = null,
 			or not DrawingDocument.TILES.document_anchor_in_range(
 				anchor_x + last_x, anchor_y + last_y):
 		return DrawingResult.failure("COORD_RANGE", "Clear area exceeds safe pixel coordinates")
+	# Dense and sparse Delete both resolve lazy sources. Reject the *whole*
+	# unpublishable native region before touching pending tiles or a Brush preview.
+	if not _bulk_area_in_native_projection(area):
+		return DrawingResult.failure("COORD_RANGE", "Clear area exceeds native document projection")
+	if _bulk_selection_excludes_area(area, selection):
+		return DrawingResult.success(change_count())
 	_materialize_hokusai_preview()
 	_materialize_brush_preview()
 	_materialize_clear_preview()
@@ -1603,17 +1708,30 @@ func paint_path(path: PackedVector2Array, rgba: int, width: float = 1.0,
 func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,
 		erase: bool, selection: DrawingSelection, max_candidates: int,
 		clip_bounds: Rect2i = Rect2i(), depth: int = 0) -> DrawingResult:
-	var left: int = floori(minf(start.x, finish.x) - radius - 0.5)
-	var top: int = floori(minf(start.y, finish.y) - radius - 0.5)
-	var right: int = ceili(maxf(start.x, finish.x) + radius + 0.5)
-	var bottom: int = ceili(maxf(start.y, finish.y) + radius + 0.5)
-	# Restrict only this stroke's candidate window, never sparse document data.
-	# Clipping before the candidate limit also avoids processing off-frame runs.
+	# Preserve floating bounds until *after* clipping: floori/ceili on an
+	# enormous but finite radius can saturate int64, then right-left wraps
+	# negative and accidentally reports success with no painted pixels.
+	var left_bound: float = minf(start.x, finish.x) - radius - 0.5
+	var top_bound: float = minf(start.y, finish.y) - radius - 0.5
+	var right_bound: float = maxf(start.x, finish.x) + radius + 0.5
+	var bottom_bound: float = maxf(start.y, finish.y) + radius + 0.5
+	# A huge brush clipped to a tiny canvas is still a valid bounded edit.
 	if clip_bounds.has_area():
-		left = maxi(left, clip_bounds.position.x)
-		top = maxi(top, clip_bounds.position.y)
-		right = mini(right, clip_bounds.end.x)
-		bottom = mini(bottom, clip_bounds.end.y)
+		left_bound = maxf(left_bound, float(clip_bounds.position.x))
+		top_bound = maxf(top_bound, float(clip_bounds.position.y))
+		right_bound = minf(right_bound, float(clip_bounds.end.x))
+		bottom_bound = minf(bottom_bound, float(clip_bounds.end.y))
+	# Candidate pixels must fit _stage's view-relative domain. Compare while
+	# floating so no integer conversion can overflow or wrap a span to zero.
+	if not is_finite(left_bound) or not is_finite(top_bound) \
+			or not is_finite(right_bound) or not is_finite(bottom_bound) \
+			or left_bound <= -1073741824.0 or top_bound <= -1073741824.0 \
+			or right_bound > 1073741824.0 or bottom_bound > 1073741824.0:
+		return DrawingResult.failure("BRUSH_LIMIT", "Brush candidate window exceeds safe pixel coordinates")
+	var left: int = floori(left_bound)
+	var top: int = floori(top_bound)
+	var right: int = ceili(right_bound)
+	var bottom: int = ceili(bottom_bound)
 	var columns: int = right - left
 	var rows: int = bottom - top
 	if columns <= 0 or rows <= 0:
@@ -1686,8 +1804,8 @@ func _paint_oblique_scanlines(start: Vector2, finish: Vector2, radius: float,
 			continue
 		var x_a: float = lerpf(start.x, finish.x, t_low)
 		var x_b: float = lerpf(start.x, finish.x, t_high)
-		var first_x: int = maxi(left, floori(minf(x_a, x_b) - broad_radius))
-		var last_x: int = mini(right, ceili(maxf(x_a, x_b) + broad_radius + 1.0))
+		var first_x: int = floori(maxf(float(left), minf(x_a, x_b) - broad_radius))
+		var last_x: int = ceili(minf(float(right), maxf(x_a, x_b) + broad_radius + 1.0))
 		var covered_row: Dictionary = _covered_rows.get(anchor_y + y, {})
 		for x: int in range(first_x, last_x):
 			if covered_row.has(anchor_x + x):
@@ -1716,8 +1834,8 @@ func _paint_dab_scanlines(center: Vector2, radius: float, left: int, top: int,
 		if dy * dy > broad_squared:
 			continue
 		var reach: float = sqrt(maxf(0.0, broad_squared - dy * dy))
-		var first_x: int = maxi(left, floori(center.x - reach - 2.5))
-		var last_x: int = mini(right, ceili(center.x + reach + 1.5))
+		var first_x: int = floori(maxf(float(left), center.x - reach - 2.5))
+		var last_x: int = ceili(minf(float(right), center.x + reach + 1.5))
 		var covered_row: Dictionary = _covered_rows.get(anchor_y + y, {})
 		for x: int in range(first_x, last_x):
 			if covered_row.has(anchor_x + x):
@@ -1744,8 +1862,8 @@ func _paint_axis_segment(start: Vector2, finish: Vector2, left: int, top: int,
 			if dy_squared > radius_squared:
 				continue
 			var reach: float = sqrt(maxf(0.0, radius_squared - dy_squared))
-			var first_x: int = maxi(left, floori(min_x - reach - 2.5))
-			var last_x: int = mini(right, ceili(max_x + reach + 1.5))
+			var first_x: int = floori(maxf(float(left), min_x - reach - 2.5))
+			var last_x: int = ceili(minf(float(right), max_x + reach + 1.5))
 			var covered_row: Dictionary = _covered_rows.get(anchor_y + y, {})
 			for x: int in range(first_x, last_x):
 				if covered_row.has(anchor_x + x):
@@ -1768,8 +1886,8 @@ func _paint_axis_segment(start: Vector2, finish: Vector2, left: int, top: int,
 			if dy_squared > radius_squared:
 				continue
 			var reach: float = sqrt(maxf(0.0, radius_squared - dy_squared))
-			var first_x: int = maxi(left, floori(start.x - reach - 2.5))
-			var last_x: int = mini(right, ceili(start.x + reach + 1.5))
+			var first_x: int = floori(maxf(float(left), start.x - reach - 2.5))
+			var last_x: int = ceili(minf(float(right), start.x + reach + 1.5))
 			var covered_row: Dictionary = _covered_rows.get(anchor_y + y, {})
 			for x: int in range(first_x, last_x):
 				if covered_row.has(anchor_x + x):
@@ -1786,8 +1904,12 @@ func _paint_axis_segment(start: Vector2, finish: Vector2, left: int, top: int,
 
 func paint_polygon(polygon: PackedVector2Array, rgba: int,
 		selection: DrawingSelection = null, max_pixels: int = 1048576) -> DrawingResult:
+	if _closed:
+		return DrawingResult.failure("CLOSED", "Gesture is already finished")
 	if polygon.size() < 3:
 		return DrawingResult.failure("SHAPE", "A filled polygon needs three vertices")
+	if rgba < 0 or rgba > 0xffffffff:
+		return DrawingResult.failure("RGBA", "RGBA8 must contain four channels")
 	var inverse: Transform2D = view_transform.affine_inverse()
 	var points: PackedVector2Array = PackedVector2Array()
 	for point: Vector2 in polygon:
@@ -1808,6 +1930,14 @@ func paint_polygon(polygon: PackedVector2Array, rgba: int,
 		ceili(max_x) - floori(min_x), ceili(max_y) - floori(min_y))
 	if area.size.x <= 0 or area.size.y <= 0 or area.size.x > max_pixels or area.size.y > max_pixels / area.size.x:
 		return DrawingResult.failure("SHAPE_LIMIT", "Polygon exceeds candidate budget")
+	if not _bulk_area_in_view_range(area):
+		return DrawingResult.failure("COORD_RANGE", "Polygon exceeds safe view-relative pixel coordinates")
+	if not _bulk_area_in_native_projection(area):
+		return DrawingResult.failure("COORD_RANGE", "Polygon exceeds native document projection")
+	if _bulk_selection_excludes_area(area, selection):
+		return DrawingResult.success(change_count())
+	if _polygon_selection_excludes_pixels(area, points, selection):
+		return DrawingResult.success(change_count())
 	_materialize_hokusai_preview()
 	# A failed mixed edit must restore the already accepted deferred Brush, not
 	# an empty pre-materialization snapshot. Materialize before rollback state.
@@ -1854,6 +1984,27 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 		limit: int = 262144) -> DrawingResult:
 	if limit <= 0 or _closed:
 		return DrawingResult.failure("FILL_LIMIT", "Invalid flood fill budget/session")
+	# Match _stage's accepted view-relative pixel and color ranges *before*
+	# asking a lazy source provider for data. A provider is arbitrary external
+	# code and must not be invoked for an edit that can never be published.
+	if seed.x <= -1073741824 or seed.x >= 1073741824 \
+			or seed.y <= -1073741824 or seed.y >= 1073741824:
+		return DrawingResult.failure("COORD_RANGE", "Gesture view-relative pixel exceeds safe bounds")
+	if rgba < 0 or rgba > 0xffffffff:
+		return DrawingResult.failure("RGBA", "RGBA8 must contain four channels")
+	# Begin-edit anchors permit a wider historical signed range than Rust's
+	# canonical pixel projection. Validate the *global* seed before resolving
+	# a lazy tile, not after staging at an unpublishable coordinate.
+	var native_projection: bool = document._native_raster_store != null or (
+		document.tile_stride >= 16 and document.tile_stride <= 2048
+		and ClassDB.class_exists("DrawingNativeTiles"))
+	if native_projection and not DrawingDocument.TILES.pixel_coordinates_in_projection_range(
+			anchor_x + int(seed.x), anchor_y + int(seed.y)):
+		return DrawingResult.failure("COORD_RANGE", "Fill seed exceeds native projection")
+	# A masked-out seed cannot expand the fill frontier. Reject it before
+	# resolving an arbitrary lazy source or flattening an accepted Brush.
+	if selection != null and not selection.allows(seed):
+		return DrawingResult.success(change_count())
 	var original: DrawingResult = _fill_source_pixel(seed)
 	if not original.ok:
 		return original
@@ -1900,6 +2051,18 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 			return staged
 		for offset: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
 			var next: Vector2i = point + offset
+			# _stage() cannot publish beyond the signed view-relative range.
+			# Do not inspect an unpublishable neighbor's arbitrary lazy source:
+			# it can contain the same color and make an otherwise legal edge
+			# fill fail after already staging the valid seed.
+			if next.x <= -1073741824 or next.x >= 1073741824 \
+					or next.y <= -1073741824 or next.y >= 1073741824:
+				continue
+			# This can overflow native projection even though the local offset is
+			# valid. Do not enqueue/fetch a neighbor that Rust cannot publish.
+			if native_projection and not DrawingDocument.TILES.pixel_coordinates_in_projection_range(
+					anchor_x + int(next.x), anchor_y + int(next.y)):
+				continue
 			if not queued.has(next):
 				queued[next] = true
 				frontier.append(next)

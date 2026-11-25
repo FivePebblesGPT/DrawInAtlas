@@ -73,6 +73,8 @@ func run() -> void:
 	var revision: int = doc.revision
 	var dirty: bool = doc.is_dirty()
 	var history: int = doc.history_length()
+	app._set_color_exact_expanded(true)
+	await frames(3)
 	check(app.color_advanced is ColorPicker and app.color_advanced.visible and
 		app.color_picker_scroll.get_parent() == app.dock_views["colors"],
 		"native full ColorPicker is an always-visible inline child")
@@ -157,8 +159,11 @@ func run() -> void:
 	check(scroll.scroll_vertical < before_wheel or before_wheel == 0,
 		"wheel over dock scrollbar scrolls vertically even beside native picker")
 	root.size = Vector2i(1050, 490)
-	app.dock_split.split_offset = roundi(app.dock_split.size.x) - 190
 	await frames(14)
+	# Apply the deliberately narrow test width after the resize-triggered
+	# preference restoration has settled, using HSplitContainer's negative offset.
+	app.dock_split.split_offset = -226
+	await frames(8)
 	app.inspector.ensure_control_visible(app.color_hex)
 	await frames(6)
 	check(app.color_hex.editable and app.color_hex.is_visible_in_tree() and
@@ -170,6 +175,11 @@ func run() -> void:
 		app.color_advanced.visible,
 		"narrow and short dock scrolls to embedded native picker")
 	var picker_horizontal: ScrollContainer = app.color_picker_scroll
+	print("T274_T226_DIAG inspector=", app.inspector.size.x,
+		" pickerScroll=", picker_horizontal.size.x, " native=", app.color_advanced.size.x,
+		" min=", app.color_advanced.get_combined_minimum_size().x,
+		" hmax=", picker_horizontal.get_h_scroll_bar().max_value,
+		" hpage=", picker_horizontal.get_h_scroll_bar().page)
 	check(picker_horizontal.get_h_scroll_bar().max_value > picker_horizontal.get_h_scroll_bar().page,
 		"narrow native picker exposes horizontal scroll for offscreen controls")
 	picker_horizontal.scroll_horizontal = 10000

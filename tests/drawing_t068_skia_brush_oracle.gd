@@ -1,13 +1,17 @@
 extends SceneTree
 ## T-068: generate pinned hard-brush/selection fixtures from the *real*
 ## DrawingEditSession, not an approximation of its geometry or RGBA8 blending.
+## T-277: run this live probe inside the native projection and read committed
+## raster pixels; the original beta2 fixture with >2^53 anchors is immutable.
 ##
 ## Run after Godot's resource import with:
 ##   godot --headless --path . --script res://tests/drawing_t068_skia_brush_oracle.gd -- /tmp/oracle.json
 
 const SIDE: int = 32
-const ANCHOR_X: int = 9007199254740993
-const ANCHOR_Y: int = -9007199254740993
+# Retain a large signed anchor with nonzero low bits, but stay inside
+# the native tile projection (the historical >2^53 probe cannot commit).
+const ANCHOR_X: int = 1125899906842625
+const ANCHOR_Y: int = -1125899906842625
 
 
 func _initialize() -> void:
@@ -159,25 +163,34 @@ func _witness(spec: Dictionary, source: PackedByteArray) -> Dictionary:
 				return {}
 			coverage.append(index)
 	coverage.sort()
-	var committed: DrawingResult
 	if session.change_count() == 0:
 		# A zero-alpha brush still reports coverage, but has no publication.
 		session.cancel()
 	else:
-		committed = session.commit()
+		var committed: DrawingResult = session.commit()
 		if not committed.ok:
 			return {}
-	var after: PackedByteArray = source.duplicate()
+	# Native-owned commits do not expose legacy per-pixel delta.after. Read
+	# actual published RGBA8 so a dropped/stale native commit cannot look
+	# like a successful empty delta.
+	var after: PackedByteArray = PackedByteArray()
+	after.resize(source.size())
 	var changed: Array[int] = []
-	for key: String in (committed.delta.after if committed != null and committed.delta != null else {}):
-		var index: int = _index(key)
-		if index < 0:
-			return {}
-		changed.append(index)
-		var value: int = int(committed.delta.after[key])
-		for channel: int in range(4):
-			after[index * 4 + channel] = (value >> (channel * 8)) & 255
-	changed.sort()
+	for y: int in range(SIDE):
+		for x: int in range(SIDE):
+			var pixel: DrawingResult = document.read_pixel(layer, ANCHOR_X + x, ANCHOR_Y + y)
+			if not pixel.ok:
+				return {}
+			var index: int = y * SIDE + x
+			var value: int = int(pixel.value)
+			for channel: int in range(4):
+				after[index * 4 + channel] = (value >> (channel * 8)) & 255
+			var different: bool = false
+			for channel: int in range(4):
+				if after[index * 4 + channel] != source[index * 4 + channel]:
+					different = true
+			if different:
+				changed.append(index)
 	var output: Dictionary = spec.duplicate(true)
 	if spec.has("transform"):
 		output["view_path"] = view_path

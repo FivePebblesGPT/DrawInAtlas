@@ -24,10 +24,12 @@ from typing import Any
 from report_godot_ci import WORKFLOW, expected_check_ids, summarize
 
 ROOT = Path(__file__).resolve().parents[1]
-ENGINE_VERSION = re.compile(r"^4\.8\.beta3\.official\.")
+ENGINE_VERSION = "4.8.beta4.official.b070e63b1"
 STEP_START = re.compile(r"^      - name: (.+)$", re.MULTILINE)
 STEP_ID = re.compile(r"^        id: (ci_[a-z0-9_]+)$", re.MULTILINE)
 RUN_LINE = re.compile(r"^        run: (.+)$", re.MULTILINE)
+STEP_FIELD = re.compile(r"([a-z][a-z0-9-]*):[ \t]*(.*)\Z")
+ALLOWED_STEP_FIELDS = frozenset({"id", "if", "continue-on-error", "shell", "run"})
 
 
 @dataclass(frozen=True)
@@ -37,12 +39,48 @@ class Check:
     script: str
 
 
+def _validate_workflow_envelope(workflow: str) -> None:
+    """Reject workflow/job settings the local Bash replay does not model.
+
+    The complete checked-in workflow has one Ubuntu job, triggered by push
+    and pull request. Step-only snippets are allowed for unit tests; a full
+    workflow must keep this known execution context. This is a conservative
+    indentation contract, not a general-purpose YAML parser.
+    """
+    if not re.search(r"^jobs:[ \t]*$", workflow, re.MULTILINE):
+        if re.search(r"^[^ \t#\r\n]", workflow, re.MULTILINE):
+            raise ValueError("Unrecognized workflow envelope")
+        return
+
+    envelope: list[tuple[int, str]] = []
+    for line in workflow.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        if indent < 6:
+            envelope.append((indent, line[indent:]))
+
+    required = [
+        (0, "on:"), (2, "push:"), (2, "pull_request:"),
+        (0, "jobs:"), (2, "smoke-and-desktop:"),
+        (4, "runs-on: ubuntu-latest"), (4, "steps:"),
+    ]
+    # The job's friendly display name has no bearing on replay semantics.
+    if (len(envelope) != len(required) + 1
+            or envelope[0][0] != 0
+            or not re.fullmatch(r"name: [^\r\n$]+", envelope[0][1])
+            or envelope[1:] != required):
+        raise ValueError("Unreplayable workflow/job configuration: unexpected "
+                         "trigger, runner, job, defaults, environment or metadata")
+
+
 def extract_checks(workflow: str) -> list[Check]:
     """Parse the narrow checked-in steps convention without a YAML dependency.
 
     Reject a CI-step change that cannot be replayed verbatim instead of
     silently claiming its test succeeded.
     """
+    _validate_workflow_envelope(workflow)
     matches = list(STEP_START.finditer(workflow))
     if not matches:
         raise ValueError("No workflow steps found")
@@ -54,13 +92,31 @@ def extract_checks(workflow: str) -> list[Check]:
             continue  # checkout, engine setup, version preflight, final summary
         if len(ids) != 1:
             raise ValueError(f"Ambiguous check ID in {match.group(1)}")
-        if re.search(r"^        uses:", block, re.MULTILINE):
-            raise ValueError(f"External action cannot be replayed: {ids[0]}")
-        if "        if: ${{ !cancelled() }}" not in block or "        continue-on-error: true" not in block:
-            raise ValueError(f"Nonstandard step conditions cannot be replayed: {ids[0]}")
-        if re.search(r"^        (?:env:|shell: (?!bash$))", block, re.MULTILINE):
-            raise ValueError(f"Nonstandard step environment or shell: {ids[0]}")
-        if len(RUN_LINE.findall(block)) != 1:
+        # Only these simple step keys are reproduced by the local Bash runner.
+        # Unknown settings (working-directory, timeout-minutes, env, etc.) or
+        # duplicate YAML keys would silently change the GitHub execution
+        # semantics while the replay still reported a trusted outcome.
+        metadata: dict[str, str] = {}
+        for line in block.splitlines():
+            if not line.startswith("        ") or line.startswith("          "):
+                continue
+            field = line[8:]
+            if not field.strip() or field.lstrip().startswith("#"):
+                continue
+            parsed = STEP_FIELD.fullmatch(field)
+            if parsed is None:
+                raise ValueError(f"Unsupported step metadata in {ids[0]}: {field}")
+            key, value = parsed.groups()
+            if key not in ALLOWED_STEP_FIELDS or key in metadata:
+                raise ValueError(f"Unsupported or duplicate step key in {ids[0]}: {key}")
+            metadata[key] = value
+        if metadata.get("id") != ids[0]:
+            raise ValueError(f"Ambiguous step ID in {match.group(1)}")
+        if (metadata.get("if") != "${{ !cancelled() }}"
+                or metadata.get("continue-on-error") != "true"
+                or metadata.get("shell", "bash") != "bash"):
+            raise ValueError(f"Nonstandard step conditions or shell: {ids[0]}")
+        if len(RUN_LINE.findall(block)) != 1 or "run" not in metadata:
             raise ValueError(f"Missing or multiple run commands: {ids[0]}")
         run = RUN_LINE.search(block)
         if run is None:
@@ -200,8 +256,8 @@ def main(argv: list[str] | None = None) -> int:
         identity = revision_identity(git_sha, dirty=dirty,
                                      expected=args.expected_commit, allow_dirty=args.allow_dirty)
         godot_version = subprocess.check_output(["godot", "--version"], cwd=ROOT, text=True).strip()
-        if not ENGINE_VERSION.match(godot_version):
-            raise ValueError(f"Godot version is not pinned 4.8 beta3: {godot_version}")
+        if godot_version != ENGINE_VERSION:
+            raise ValueError(f"Expected pinned Godot {ENGINE_VERSION}; got {godot_version}")
         output = args.output.resolve()
         if ROOT == output or ROOT in output.parents:
             raise ValueError("Place replay logs outside the tracked repository")

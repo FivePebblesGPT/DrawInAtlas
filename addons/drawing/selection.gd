@@ -5,6 +5,8 @@ extends RefCounted
 ## without allocating one byte (or dictionary entry) per selected pixel.
 
 const MAX_OPERATIONS: int = 128
+## Bound exact overlap proofs so a huge Delete region never scans a dense mask.
+const MAX_BULK_OVERLAP_PROBES: int = 4096
 var enabled: bool = false
 ## Conservative enclosing area. Use allows() for the actual per-pixel mask.
 var bounds: Rect2i = Rect2i()
@@ -112,6 +114,30 @@ func allows(point: Vector2i) -> bool:
 			"Subtract": contained = contained and not inside
 			"Intersect": contained = contained and inside
 	return not contained if inverted else contained
+
+
+## Return false only when the overlap is provably empty. Complex masks and
+## boolean rectangle expressions are sampled within a small exact budget;
+## large/uncertain regions conservatively continue to the usual per-pixel mask.
+## This guard must not turn an inverted selection into a bulk no-op.
+func allows_any_in_area(area: Rect2i) -> bool:
+	if not area.has_area():
+		return false
+	if not enabled or inverted:
+		return true
+	var overlap: Rect2i = bounds.intersection(area)
+	if not overlap.has_area():
+		return false
+	if _pixel_mask.is_empty() and _operations.is_empty():
+		return true  # A plain rectangular selection exactly covers its bounds.
+	if overlap.size.x > MAX_BULK_OVERLAP_PROBES \
+			or overlap.size.y > MAX_BULK_OVERLAP_PROBES / overlap.size.x:
+		return true  # Unknown is not equivalent to excluded.
+	for y: int in range(overlap.position.y, overlap.end.y):
+		for x: int in range(overlap.position.x, overlap.end.x):
+			if allows(Vector2i(x, y)):
+				return true
+	return false
 
 
 func translated(offset: Vector2i) -> DrawingSelection:

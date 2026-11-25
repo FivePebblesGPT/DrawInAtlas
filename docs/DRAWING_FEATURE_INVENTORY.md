@@ -141,7 +141,7 @@ Every row is an independent scope choice and rationale. The labels `Both` and `P
 | Lossless WebP import/export and canonical artwork payloads | Both / project | Essential | Current DrawInAtlas artwork contract requires lossless WebP; keep data lossless. |
 | PNG import/export with alpha | Both | Essential | Most useful transparent image interchange format. |
 | JPEG import | Both | Essential | Common reference-image input. |
-| JPEG export | Both | Later | PNG covers initial export; flattened JPEG is convenient afterwards. |
+| JPEG export | Both | Essential (2026-11-25 owner update; originally Later) | Required alongside PNG/WebP; flattened JPEG needs an explicit matte and quality options. T-305. |
 | Raster clipboard paste/import | Both | Essential | Quick import of screenshots and props. |
 | SVG import as object / rasterized import | PhotoCraft | Later | Useful for icons; specify whether vector preservation is supported. |
 | OpenRaster read/write of layered art | PhotoCraft | Later | Pragmatic layered interchange candidate. |
@@ -176,7 +176,7 @@ Every row is an independent scope choice and rationale. The labels `Both` and `P
 
 ## T-073 implementation ledger — scope approval is not delivery (2026-11-02)
 
-**Source of authority:** the 99 comparison rows above are the owner's **47 Essential / 34 Later / 18 Skip** priorities. Do not reclassify or delete them when an engineering ticket finishes. `[[T-059]]` retains the separate **hands-on final UX gate**; this documentation ledger is not owner acceptance. `[[DRAW_MODULE_UI_SPEC]]` remains a **proposed** workspace composition under `[[T-063]]`, whereas the dedicated Object Editor tab (`[[T-062]]`) and a dock-peer Asset Browser requirement (`[[T-065]]`) are **accepted requirements**. The tab is implemented; the Asset Browser dock is still blocked on T-063.
+**Source of authority:** the 99 comparison rows above reflect the owner's amended **48 Essential / 33 Later / 18 Skip** priorities (original **47 Essential / 34 Later / 18 Skip**, with JPEG export promoted on 2026-11-25). Do not reclassify or delete them when an engineering ticket finishes; an explicit owner scope update is required. `[[T-059]]` retains the separate **hands-on final UX gate**; this documentation ledger is not owner acceptance. `[[DRAW_MODULE_UI_SPEC]]` remains a **proposed** workspace composition under `[[T-063]]`, whereas the dedicated Object Editor tab (`[[T-062]]`) and a dock-peer Asset Browser requirement (`[[T-065]]`) are **accepted requirements**. The tab is implemented; the Asset Browser dock is still blocked on T-063.
 
 ### First slice: bounded T-053 witness (implemented and tested)
 
@@ -188,7 +188,7 @@ Every row is an independent scope choice and rationale. The labels `Both` and `P
 | [x] Lossless portable witness | Save/reopen `.drawing` with exact RGBA8 including hidden RGB at zero alpha, same document/group/layer IDs | `drawing/tests/standalone_smoke.gd` |
 | [x] One shared Object Editor shell | A dedicated tab edits an independent source, without Atlas drawing engine copies | `drawing/tests/object_editor_ui_smoke.gd`; Atlas publication/rebinding separately in `tests/object_editor_smoke.gd` (T-062) |
 
-**Do not expand the minimum witness retroactively:** the first four checks justify T-053's completed vertical slice; the Object Editor integration was added later under T-062. Completion of these checks does **not** close the 47 Essential items or T-059.
+**Do not expand the minimum witness retroactively:** the first four checks justify T-053's completed vertical slice; the Object Editor integration was added later under T-062. Completion of these checks does **not** close the Essential baseline or T-059.
 
 ### Remaining complete-baseline work (bounded follow-on tickets)
 
@@ -267,3 +267,7 @@ Each case starts with a **real UI entry point** and an observable result. A cite
 - [Approved Drawing/Atlas decisions](DECISIONS_DRAWING_ATLAS_2026-11-01.md)
 
 **Owner sign-off (2026-11-02):** The complete 99-item Essential/Later/Skip inventory is **approved as written** (47 Essential, 34 Later, 18 Skip). Use it as the scope authority for Drawing feature planning. Preserve T-053's small initial standalone vertical slice; implement the Essential baseline incrementally. Later features remain deferred, Skip features remain out of initial scope. The separately proposed [[DRAW_MODULE_UI_SPEC]] still needs actual native UX validation; approval of this feature matrix is not implementation or usability acceptance. No acceptance based only on a passing test count.
+
+## 2026-11-25 owner scope update
+
+[Hands-on PR #23 review](DRAWING_UX_REVIEW_2026-11-25.md) confirms the next Drawing corrections T-302–T-312. The 2026-11-02 approval counts (47 Essential / 34 Later / 18 Skip) remain historical; promoting the existing JPEG export row yields 48 Essential / 33 Later / 18 Skip for the amended inventory. Standalone must expose Bucket and raster Shapes, the export options, live Text Options panel, individual Window panel restoration, usable Asset Browser drop, actual layer disclosure controls, consistent icon filtering, and an sRGB artwork pipeline. Remove the standalone Snap (8 px) toggle while retaining the generic snapping contract for appropriate callers. Use a measured, versioned binary standalone .drawing codec; Atlas sparse multi-file storage remains a separate contract. See T-059 and T-250 for independent acceptance gates.

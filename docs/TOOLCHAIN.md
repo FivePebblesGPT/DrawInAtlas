@@ -7,7 +7,7 @@ point; Cargo still owns incremental Rust compilation and Godot owns imports.
 ## Linux x86-64: developer's installed tools
 
 Requires GNU Make, Python >=3.11, Bash, Rust >=1.94 with Cargo/rustfmt,
-Godot 4.8 beta3 and (for linting) uv.
+Godot 4.8 beta4 and (for linting) uv.
 
     cp local.mk.example local.mk
     # Update paths in local.mk, or pass explicit command-line overrides.
@@ -21,7 +21,7 @@ Godot 4.8 beta3 and (for linting) uv.
 
 Example without local.mk:
 
-    make drawing TOOLCHAIN=system GODOT=/opt/Godot_v4.8-beta3_linux.x86_64
+    make drawing TOOLCHAIN=system GODOT=/opt/Godot_v4.8-beta4_linux.x86_64
 
 The system mode checks tool versions with `make doctor` but does not promise
 identical binaries across machines. GNU Make assignments override local.mk,
@@ -47,6 +47,9 @@ but not silently embedded into the version-locked bundle.
 The output defaults to:
 
     .build/bundles/drawing-toolchain-linux-x86_64.tar.zst
+
+The **T-180 Rebuildable Linux native toolchain** GitHub Actions workflow also
+uploads the verified archive as the `drawing-toolchain-linux-x86_64` artifact.
 
 `toolchain.lock.toml` is the version/source manifest. It pins official Godot
 and uv release URLs and SHA-256 hashes, Rust 1.99.1, Ruff/ty versions and the
@@ -119,11 +122,10 @@ the toolchain archive's internal checksum manifest. The checked-in copy comes
 from the standalone [git_lfs_mbox gist](https://gist.github.com/FivePebblesGPT/f9ac329f8537151441535027758ff5a5)
 and includes the DrawInAtlas compatibility and successful-apply cleanup changes.
 
-The old `Godot_v4.8b3_rust_hokusai_bundle8.tar.zst` remains usable as a
-transition input if its SHA-256 matches the committed historic checksum.
-The old archive cannot be *regenerated* from its assembled bytes; `make
-bundle` creates the new source-defined format instead. Legacy compatibility
-was not revalidated locally because the historic archive was unavailable.
+The old `Godot_v4.8b3_rust_hokusai_bundle8.tar.zst` checksum is retained for
+historical verification. The archive contains beta3 and cannot satisfy the
+current engine pin. Use `make bundle` to build the current archive from the
+locked upstream sources.
 
 For a cold network-isolated acceptance run (optional **bubblewrap** validator
 dependency; ordinary builds do not require it):

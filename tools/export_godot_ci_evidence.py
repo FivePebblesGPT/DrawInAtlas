@@ -17,11 +17,12 @@ import sys
 from pathlib import Path
 from typing import Any, Mapping
 
+from replay_godot_ci import ENGINE_VERSION
 from report_godot_ci import WORKFLOW, expected_check_ids, summarize
 
 HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 DIGITS = re.compile(r"[1-9][0-9]*\Z")
-GODOT_PIN = re.compile(r"4\.8\.beta3\.official\.[a-zA-Z0-9]+\Z")
+GODOT_PIN = re.compile(re.escape(ENGINE_VERSION))
 RUNNER_OS = {"Linux", "Windows", "macOS"}
 SCHEMA_VERSION = 1
 
@@ -111,7 +112,7 @@ def verify_evidence(evidence: Any, *, workflow: str,
         problems.append("Invalid runner OS")
     version = evidence.get("godot_version")
     if not isinstance(version, str) or GODOT_PIN.fullmatch(version) is None:
-        problems.append("Godot 4.8-beta3 identity missing")
+        problems.append(f"Godot {ENGINE_VERSION} identity missing")
     checks = evidence.get("checks")
     if not isinstance(checks, list) or any(not isinstance(row, dict) for row in checks):
         return problems + ["Invalid check list"]

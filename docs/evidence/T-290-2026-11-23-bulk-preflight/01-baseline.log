@@ -1,0 +1,45 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ERROR: T290_BULK_PREFLIGHT_FAILED: invalid rectangle cannot resolve an otherwise valid lazy edge pixel
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t290_bulk_edit_preflight.gd:23)
+       [1] _run (res://tests/t290_bulk_edit_preflight.gd:64)
+ERROR: T290_BULK_PREFLIGHT_FAILED: invalid byte region cannot fetch the lazy edge pixel
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t290_bulk_edit_preflight.gd:23)
+       [1] _run (res://tests/t290_bulk_edit_preflight.gd:70)
+ERROR: T290_BULK_PREFLIGHT_FAILED: invalid rectangle cannot materialize deferred Brush
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t290_bulk_edit_preflight.gd:23)
+       [1] _run (res://tests/t290_bulk_edit_preflight.gd:96)
+ERROR: T290_BULK_PREFLIGHT_FAILED: invalid polygon cannot materialize deferred Brush
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t290_bulk_edit_preflight.gd:23)
+       [1] _run (res://tests/t290_bulk_edit_preflight.gd:104)
+ERROR: T290_BULK_PREFLIGHT_FAILED: invalid rectangle cannot materialize deferred Brush
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t290_bulk_edit_preflight.gd:23)
+       [1] _run (res://tests/t290_bulk_edit_preflight.gd:96)
+ERROR: T290_BULK_PREFLIGHT_FAILED: invalid polygon cannot materialize deferred Brush
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t290_bulk_edit_preflight.gd:23)
+       [1] _run (res://tests/t290_bulk_edit_preflight.gd:104)
+ERROR: T290_BULK_PREFLIGHT_FAILED: invalid late rectangle preserves accepted deferred Brush
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t290_bulk_edit_preflight.gd:23)
+       [1] _run (res://tests/t290_bulk_edit_preflight.gd:109)
+ERROR: T290_BULK_PREFLIGHT_FAILED: invalid late byte region preserves accepted deferred Brush
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t290_bulk_edit_preflight.gd:23)
+       [1] _run (res://tests/t290_bulk_edit_preflight.gd:113)
+T290_BULK_PREFLIGHT_FAILED checks=24 failures=8

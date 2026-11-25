@@ -1,0 +1,95 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ERROR: T296_CLEAR_PROJECTION_FAILED: x+ rejects a Delete region crossing native projection
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t296_clear_native_projection.gd:22)
+       [1] _edge_case (res://tests/t296_clear_native_projection.gd:74)
+       [2] _run (res://tests/t296_clear_native_projection.gd:131)
+ERROR: T296_CLEAR_PROJECTION_FAILED: x+ invalid Delete makes no lazy fetch or staged change
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t296_clear_native_projection.gd:22)
+       [1] _edge_case (res://tests/t296_clear_native_projection.gd:76)
+       [2] _run (res://tests/t296_clear_native_projection.gd:131)
+ERROR: T296_CLEAR_PROJECTION_FAILED: x+ invalid Delete cannot create dense preview
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t296_clear_native_projection.gd:22)
+       [1] _edge_case (res://tests/t296_clear_native_projection.gd:79)
+       [2] _run (res://tests/t296_clear_native_projection.gd:131)
+ERROR: T296_CLEAR_PROJECTION_FAILED: x- rejects a Delete region crossing native projection
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t296_clear_native_projection.gd:22)
+       [1] _edge_case (res://tests/t296_clear_native_projection.gd:74)
+       [2] _run (res://tests/t296_clear_native_projection.gd:131)
+ERROR: T296_CLEAR_PROJECTION_FAILED: x- invalid Delete makes no lazy fetch or staged change
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t296_clear_native_projection.gd:22)
+       [1] _edge_case (res://tests/t296_clear_native_projection.gd:76)
+       [2] _run (res://tests/t296_clear_native_projection.gd:131)
+ERROR: T296_CLEAR_PROJECTION_FAILED: x- invalid Delete cannot create dense preview
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t296_clear_native_projection.gd:22)
+       [1] _edge_case (res://tests/t296_clear_native_projection.gd:79)
+       [2] _run (res://tests/t296_clear_native_projection.gd:131)
+ERROR: T296_CLEAR_PROJECTION_FAILED: y+ rejects a Delete region crossing native projection
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t296_clear_native_projection.gd:22)
+       [1] _edge_case (res://tests/t296_clear_native_projection.gd:74)
+       [2] _run (res://tests/t296_clear_native_projection.gd:131)
+ERROR: T296_CLEAR_PROJECTION_FAILED: y+ invalid Delete makes no lazy fetch or staged change
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t296_clear_native_projection.gd:22)
+       [1] _edge_case (res://tests/t296_clear_native_projection.gd:76)
+       [2] _run (res://tests/t296_clear_native_projection.gd:131)
+ERROR: T296_CLEAR_PROJECTION_FAILED: y+ invalid Delete cannot create dense preview
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t296_clear_native_projection.gd:22)
+       [1] _edge_case (res://tests/t296_clear_native_projection.gd:79)
+       [2] _run (res://tests/t296_clear_native_projection.gd:131)
+ERROR: T296_CLEAR_PROJECTION_FAILED: y- rejects a Delete region crossing native projection
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t296_clear_native_projection.gd:22)
+       [1] _edge_case (res://tests/t296_clear_native_projection.gd:74)
+       [2] _run (res://tests/t296_clear_native_projection.gd:131)
+ERROR: T296_CLEAR_PROJECTION_FAILED: y- invalid Delete makes no lazy fetch or staged change
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t296_clear_native_projection.gd:22)
+       [1] _edge_case (res://tests/t296_clear_native_projection.gd:76)
+       [2] _run (res://tests/t296_clear_native_projection.gd:131)
+ERROR: T296_CLEAR_PROJECTION_FAILED: y- invalid Delete cannot create dense preview
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t296_clear_native_projection.gd:22)
+       [1] _edge_case (res://tests/t296_clear_native_projection.gd:79)
+       [2] _run (res://tests/t296_clear_native_projection.gd:131)
+ERROR: T296_CLEAR_PROJECTION_FAILED: out-of-range Delete rejects after deferred Brush
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t296_clear_native_projection.gd:22)
+       [1] _deferred_brush_case (res://tests/t296_clear_native_projection.gd:110)
+       [2] _run (res://tests/t296_clear_native_projection.gd:132)
+ERROR: T296_CLEAR_PROJECTION_FAILED: invalid Delete leaves deferred Brush and lazy source untouched
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t296_clear_native_projection.gd:22)
+       [1] _deferred_brush_case (res://tests/t296_clear_native_projection.gd:112)
+       [2] _run (res://tests/t296_clear_native_projection.gd:132)
+ERROR: T296_CLEAR_PROJECTION_FAILED: rejected Delete cannot erase accepted Brush or source
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t296_clear_native_projection.gd:22)
+       [1] _deferred_brush_case (res://tests/t296_clear_native_projection.gd:117)
+       [2] _run (res://tests/t296_clear_native_projection.gd:132)
+T296_CLEAR_PROJECTION_FAILED checks=50 failures=15

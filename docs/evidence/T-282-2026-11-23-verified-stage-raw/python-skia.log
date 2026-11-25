@@ -1,0 +1,15 @@
+test_continuous_and_batched_brush_are_identical (test_t068_skia_brush.BrushFixtureContracts.test_continuous_and_batched_brush_are_identical) ... ok
+test_fixture_rejects_corrupt_sha_coverage_and_changes (test_t068_skia_brush.BrushFixtureContracts.test_fixture_rejects_corrupt_sha_coverage_and_changes) ... ok
+test_godot_regenerates_exact_pinned_oracle_when_available (test_t068_skia_brush.BrushFixtureContracts.test_godot_regenerates_exact_pinned_oracle_when_available) ... skipped 'Set T068_GODOT to reproduce the fixture from the real DrawingEditSession'
+test_mask_predicates_cover_rect_sparse_and_inverted (test_t068_skia_brush.BrushFixtureContracts.test_mask_predicates_cover_rect_sparse_and_inverted) ... ok
+test_nonidentity_transform_cases_keep_raster_local_scope (test_t068_skia_brush.BrushFixtureContracts.test_nonidentity_transform_cases_keep_raster_local_scope) ... ok
+test_real_godot_fixture_is_independently_rgba8_exact (test_t068_skia_brush.BrushFixtureContracts.test_real_godot_fixture_is_independently_rgba8_exact) ... ok
+test_screen_budget_validation_does_not_load_optional_skia (test_t068_skia_brush.BrushFixtureContracts.test_screen_budget_validation_does_not_load_optional_skia) ... ok
+test_transform_decoder_rejects_corruption_without_silent_identity_fallback (test_t068_skia_brush.BrushFixtureContracts.test_transform_decoder_rejects_corruption_without_silent_identity_fallback) ... ok
+test_unsigned_or_aliasing_anchor_is_not_accepted (test_t068_skia_brush.BrushFixtureContracts.test_unsigned_or_aliasing_anchor_is_not_accepted) ... ok
+setUpClass (test_t068_skia_brush.BrushSkiaLiveContracts) ... skipped 'Live Skia wheel is opt-in; ordinary CI validates fixture contracts'
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.126s
+
+OK (skipped=2)

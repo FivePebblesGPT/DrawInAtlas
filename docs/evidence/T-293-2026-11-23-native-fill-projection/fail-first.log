@@ -1,0 +1,113 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ERROR: T293_PROJECTION_FAILED: positive-x rejects global projection overflow before lazy source
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t293_fill_native_projection.gd:23)
+       [1] _case (res://tests/t293_fill_native_projection.gd:71)
+       [2] _run (res://tests/t293_fill_native_projection.gd:100)
+ERROR: T293_PROJECTION_FAILED: positive-x invalid seed has zero lazy or gesture side effects
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t293_fill_native_projection.gd:23)
+       [1] _case (res://tests/t293_fill_native_projection.gd:73)
+       [2] _run (res://tests/t293_fill_native_projection.gd:100)
+ERROR: T293_PROJECTION_FAILED: positive-x valid edge resolves only one source and stages one pixel
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t293_fill_native_projection.gd:23)
+       [1] _case (res://tests/t293_fill_native_projection.gd:79)
+       [2] _run (res://tests/t293_fill_native_projection.gd:100)
+ERROR: T293_PROJECTION_FAILED: positive-x commits legal edge edit
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t293_fill_native_projection.gd:23)
+       [1] _case (res://tests/t293_fill_native_projection.gd:84)
+       [2] _run (res://tests/t293_fill_native_projection.gd:100)
+ERROR: T293_PROJECTION_FAILED: positive-x exact committed RGBA8
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t293_fill_native_projection.gd:23)
+       [1] _case (res://tests/t293_fill_native_projection.gd:88)
+       [2] _run (res://tests/t293_fill_native_projection.gd:100)
+ERROR: T293_PROJECTION_FAILED: positive-x Undo preserves hidden RGB
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t293_fill_native_projection.gd:23)
+       [1] _case (res://tests/t293_fill_native_projection.gd:90)
+       [2] _run (res://tests/t293_fill_native_projection.gd:100)
+ERROR: T293_PROJECTION_FAILED: positive-x Redo restores native RGBA8
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t293_fill_native_projection.gd:23)
+       [1] _case (res://tests/t293_fill_native_projection.gd:93)
+       [2] _run (res://tests/t293_fill_native_projection.gd:100)
+ERROR: T293_PROJECTION_FAILED: negative-x rejects global projection overflow before lazy source
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t293_fill_native_projection.gd:23)
+       [1] _case (res://tests/t293_fill_native_projection.gd:71)
+       [2] _run (res://tests/t293_fill_native_projection.gd:101)
+ERROR: T293_PROJECTION_FAILED: negative-x invalid seed has zero lazy or gesture side effects
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t293_fill_native_projection.gd:23)
+       [1] _case (res://tests/t293_fill_native_projection.gd:73)
+       [2] _run (res://tests/t293_fill_native_projection.gd:101)
+ERROR: T293_PROJECTION_FAILED: positive-y rejects global projection overflow before lazy source
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t293_fill_native_projection.gd:23)
+       [1] _case (res://tests/t293_fill_native_projection.gd:71)
+       [2] _run (res://tests/t293_fill_native_projection.gd:102)
+ERROR: T293_PROJECTION_FAILED: positive-y invalid seed has zero lazy or gesture side effects
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t293_fill_native_projection.gd:23)
+       [1] _case (res://tests/t293_fill_native_projection.gd:73)
+       [2] _run (res://tests/t293_fill_native_projection.gd:102)
+ERROR: T293_PROJECTION_FAILED: positive-y valid edge resolves only one source and stages one pixel
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t293_fill_native_projection.gd:23)
+       [1] _case (res://tests/t293_fill_native_projection.gd:79)
+       [2] _run (res://tests/t293_fill_native_projection.gd:102)
+ERROR: T293_PROJECTION_FAILED: positive-y commits legal edge edit
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t293_fill_native_projection.gd:23)
+       [1] _case (res://tests/t293_fill_native_projection.gd:84)
+       [2] _run (res://tests/t293_fill_native_projection.gd:102)
+ERROR: T293_PROJECTION_FAILED: positive-y exact committed RGBA8
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t293_fill_native_projection.gd:23)
+       [1] _case (res://tests/t293_fill_native_projection.gd:88)
+       [2] _run (res://tests/t293_fill_native_projection.gd:102)
+ERROR: T293_PROJECTION_FAILED: positive-y Undo preserves hidden RGB
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t293_fill_native_projection.gd:23)
+       [1] _case (res://tests/t293_fill_native_projection.gd:90)
+       [2] _run (res://tests/t293_fill_native_projection.gd:102)
+ERROR: T293_PROJECTION_FAILED: positive-y Redo restores native RGBA8
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t293_fill_native_projection.gd:23)
+       [1] _case (res://tests/t293_fill_native_projection.gd:93)
+       [2] _run (res://tests/t293_fill_native_projection.gd:102)
+ERROR: T293_PROJECTION_FAILED: negative-y rejects global projection overflow before lazy source
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t293_fill_native_projection.gd:23)
+       [1] _case (res://tests/t293_fill_native_projection.gd:71)
+       [2] _run (res://tests/t293_fill_native_projection.gd:103)
+ERROR: T293_PROJECTION_FAILED: negative-y invalid seed has zero lazy or gesture side effects
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t293_fill_native_projection.gd:23)
+       [1] _case (res://tests/t293_fill_native_projection.gd:73)
+       [2] _run (res://tests/t293_fill_native_projection.gd:103)
+T293_PROJECTION_FAILED checks=41 failures=18

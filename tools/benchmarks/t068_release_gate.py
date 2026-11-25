@@ -165,6 +165,7 @@ def _inspect_binary(path: Path, platform: str, *, shared: bool = False) -> None:
 
 def inspect_distribution_entries(
     directory: Path, platform: str, *, allow_missing_native: bool = False,
+    engine_copied_native: bool = False, preexisting_native: bool = False,
 ) -> dict[str, Path]:
     """Require an exact regular-file export tree, including directory entries.
 
@@ -179,6 +180,17 @@ def inspect_distribution_entries(
     if allow_missing_native and platform != "linux":
         raise ReleaseError("Only Linux may stage an unpackaged native export")
     required = expected - ({NATIVE_LIBRARY.as_posix()} if allow_missing_native else set())
+    if engine_copied_native:
+        if not allow_missing_native:
+            raise ReleaseError("An engine-copied library is only valid before packaging")
+        expected.add(NATIVE_LIBRARY.name)
+        required.add(NATIVE_LIBRARY.name)
+    if preexisting_native:
+        if not (platform == "linux" and allow_missing_native and engine_copied_native):
+            raise ReleaseError(
+                "A preexisting native library is only allowed during Linux re-export normalization"
+            )
+        required.add(NATIVE_LIBRARY.as_posix())
     expected_directories = {
         parent.as_posix()
         for name in expected
@@ -495,9 +507,8 @@ def launch_linux(directory: Path, *, timeout: int = 45) -> dict[str, Any]:
                        "GODOT_SILENCE_ROOT_WARNING": "1"}
         environment.pop("GODOT_PROJECT_PATH", None)
         leaks = 0
-        for arguments in (("--path", str(base / "distribution"), "--headless", "--script",
-                           "res://tests/native_extension_ready.gd"),
-                          ("--path", str(base / "distribution"), "--headless", "--quit-after", "5")):
+        for arguments in (("--headless", "--quit-after", "5", "--", "--verify-native-extension"),
+                          ("--headless", "--quit-after", "5")):
             try:
                 result = subprocess.run(
                     [str(executable), *arguments], cwd=base / "work", env=environment,
@@ -507,7 +518,7 @@ def launch_linux(directory: Path, *, timeout: int = 45) -> dict[str, Any]:
                 raise ReleaseError(f"Isolated Linux export failed to launch: {exc}") from exc
             log = result.stdout + "\n" + result.stderr
             leaks += check_launch_log(log, result.returncode)
-            if "--script" in arguments and "NATIVE_EXTENSION_READY" not in log.splitlines():
+            if "--verify-native-extension" in arguments and "NATIVE_EXTENSION_READY" not in log.splitlines():
                 raise ReleaseError("Exported GDExtension classes or ABI were not verified")
         return {"status": "passed", "isolated_working_directory": True,
                 "isolated_user_profile": True, "source_project_loaded": False,

@@ -1,0 +1,18 @@
+test_candidate_window_clips_float_before_integer_conversion (tests.test_t297_brush_candidate_bounds_ci.BrushCandidateBoundsContracts.test_candidate_window_clips_float_before_integer_conversion) ... ok
+test_required_native_step_runs_fail_closed_brush_witness (tests.test_t297_brush_candidate_bounds_ci.BrushCandidateBoundsContracts.test_required_native_step_runs_fail_closed_brush_witness) ... ok
+test_witness_covers_overflow_clipping_and_history (tests.test_t297_brush_candidate_bounds_ci.BrushCandidateBoundsContracts.test_witness_covers_overflow_clipping_and_history) ... ok
+test_delete_guard_is_before_any_preview_or_lazy_source (tests.test_t296_clear_native_projection_ci.ClearProjectionContracts.test_delete_guard_is_before_any_preview_or_lazy_source) ... ok
+test_real_witness_checks_four_edges_and_deferred_history (tests.test_t296_clear_native_projection_ci.ClearProjectionContracts.test_real_witness_checks_four_edges_and_deferred_history) ... ok
+test_required_native_step_fails_closed_on_signed_delete_witness (tests.test_t296_clear_native_projection_ci.ClearProjectionContracts.test_required_native_step_fails_closed_on_signed_delete_witness) ... ok
+test_brush_guard_precedes_lazy_sources_and_deferred_materialization (tests.test_t295_brush_native_projection_ci.BrushProjectionContracts.test_brush_guard_precedes_lazy_sources_and_deferred_materialization) ... ok
+test_real_witness_covers_axes_and_exact_history (tests.test_t295_brush_native_projection_ci.BrushProjectionContracts.test_real_witness_covers_axes_and_exact_history) ... ok
+test_required_native_step_gates_brush_boundary_witness (tests.test_t295_brush_native_projection_ci.BrushProjectionContracts.test_required_native_step_gates_brush_boundary_witness) ... ok
+test_required_native_ci_has_fail_closed_bulk_witness (tests.test_t294_bulk_native_projection_ci.BulkNativeProjectionContracts.test_required_native_ci_has_fail_closed_bulk_witness) ... ok
+test_signed_extent_preflight_precedes_source_or_preview_mutation (tests.test_t294_bulk_native_projection_ci.BulkNativeProjectionContracts.test_signed_extent_preflight_precedes_source_or_preview_mutation) ... ok
+test_witness_has_signed_axes_and_transaction_evidence (tests.test_t294_bulk_native_projection_ci.BulkNativeProjectionContracts.test_witness_has_signed_axes_and_transaction_evidence) ... ok
+test_required_native_step_runs_bulk_preflight_fail_closed (tests.test_t290_bulk_edit_preflight_ci.BulkEditPreflightCIContracts.test_required_native_step_runs_bulk_preflight_fail_closed) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.017s
+
+OK

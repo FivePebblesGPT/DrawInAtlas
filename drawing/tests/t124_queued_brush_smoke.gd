@@ -8,6 +8,10 @@ const NATIVE_REFERENCE = preload("res://tests/t206_native_queued_reference.gd")
 const AREA: Rect2i = Rect2i(-85, -80, 180, 160)
 const FIRST: int = 0xb44183e9
 const SECOND: int = 0xffa9421b
+## The first press must leave a real backlog even on a fast CPU: a release
+## processes at most 256 segments synchronously. With 840 distinct samples,
+## the next press always exercises the deferred-gesture path, not an idle edit.
+const FIRST_SAMPLES: int = 840
 var checks: int = 0
 var failures: int = 0
 
@@ -27,8 +31,8 @@ func make_target(name: String) -> Dictionary:
 
 func first_path() -> PackedVector2Array:
 	var path: PackedVector2Array = PackedVector2Array()
-	for i: int in range(210):
-		var t: float = float(i) / 209.0
+	for i: int in range(FIRST_SAMPLES):
+		var t: float = float(i) / float(FIRST_SAMPLES - 1)
 		path.append(Vector2(-35.5 + 66.0 * t,
 			-16.5 + sin(t * TAU * 8.0) * 29.0))
 	return path
@@ -244,6 +248,11 @@ func failed_predecessor_scenario() -> void:
 	check(not deferred(canvas).is_empty(), "pending second release held before failed commit")
 	var errors: Array[String] = []
 	canvas.canvas_error.connect(func(message: String) -> void: errors.append(message))
+	if canvas.session == null:
+		check(false, "test prerequisite: predecessor remains active for stale-revision fault")
+		canvas.queue_free()
+		await process_frame
+		return
 	canvas.session.expected_revision += 1  # Fault injection: stale commit, no document mutation.
 	canvas._commit_stroke()
 	check(deferred(canvas).is_empty() and canvas.session == null,

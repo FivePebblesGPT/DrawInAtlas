@@ -1,0 +1,12 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+T095_BRUSH_TILE_REFERENCE_FAILED: stride=3 erase=false both commits
+T095_BRUSH_TILE_REFERENCE_FAILED: stride=3 erase=false published matches draft/reference
+T095_BRUSH_TILE_REFERENCE_FAILED: stride=3 erase=false exact Undo
+T095_BRUSH_TILE_REFERENCE_FAILED: stride=3 erase=false exact Redo
+T095_BRUSH_TILE_REFERENCE_FAILED: stride=3 erase=true both commits
+T095_BRUSH_TILE_REFERENCE_FAILED: stride=3 erase=true published matches draft/reference
+T095_BRUSH_TILE_REFERENCE_FAILED: stride=3 erase=true exact Undo
+T095_BRUSH_TILE_REFERENCE_FAILED: stride=3 erase=true exact Redo
+T095_BRUSH_TILE_REFERENCE_RESULT checks=612 failures=8

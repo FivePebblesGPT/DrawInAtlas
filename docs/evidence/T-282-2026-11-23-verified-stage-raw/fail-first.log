@@ -1,0 +1,45 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ERROR: T068_VERIFIED_STAGE_FAILED: combined gesture commits one correct delta
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_verified_stage_smoke.gd:23)
+       [1] _run (res://tests/drawing_fill_verified_stage_smoke.gd:66)
+ERROR: T068_VERIFIED_STAGE_FAILED: published mixed-command delta keeps canonical before and final after
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_verified_stage_smoke.gd:23)
+       [1] _run (res://tests/drawing_fill_verified_stage_smoke.gd:69)
+ERROR: T068_VERIFIED_STAGE_FAILED: seed hidden-RGB pixels at far positive/negative 64-bit coordinates
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_verified_stage_smoke.gd:23)
+       [1] _run (res://tests/drawing_fill_verified_stage_smoke.gd:95)
+ERROR: T068_VERIFIED_STAGE_FAILED: masked fill stages two pixels across signed seam
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_verified_stage_smoke.gd:23)
+       [1] _run (res://tests/drawing_fill_verified_stage_smoke.gd:100)
+ERROR: T068_VERIFIED_STAGE_FAILED: second fill reuses original source snapshot
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_verified_stage_smoke.gd:23)
+       [1] _run (res://tests/drawing_fill_verified_stage_smoke.gd:102)
+ERROR: T068_VERIFIED_STAGE_FAILED: second fill replaces earlier preview without losing source before-bytes
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_verified_stage_smoke.gd:23)
+       [1] _run (res://tests/drawing_fill_verified_stage_smoke.gd:104)
+ERROR: T068_VERIFIED_STAGE_FAILED: publish three exact far-world pixels in one transaction
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_verified_stage_smoke.gd:23)
+       [1] _run (res://tests/drawing_fill_verified_stage_smoke.gd:107)
+ERROR: T068_VERIFIED_STAGE_FAILED: far-world undo restores all hidden RGB exactly
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_verified_stage_smoke.gd:23)
+       [1] _run (res://tests/drawing_fill_verified_stage_smoke.gd:110)
+T068_VERIFIED_STAGE_FAILED checks=29 failures=8

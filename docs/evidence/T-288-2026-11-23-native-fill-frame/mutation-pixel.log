@@ -1,0 +1,89 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3626)
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill and clear border 32/0
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:209)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill and clear border 32/1
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:209)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill and clear border 32/2
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:209)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill and clear border 32/3
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:209)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill and clear border 32/4
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:209)
+T068_FILL_FRAME_CASE {"cpu_dispatch":{"max_ms":19.9,"median_ms":19.363,"min_ms":18.936,"p95_ms":19.9,"samples_ms":[18.936,19.024,19.363,19.662,19.9]},"event_to_frame_post_draw":{"max_ms":37.714,"median_ms":36.806,"min_ms":36.486,"p95_ms":37.714,"samples_ms":[36.486,36.506,36.806,37.032,37.714]},"pixels":1024,"size":32,"trials":5}
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill and clear border 64/0
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:209)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill and clear border 64/1
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:209)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill and clear border 64/2
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:209)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill and clear border 64/3
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:209)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill and clear border 64/4
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:209)
+T068_FILL_FRAME_CASE {"cpu_dispatch":{"max_ms":74.222,"median_ms":70.494,"min_ms":70.24,"p95_ms":74.222,"samples_ms":[70.24,70.288,70.494,71.921,74.222]},"event_to_frame_post_draw":{"max_ms":95.255,"median_ms":89.282,"min_ms":88.987,"p95_ms":95.255,"samples_ms":[88.987,89.27,89.282,91.06,95.255]},"pixels":4096,"size":64,"trials":5}
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill and clear border 96/0
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:209)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill and clear border 96/1
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:209)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill and clear border 96/2
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:209)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill and clear border 96/3
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:209)
+ERROR: T068_FILL_FRAME_FAILED: exact canonical fill and clear border 96/4
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_frame_native.gd:33)
+       [1] _run (res://tests/drawing_fill_frame_native.gd:209)
+T068_FILL_FRAME_CASE {"cpu_dispatch":{"max_ms":188.149,"median_ms":169.189,"min_ms":165.708,"p95_ms":188.149,"samples_ms":[165.708,166.525,169.189,171.017,188.149]},"event_to_frame_post_draw":{"max_ms":206.237,"median_ms":187.684,"min_ms":184.762,"p95_ms":206.237,"samples_ms":[184.762,185.181,187.684,188.903,206.237]},"pixels":9216,"size":96,"trials":5}
+T068_FILL_FRAME_FAILED checks=94 failures=15

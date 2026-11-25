@@ -1,0 +1,5 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+T095_ORACLE_RESULT checks=32 failures=0 union_pixels=12769 engine=4.8-beta4 (official)
+T095_ORACLE_PASSED

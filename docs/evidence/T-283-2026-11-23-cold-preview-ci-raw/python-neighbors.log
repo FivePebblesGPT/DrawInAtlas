@@ -1,0 +1,21 @@
+test_fails_closed_without_exact_committed_occupancy (tests.test_t135_sparse_viewport.SparseViewportContracts.test_fails_closed_without_exact_committed_occupancy) ... ok
+test_models_cover_signed_order_invalid_fallback_and_native_state (tests.test_t135_sparse_viewport.SparseViewportContracts.test_models_cover_signed_order_invalid_fallback_and_native_state) ... ok
+test_strict_required_ci_and_on_demand_native (tests.test_t135_sparse_viewport.SparseViewportContracts.test_strict_required_ci_and_on_demand_native) ... ok
+test_fails_closed_and_keeps_bounded_exact_index (tests.test_t136_preview_sparse_union.PreviewSparseUnionContracts.test_fails_closed_and_keeps_bounded_exact_index) ... ok
+test_models_and_native_witness_verify_real_parity (tests.test_t136_preview_sparse_union.PreviewSparseUnionContracts.test_models_and_native_witness_verify_real_parity) ... ok
+test_strict_required_ci_and_on_demand_native (tests.test_t136_preview_sparse_union.PreviewSparseUnionContracts.test_strict_required_ci_and_on_demand_native) ... ok
+test_existing_ci_inventory_and_fail_closed_logs (tests.test_t137_preview_cold_population.PreviewColdPopulationContracts.test_existing_ci_inventory_and_fail_closed_logs) ... ok
+test_native_redo_requires_settlement_and_source_frame_parity (tests.test_t137_preview_cold_population.PreviewColdPopulationContracts.test_native_redo_requires_settlement_and_source_frame_parity) ... ok
+test_real_regressions_cover_fallback_and_settlement (tests.test_t137_preview_cold_population.PreviewColdPopulationContracts.test_real_regressions_cover_fallback_and_settlement) ... ok
+test_source_only_throttles_complete_retainable_preview (tests.test_t137_preview_cold_population.PreviewColdPopulationContracts.test_source_only_throttles_complete_retainable_preview) ... ok
+test_archived_comparator_not_misrepresented_as_current_native (tests.test_t266_viewport_ci.ViewportNativeCiContracts.test_archived_comparator_not_misrepresented_as_current_native) ... ok
+test_build_before_both_imports_and_all_native_workloads (tests.test_t266_viewport_ci.ViewportNativeCiContracts.test_build_before_both_imports_and_all_native_workloads) ... ok
+test_current_cold_exact_pixel_hashes_and_workload (tests.test_t266_viewport_ci.ViewportNativeCiContracts.test_current_cold_exact_pixel_hashes_and_workload) ... ok
+test_local_make_gate_has_pipeline_error_propagation (tests.test_t266_viewport_ci.ViewportNativeCiContracts.test_local_make_gate_has_pipeline_error_propagation) ... ok
+test_log_verifier_cli_fails_closed_on_bad_success (tests.test_t266_viewport_ci.ViewportNativeCiContracts.test_log_verifier_cli_fails_closed_on_bad_success) ... ok
+test_viewport_summary_and_engine_diagnostics_are_required (tests.test_t266_viewport_ci.ViewportNativeCiContracts.test_viewport_summary_and_engine_diagnostics_are_required) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 1.800s
+
+OK

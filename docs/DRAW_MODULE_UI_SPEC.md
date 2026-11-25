@@ -11,7 +11,7 @@ The owner tested the shipped standalone shell and rejected several usability cho
 
 **Proposed, not signed off:** the owner-proposed compact `BarDivider` layout has
 now been implemented as an engineering prototype in **T-063**. The 99-row,
-47 Essential / 34 Later / 18 Skip feature inventory is approved scope, **not**
+original 47 Essential / 34 Later / 18 Skip feature inventory (amended to 48 Essential / 33 Later / 18 Skip on 2026-11-25 for JPEG export, T-305) is approved scope, **not**
 owner usability acceptance. Full native Drawing UX acceptance remains with
 **T-059** and standalone/Atlas integration acceptance with **T-056**. The
 `BarDivider` is a visual boundary only; the independent `ToolOptionsRegion`

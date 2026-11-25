@@ -76,17 +76,116 @@ class LinuxNativeExportTests(unittest.TestCase):
             env = kwargs["env"]
             assert isinstance(env, dict)
             self.assertNotEqual(env["HOME"], str(Path.home()))
-            self.assertEqual(command[1:3], ["--path", str(executable.parent)])
-            if "--script" in command:
-                self.assertEqual(command[-1], "res://tests/native_extension_ready.gd")
-                return Completed("Godot Engine v4.8.beta3\nNATIVE_EXTENSION_READY\n")
-            self.assertEqual(command[3:], ["--headless", "--quit-after", "5"])
-            return Completed("Godot Engine v4.8.beta3\n")
+            self.assertEqual(command[1:4], ["--headless", "--quit-after", "5"])
+            if "--verify-native-extension" in command:
+                self.assertEqual(command[4:], ["--", "--verify-native-extension"])
+                return Completed("Godot Engine v4.8.beta4\nNATIVE_EXTENSION_READY\n")
+            self.assertEqual(command[4:], [])
+            return Completed("Godot Engine v4.8.beta4\n")
 
         with patch.object(gate.subprocess, "run", side_effect=run) as mocked:
             result = gate.launch_linux(self.output)
         self.assertEqual(mocked.call_count, 2)
         self.assertTrue(result["native_abi_verified"])
+
+    def test_engine_copy_is_normalized_only_if_it_matches_the_stage(self) -> None:
+        root_copy = self.output / gate.NATIVE_LIBRARY.name
+        wrong = self.native.read_bytes() + b"extra"
+        root_copy.write_bytes(wrong)
+        with self.assertRaisesRegex(package.PackageError, "Engine-copied native library differs"):
+            package.package(self.stage, self.output)
+        self.assertEqual(root_copy.read_bytes(), wrong)
+        self.assertFalse((self.output / gate.NATIVE_LIBRARY).exists())
+
+        root_copy.write_bytes(self.native.read_bytes())
+        destination = package.package(self.stage, self.output)
+        self.assertEqual(destination, self.output / gate.NATIVE_LIBRARY)
+        self.assertFalse(root_copy.exists())
+        self.assertEqual(destination.read_bytes(), self.native.read_bytes())
+
+    def test_repeated_godot_export_normalizes_identical_engine_copy(self) -> None:
+        """A second beta4 export must not invalidate an already packaged release."""
+        shipped = package.package(self.stage, self.output)
+        original_bytes = shipped.read_bytes()
+        root_copy = self.output / gate.NATIVE_LIBRARY.name
+        root_copy.write_bytes(original_bytes)
+        with self.assertRaisesRegex(gate.ReleaseError, "Unexpected export file"):
+            gate.inspect_distribution(self.output, "linux")
+
+        self.assertEqual(package.package(self.stage, self.output), shipped)
+        self.assertFalse(root_copy.exists())
+        self.assertEqual(shipped.read_bytes(), original_bytes)
+        self.assertEqual(
+            gate.inspect_distribution(self.output, "linux")["native_library"]["sha256"],
+            gate.digest(self.native),
+        )
+        self.assertFalse(any(self.output.parent.glob(".native-reexport-*")))
+
+    def test_repeated_export_rejects_changed_engine_copy_without_mutation(self) -> None:
+        shipped = package.package(self.stage, self.output)
+        root_copy = self.output / gate.NATIVE_LIBRARY.name
+        root_copy.write_bytes(self.native.read_bytes() + b"unexpected")
+        before = {p.relative_to(self.output): p.read_bytes() for p in self.output.rglob("*") if p.is_file()}
+        with self.assertRaisesRegex(package.PackageError, "Engine-copied native library differs"):
+            package.package(self.stage, self.output)
+        after = {p.relative_to(self.output): p.read_bytes() for p in self.output.rglob("*") if p.is_file()}
+        self.assertEqual(before, after)
+        self.assertEqual(shipped.read_bytes(), self.native.read_bytes())
+
+    def test_repeated_export_rejects_corrupt_pck_and_extra_entries_unchanged(self) -> None:
+        package.package(self.stage, self.output)
+        root_copy = self.output / gate.NATIVE_LIBRARY.name
+        root_copy.write_bytes(self.native.read_bytes())
+        original_pack = (self.output / "Drawing.pck").read_bytes()
+        for kind in ("pack", "extra", "symlink"):
+            unexpected = self.output / "foreign.txt"
+            if kind == "pack":
+                (self.output / "Drawing.pck").write_bytes(b"broken export")
+            elif kind == "extra":
+                unexpected.write_bytes(b"foreign artifact")
+            else:
+                root_copy.unlink()
+                root_copy.symlink_to(self.native)
+            before = {
+                path.relative_to(self.output): (path.is_symlink(), path.read_bytes())
+                for path in self.output.rglob("*") if path.is_file() or path.is_symlink()
+            }
+            with self.subTest(kind=kind):
+                with self.assertRaises(package.PackageError):
+                    package.package(self.stage, self.output)
+                self.assertEqual(before, {
+                    path.relative_to(self.output): (path.is_symlink(), path.read_bytes())
+                    for path in self.output.rglob("*") if path.is_file() or path.is_symlink()
+                })
+                self.assertFalse(any(self.output.parent.glob(".native-reexport-*")))
+            (self.output / "Drawing.pck").write_bytes(original_pack)
+            unexpected.unlink(missing_ok=True)
+            if kind == "symlink":
+                root_copy.unlink()
+                root_copy.write_bytes(self.native.read_bytes())
+
+    def test_repeated_export_restores_engine_copy_on_late_failure(self) -> None:
+        package.package(self.stage, self.output)
+        root_copy = self.output / gate.NATIVE_LIBRARY.name
+        root_copy.write_bytes(self.native.read_bytes())
+        original = {p.relative_to(self.output): p.read_bytes() for p in self.output.rglob("*") if p.is_file()}
+        real_inspect = package.inspect_distribution
+        calls = 0
+
+        def fail_after_normalization(path: Path, platform: str) -> dict[str, object]:
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise gate.ReleaseError("injected late distribution failure")
+            return real_inspect(path, platform)
+
+        with patch.object(package, "inspect_distribution", side_effect=fail_after_normalization):
+            with self.assertRaisesRegex(package.PackageError, "injected late distribution failure"):
+                package.package(self.stage, self.output)
+        self.assertEqual(calls, 2)
+        after = {p.relative_to(self.output): p.read_bytes() for p in self.output.rglob("*") if p.is_file()}
+        self.assertEqual(original, after)
+        self.assertFalse(any(self.output.parent.glob(".native-reexport-*")))
 
     def test_unrelated_pack_is_rejected_before_native_publication(self) -> None:
         pack = self.output / "Drawing.pck"

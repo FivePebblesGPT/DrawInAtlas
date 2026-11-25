@@ -352,7 +352,7 @@ def find_godot(root: Path) -> Path:
     )
     if len(candidates) == 1:
         return candidates[0]
-    raise ToolchainError("Godot beta3 executable missing or ambiguous inside bundle")
+    raise ToolchainError("Godot executable missing or ambiguous inside bundle")
 
 
 def tool_command(command: list[str], env: dict[str, str], root: Path | None, legacy: bool) -> list[str]:
@@ -483,7 +483,7 @@ def bundle(output: Path, python: str, godot_archive: str = "", uv_archive: str =
     output = output.expanduser().resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     download_cache = Path(os.environ.get("TOOLCHAIN_DOWNLOAD_CACHE", str(BUILD / "downloads"))).resolve()
-    godot_zip = download_cache / "godot-4.8-beta3.zip"
+    godot_zip = download_cache / f"{lock['godot']['executable']}.zip"
     uv_tgz = download_cache / "uv-linux-x86_64.tar.gz"
     download(lock["godot"]["url"], lock["godot"]["sha256"], godot_zip, godot_archive)
     download(lock["uv"]["url"], lock["uv"]["sha256"], uv_tgz, uv_archive)

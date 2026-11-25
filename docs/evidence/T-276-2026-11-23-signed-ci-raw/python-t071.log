@@ -1,0 +1,13 @@
+test_all_markdown_links_and_wiki_references_resolve (test_t071_storage_docs.StorageDocsContractTests.test_all_markdown_links_and_wiki_references_resolve) ... ok
+test_approved_authority_and_current_first (test_t071_storage_docs.StorageDocsContractTests.test_approved_authority_and_current_first) ... ok
+test_current_physical_schema_and_code_owners (test_t071_storage_docs.StorageDocsContractTests.test_current_physical_schema_and_code_owners) ... ok
+test_failure_matrix_has_reproducible_oracle (test_t071_storage_docs.StorageDocsContractTests.test_failure_matrix_has_reproducible_oracle) ... ok
+test_import_edit_and_storage_strides_are_distinct (test_t071_storage_docs.StorageDocsContractTests.test_import_edit_and_storage_strides_are_distinct) ... ok
+test_legacy_native_and_import_baselines_are_marked (test_t071_storage_docs.StorageDocsContractTests.test_legacy_native_and_import_baselines_are_marked) ... ok
+test_signed_address_and_byte_integrity (test_t071_storage_docs.StorageDocsContractTests.test_signed_address_and_byte_integrity) ... ok
+test_unsupported_safety_claims_are_excluded (test_t071_storage_docs.StorageDocsContractTests.test_unsupported_safety_claims_are_excluded) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.003s
+
+OK

@@ -1,0 +1,61 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3626)
+
+WARNING: Drawing: Stroke still processing; Save after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:4383)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2872)
+         [2] _save (res://addons/drawing/workspace.gd:4271)
+         [3] test_save_during_backlog (res://tests/t125_pending_persistence_smoke.gd:71)
+         [4] new_app (res://tests/t125_pending_persistence_smoke.gd:28)
+         [5] frames (res://tests/t125_pending_persistence_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Save As after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:4383)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2872)
+         [2] _ask_save (res://addons/drawing/workspace.gd:4251)
+         [3] test_save_during_backlog (res://tests/t125_pending_persistence_smoke.gd:76)
+         [4] new_app (res://tests/t125_pending_persistence_smoke.gd:28)
+         [5] frames (res://tests/t125_pending_persistence_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Save after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:4383)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2872)
+         [2] _save_file (res://addons/drawing/workspace.gd:4314)
+         [3] test_save_during_backlog (res://tests/t125_pending_persistence_smoke.gd:78)
+         [4] new_app (res://tests/t125_pending_persistence_smoke.gd:28)
+         [5] frames (res://tests/t125_pending_persistence_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Save after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:4383)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2872)
+         [2] _save_file (res://addons/drawing/workspace.gd:4314)
+         [3] test_save_during_backlog (res://tests/t125_pending_persistence_smoke.gd:88)
+         [4] new_app (res://tests/t125_pending_persistence_smoke.gd:28)
+         [5] frames (res://tests/t125_pending_persistence_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Close Tab after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:4383)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2872)
+         [2] _request_close_tab (res://addons/drawing/workspace.gd:2909)
+         [3] test_close_during_backlog (res://tests/t125_pending_persistence_smoke.gd:116)
+         [4] new_app (res://tests/t125_pending_persistence_smoke.gd:28)
+         [5] frames (res://tests/t125_pending_persistence_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Save Object after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:4383)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2872)
+         [2] _publish_object (res://addons/drawing/workspace.gd:4297)
+         [3] test_object_publish_during_backlog (res://tests/t125_pending_persistence_smoke.gd:149)
+         [4] new_app (res://tests/t125_pending_persistence_smoke.gd:28)
+         [5] frames (res://tests/t125_pending_persistence_smoke.gd:17)
+T125_PENDING_PASSED checks=29 failures=0

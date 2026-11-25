@@ -31,7 +31,7 @@ A ticket that **requires later owner acceptance** may be `Blocked` or `In Progre
 - Web-only T-044 is archived at `docs/Archive/Web/T-044.md`; the active ticket path remains as a compatibility pointer, with status Archived.
 
 ## Scope snapshot
-The explicit [Drawing feature inventory](DRAWING_FEATURE_INVENTORY.md) is **approved**: 47 Essential, 34 Later, 18 Skip. This does not make the complete baseline Done. `T-053` still first proves the standalone minimum witness; `T-059` later gates manual UX acceptance.
+The explicit [Drawing feature inventory](DRAWING_FEATURE_INVENTORY.md) is **approved**: 48 Essential, 33 Later, 18 Skip after the 2026-11-25 JPEG export promotion (originally 47 Essential, 34 Later, 18 Skip). This does not make the complete baseline Done. `T-053` still first proves the standalone minimum witness; `T-059` later gates manual UX acceptance.
 
 ## Keep engineering checkpoints independently reviewable
 
@@ -55,3 +55,8 @@ The explicit [Drawing feature inventory](DRAWING_FEATURE_INVENTORY.md) is **appr
 ## Owner-directed Drawing-first Atlas dependency (2026-11-22)
 
 T-250 is a **manual-review** ticket with explicit hard dependencies T-251–T-254. Every unfinished or future Atlas *feature/user-facing integration* ticket must carry direct `[[T-250]]` in `depends_on`; validation and CI must not be mistaken for owner signoff. Keep old Done records as historical proof rather than making a Done ticket depend on a new unfinished gate. The Atlas gate's scope includes Atlas-specific product tickets under E-005/E-007/E-008/E-009, but not prerequisite standalone Drawing fixes (to avoid a cycle). This gate prevents **Done** status, even where independent preparations are possible. See [2026-11-22 UX review](DRAWING_UX_REVIEW_2026-11-22.md).
+
+
+## 2026-11-25 Drawing-first correction cycle
+
+T-250 is Blocked on the six historical Done prerequisites plus T-302–T-312 (see [owner review](DRAWING_UX_REVIEW_2026-11-25.md)). Positive general feedback is not explicit approval; preserve the prior engineering evidence and do not create cycles by attaching T-250 to standalone corrective work. The historical inventory approval counts remain 47/34/18; JPEG export is now requested, making the amended inventory 48/33/18. The new tickets are Ready for independent engineering; T-148–T-152 consolidation remains a separate critical path.

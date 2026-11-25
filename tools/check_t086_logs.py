@@ -48,7 +48,7 @@ def verify_cold(content: str) -> list[str]:
         return errors + [f"Invalid renderer JSON: {exc}"]
     if not isinstance(report, dict):
         return errors + ["Renderer JSON must be an object"]
-    if ("4.8-beta3" not in str(report.get("engine", ""))
+    if (report.get("engine") != "4.8-beta4 (official)"
             or report.get("samples_per_case") != 9
             or report.get("viewport_source") != [256, 256]
             or report.get("storage_stride") != 128

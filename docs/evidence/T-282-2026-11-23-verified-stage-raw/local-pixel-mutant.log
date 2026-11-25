@@ -1,0 +1,15 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ERROR: T068_VERIFIED_STAGE_FAILED: published mixed gesture matches every canonical RGBA8 and guard pixel
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_verified_stage_smoke.gd:23)
+       [1] _run (res://tests/drawing_fill_verified_stage_smoke.gd:107)
+ERROR: T068_VERIFIED_STAGE_FAILED: one Redo restores the entire late-edit and fill result
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_verified_stage_smoke.gd:23)
+       [1] _run (res://tests/drawing_fill_verified_stage_smoke.gd:111)
+T068_VERIFIED_STAGE_FAILED checks=36 failures=2

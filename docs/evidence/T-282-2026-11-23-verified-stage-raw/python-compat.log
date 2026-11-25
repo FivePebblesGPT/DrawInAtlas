@@ -1,0 +1,7 @@
+test_native_brush_relocation_preserves_every_historical_pixel (test_t106_oracle_engine_compat.EngineCompatibilityTests.test_native_brush_relocation_preserves_every_historical_pixel) ... ok
+test_only_pinned_engine_version_label_may_change (test_t106_oracle_engine_compat.EngineCompatibilityTests.test_only_pinned_engine_version_label_may_change) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.026s
+
+OK

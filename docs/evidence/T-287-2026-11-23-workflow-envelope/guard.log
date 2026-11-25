@@ -1,0 +1,8 @@
+test_current_workflow_remains_replayable (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_current_workflow_remains_replayable) ... ok
+test_noop_comments_and_step_only_unit_fixtures_work (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_noop_comments_and_step_only_unit_fixtures_work) ... ok
+test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.022s
+
+OK

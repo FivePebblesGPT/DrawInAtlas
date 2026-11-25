@@ -1,0 +1,14 @@
+test_required_native_step_runs_bulk_preflight_fail_closed (test_t290_bulk_edit_preflight_ci.BulkEditPreflightCIContracts.test_required_native_step_runs_bulk_preflight_fail_closed) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+OK
+test_required_step_keeps_native_smoke_and_fail_closed_log (test_t289_fill_preflight_ci.FillPreflightCIContracts.test_required_step_keeps_native_smoke_and_fail_closed_log) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+OK
+Validated 290 tickets and manual-review dependency gates.
+Explicit typing check passed: 599 project scripts, 33 skill documents

@@ -1,0 +1,272 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3626)
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ERROR: T294_BULK_PROJECTION_FAILED: x+ rejects rectangle crossing global native boundary
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:77)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x+ invalid rectangle does not resolve lazy source or stage pixels
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:79)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x+ rejects byte region crossing native boundary
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:85)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x+ invalid byte region does not read or stage
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:87)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x+ rejects polygon crossing native boundary
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:92)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x+ invalid polygon does not read or stage
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:94)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x+ valid retry loads only its single source tile
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:99)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x+ legal boundary edit commits
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:101)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x+ published exact RGBA8
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:105)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x+ Undo restores transparent hidden RGB
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:107)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x+ Redo restores exact pixel
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:109)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x- rejects rectangle crossing global native boundary
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:77)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x- invalid rectangle does not resolve lazy source or stage pixels
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:79)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x- rejects byte region crossing native boundary
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:85)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x- invalid byte region does not read or stage
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:87)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x- rejects polygon crossing native boundary
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:92)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x- invalid polygon does not read or stage
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:94)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x- valid retry loads only its single source tile
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:99)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x- legal boundary edit commits
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:101)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x- published exact RGBA8
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:105)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x- Undo restores transparent hidden RGB
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:107)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: x- Redo restores exact pixel
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:109)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y+ rejects rectangle crossing global native boundary
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:77)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y+ invalid rectangle does not resolve lazy source or stage pixels
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:79)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y+ rejects byte region crossing native boundary
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:85)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y+ invalid byte region does not read or stage
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:87)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y+ rejects polygon crossing native boundary
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:92)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y+ invalid polygon does not read or stage
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:94)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y+ valid retry loads only its single source tile
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:99)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y+ legal boundary edit commits
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:101)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y+ published exact RGBA8
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:105)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y+ Undo restores transparent hidden RGB
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:107)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y+ Redo restores exact pixel
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:109)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y- rejects rectangle crossing global native boundary
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:77)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y- invalid rectangle does not resolve lazy source or stage pixels
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:79)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y- rejects byte region crossing native boundary
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:85)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y- invalid byte region does not read or stage
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:87)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y- rejects polygon crossing native boundary
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:92)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y- invalid polygon does not read or stage
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:94)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y- valid retry loads only its single source tile
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:99)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y- legal boundary edit commits
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:101)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y- published exact RGBA8
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:105)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y- Undo restores transparent hidden RGB
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:107)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+ERROR: T294_BULK_PROJECTION_FAILED: y- Redo restores exact pixel
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t294_bulk_native_projection.gd:23)
+       [1] _case (res://tests/t294_bulk_native_projection.gd:109)
+       [2] _run (res://tests/t294_bulk_native_projection.gd:117)
+T294_BULK_PROJECTION_FAILED checks=57 failures=44

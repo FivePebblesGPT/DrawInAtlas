@@ -48,7 +48,7 @@ For an explicitly network-isolated cold rebuild, use
 
 ## Run and test the existing implementation
 
-- Open `project.godot` in Godot **4.8-beta3** and run `main.tscn` / F5.
+- Open `project.godot` in Godot **4.8-beta4** and run `main.tscn` / F5.
 - The sample campaign includes world and city coordinate grids with a linked Greyhaven map. Paint raster with the brush, clear pixels with the eraser, and undo/redo complete gestures. Artwork uses continuous board coordinates, including on gridless maps.
 - **File → New board** creates an independent blank board with no grid, square cells, or pointy/flat hexes. Choose native units and distance per cell. The inspector edits spacing, origin, rotation and visibility without moving artwork; creation/grid edits support undo/redo.
 - The **Tools** sidebar groups raster drawing/shapes and Objects tools. B/E/F and L/R/O/P automatically target raster; W/T/V/M target Objects. Lines, rectangles, ellipses and polygons commit pixels. Walls, text and image props remain independently selectable, movable and editable. Inspector transforms also scale and rotate selected objects.

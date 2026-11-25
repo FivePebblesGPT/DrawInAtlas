@@ -153,6 +153,8 @@ func run() -> void:
 		app._pack_color(app.recent_colors[0]) == app._pack_color(before_text),
 		"native picker text field focus loss creates only one recent entry")
 	line.queue_free()
+	# The optional canonical channel editor is collapsed by default in T-274.
+	app._set_color_exact_expanded(true)
 	# RGBA8 SpinBox dragging shares the pending gesture state rather than
 	# recording one value_changed for every small increment.
 	app.recent_colors.clear()

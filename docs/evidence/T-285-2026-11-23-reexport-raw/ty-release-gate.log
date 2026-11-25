@@ -1,0 +1,10 @@
+Installed 1 package in 1ms
+error[invalid-assignment]: Invalid subscript assignment with key of type `Literal["runtime"]` and value of type `dict[str, Any]` on object of type `dict[str, str]`
+   --> tools/benchmarks/t068_release_gate.py:544:9
+    |
+544 |         report["linux"]["runtime"] = launch_linux(linux)
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^-------------------
+    |                                      |
+    |                                      Expected value of type `str`, got `dict[str, Any]`
+
+Found 1 diagnostic

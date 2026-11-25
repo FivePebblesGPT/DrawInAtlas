@@ -34,7 +34,9 @@ func _draw() -> void:
 	draw_colored_polygon(surface, fill)
 	draw_polyline(curve, Color(0.78, 0.88, 0.97, 0.65), 1.4, true)
 	var arrow_x: float = size.x * 0.55
-	var sign: float = 1.0 if minimized else -1.0
+	# Right-side dock: > means collapse toward the window edge, < means
+	# expand back into the canvas. The previous mapping reversed both.
+	var sign: float = -1.0 if minimized else 1.0
 	var mark: Color = Color(1.0, 1.0, 1.0, 0.95)
 	draw_line(Vector2(arrow_x - sign * 4.0, center.y - 7.0),
 		Vector2(arrow_x + sign * 3.0, center.y), mark, 2.0, true)

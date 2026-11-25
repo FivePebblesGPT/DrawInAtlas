@@ -1,0 +1,83 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ERROR: T300_MASK_OVERLAP_FAILED: masked-out command 0 preserves deferred Brush and preview
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t300_masked_overlap_noop.gd:24)
+       [1] _masked_hole_noop (res://tests/t300_masked_overlap_noop.gd:93)
+       [2] _run (res://tests/t300_masked_overlap_noop.gd:163)
+ERROR: T300_MASK_OVERLAP_FAILED: masked-out command 1 preserves deferred Brush and preview
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t300_masked_overlap_noop.gd:24)
+       [1] _masked_hole_noop (res://tests/t300_masked_overlap_noop.gd:93)
+       [2] _run (res://tests/t300_masked_overlap_noop.gd:163)
+ERROR: T300_MASK_OVERLAP_FAILED: masked-out command 2 preserves deferred Brush and preview
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t300_masked_overlap_noop.gd:24)
+       [1] _masked_hole_noop (res://tests/t300_masked_overlap_noop.gd:93)
+       [2] _run (res://tests/t300_masked_overlap_noop.gd:163)
+ERROR: T300_MASK_OVERLAP_FAILED: masked-out command 3 preserves deferred Brush and preview
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t300_masked_overlap_noop.gd:24)
+       [1] _masked_hole_noop (res://tests/t300_masked_overlap_noop.gd:93)
+       [2] _run (res://tests/t300_masked_overlap_noop.gd:163)
+ERROR: T300_MASK_OVERLAP_FAILED: masked-out command 0 preserves deferred Brush and preview
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t300_masked_overlap_noop.gd:24)
+       [1] _masked_hole_noop (res://tests/t300_masked_overlap_noop.gd:93)
+       [2] _run (res://tests/t300_masked_overlap_noop.gd:163)
+ERROR: T300_MASK_OVERLAP_FAILED: masked-out command 1 preserves deferred Brush and preview
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t300_masked_overlap_noop.gd:24)
+       [1] _masked_hole_noop (res://tests/t300_masked_overlap_noop.gd:93)
+       [2] _run (res://tests/t300_masked_overlap_noop.gd:163)
+ERROR: T300_MASK_OVERLAP_FAILED: masked-out command 2 preserves deferred Brush and preview
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t300_masked_overlap_noop.gd:24)
+       [1] _masked_hole_noop (res://tests/t300_masked_overlap_noop.gd:93)
+       [2] _run (res://tests/t300_masked_overlap_noop.gd:163)
+ERROR: T300_MASK_OVERLAP_FAILED: masked-out command 3 preserves deferred Brush and preview
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t300_masked_overlap_noop.gd:24)
+       [1] _masked_hole_noop (res://tests/t300_masked_overlap_noop.gd:93)
+       [2] _run (res://tests/t300_masked_overlap_noop.gd:163)
+ERROR: T300_MASK_OVERLAP_FAILED: masked-out command 0 preserves deferred Brush and preview
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t300_masked_overlap_noop.gd:24)
+       [1] _masked_hole_noop (res://tests/t300_masked_overlap_noop.gd:93)
+       [2] _run (res://tests/t300_masked_overlap_noop.gd:163)
+ERROR: T300_MASK_OVERLAP_FAILED: masked-out command 1 preserves deferred Brush and preview
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t300_masked_overlap_noop.gd:24)
+       [1] _masked_hole_noop (res://tests/t300_masked_overlap_noop.gd:93)
+       [2] _run (res://tests/t300_masked_overlap_noop.gd:163)
+ERROR: T300_MASK_OVERLAP_FAILED: masked-out command 2 preserves deferred Brush and preview
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t300_masked_overlap_noop.gd:24)
+       [1] _masked_hole_noop (res://tests/t300_masked_overlap_noop.gd:93)
+       [2] _run (res://tests/t300_masked_overlap_noop.gd:163)
+ERROR: T300_MASK_OVERLAP_FAILED: masked-out command 3 preserves deferred Brush and preview
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t300_masked_overlap_noop.gd:24)
+       [1] _masked_hole_noop (res://tests/t300_masked_overlap_noop.gd:93)
+       [2] _run (res://tests/t300_masked_overlap_noop.gd:163)
+ERROR: T300_MASK_OVERLAP_FAILED: selection must expose a bounded exact overlap probe
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t300_masked_overlap_noop.gd:24)
+       [1] _budget_and_inversion (res://tests/t300_masked_overlap_noop.gd:143)
+       [2] _run (res://tests/t300_masked_overlap_noop.gd:165)
+T300_MASK_OVERLAP_FAILED checks=59 failures=13

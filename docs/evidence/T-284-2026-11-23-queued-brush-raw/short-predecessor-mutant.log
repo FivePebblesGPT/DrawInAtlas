@@ -1,0 +1,57 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3626)
+
+T124_QUEUED_FAILED: long first stroke leaves an unfinished release backlog
+T124_QUEUED_FAILED: second press is buffered without publishing or replacing the first edit
+T124_QUEUED_FAILED: second mouse-up is retained before the first commit
+T124_QUEUED_FAILED: released queued source samples survive zoom, pan and toolbar changes
+T124_QUEUED_FAILED: sequential native reference commits exactly two transactions
+T124_QUEUED_FAILED: reference captures every actual press, motion and release without omission
+T124_QUEUED_FAILED: queued and direct native history each contain two transactions
+T124_QUEUED_FAILED: two native paths retain exact canonical bytes
+T124_QUEUED_FAILED: native reference detects a changed queued brush width
+T124_QUEUED_FAILED: first Undo leaves first stroke intact
+T124_QUEUED_FAILED: second Undo removes first stroke
+T124_QUEUED_FAILED: both Redo transactions restore both strokes
+T124_QUEUED_FAILED: both Redo transactions match original pixels
+T124_QUEUED_FAILED: long first stroke leaves an unfinished release backlog
+T124_QUEUED_FAILED: second press is buffered without publishing or replacing the first edit
+T124_QUEUED_FAILED: sequential native reference commits exactly two transactions
+T124_QUEUED_FAILED: reference captures every actual press, motion and release without omission
+T124_QUEUED_FAILED: queued and direct native history each contain two transactions
+T124_QUEUED_FAILED: two native paths retain exact canonical bytes
+T124_QUEUED_FAILED: first Undo leaves first stroke intact
+T124_QUEUED_FAILED: second Undo removes first stroke
+T124_QUEUED_FAILED: both Redo transactions restore both strokes
+T124_QUEUED_FAILED: both Redo transactions match original pixels
+T124_QUEUED_FAILED: long first stroke leaves an unfinished release backlog
+T124_QUEUED_FAILED: second press is buffered without publishing or replacing the first edit
+T124_QUEUED_FAILED: second mouse-up is retained before the first commit
+T124_QUEUED_FAILED: released queued source samples survive zoom, pan and toolbar changes
+T124_QUEUED_FAILED: sequential native reference commits exactly two transactions
+T124_QUEUED_FAILED: reference captures every actual press, motion and release without omission
+T124_QUEUED_FAILED: queued and direct native history each contain two transactions
+T124_QUEUED_FAILED: two native paths retain exact canonical bytes
+T124_QUEUED_FAILED: first Undo leaves first stroke intact
+T124_QUEUED_FAILED: second Undo removes first stroke
+T124_QUEUED_FAILED: both Redo transactions restore both strokes
+T124_QUEUED_FAILED: both Redo transactions match original pixels
+T124_QUEUED_FAILED: long first stroke leaves an unfinished release backlog
+T124_QUEUED_FAILED: second press is buffered without publishing or replacing the first edit
+T124_QUEUED_FAILED: sequential native reference commits exactly two transactions
+T124_QUEUED_FAILED: reference captures every actual press, motion and release without omission
+T124_QUEUED_FAILED: queued and direct native history each contain two transactions
+T124_QUEUED_FAILED: two native paths retain exact canonical bytes
+T124_QUEUED_FAILED: first Undo leaves first stroke intact
+T124_QUEUED_FAILED: second Undo removes first stroke
+T124_QUEUED_FAILED: both Redo transactions restore both strokes
+T124_QUEUED_FAILED: both Redo transactions match original pixels
+T124_QUEUED_FAILED: overflow guard starts with backlog
+T124_QUEUED_FAILED: excess input fails visibly and releases bounded capture memory
+T124_QUEUED_FAILED: original released stroke still finishes
+T124_QUEUED_FAILED: pending second release held before failed commit
+T124_QUEUED_FAILED: test prerequisite: predecessor remains active for stale-revision fault
+T124_QUEUED_FAILED checks=77 failures=50

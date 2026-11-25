@@ -116,6 +116,27 @@ func _seed(size: int) -> bool:
 	return true
 
 
+## This is a correctness oracle, not timed input-to-frame work. The native
+## publisher records whole tiles in history, so DrawingDelta.after no longer
+## represents the number of pixels committed by a flood fill.
+func _region_is_exact(size: int, rgba: int) -> bool:
+	@warning_ignore("integer_division")
+	var half: int = size / 2
+	for y: int in range(-half, half):
+		for x: int in range(-half, half):
+			var pixel: DrawingResult = _document.read_pixel(_layer, x, y)
+			if not pixel.ok or int(pixel.value) != rgba:
+				return false
+	for offset: int in range(-half, half):
+		for point: Vector2i in [Vector2i(-half - 1, offset),
+				Vector2i(half, offset), Vector2i(offset, -half - 1),
+				Vector2i(offset, half)]:
+			var guard: DrawingResult = _document.read_pixel(_layer, point.x, point.y)
+			if not guard.ok or int(guard.value) != 0:
+				return false
+	return true
+
+
 func _frame_color() -> Color:
 	var position: Vector2i = Vector2i(_canvas.global_position + _canvas.size * 0.5 + Vector2(2, 2))
 	return root.get_texture().get_image().get_pixelv(position)
@@ -186,8 +207,8 @@ func _run() -> void:
 			_check(_dispatch_count == before_dispatch + 1 and _last_result != null
 				and _last_result.ok, "native release commits once %d/%d" % [size, trial])
 			_check(_document.revision == revision + 1 and _last_result != null
-				and _last_result.delta != null and _last_result.delta.after.size() == size * size,
-				"exact canonical fill coverage %d/%d" % [size, trial])
+				and _last_result.delta != null and _region_is_exact(size, TARGET_RGBA),
+				"exact canonical fill and clear border %d/%d" % [size, trial])
 			_check(int(_document.read_pixel(_layer, 0, 0).value) == TARGET_RGBA,
 				"source RGBA8 updated %d/%d" % [size, trial])
 			_check(visible.r > previous.r + 0.35 and visible.g > previous.g + 0.25,

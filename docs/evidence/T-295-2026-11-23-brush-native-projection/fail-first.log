@@ -1,0 +1,185 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ERROR: T295_BRUSH_PROJECTION_FAILED: x+ rejects unpublishable Brush dab
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:73)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: x+ invalid Brush cannot access lazy source or stage preview
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:75)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: x+ invalid Brush cannot mark coverage
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:78)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: x+ legal edge retry stages one pixel from one source
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:82)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: x- rejects unpublishable Brush dab
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:73)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: x- invalid Brush cannot access lazy source or stage preview
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:75)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: x- invalid Brush cannot mark coverage
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:78)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: x- legal edge retry stages one pixel from one source
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:82)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: x- legal Brush commits
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:84)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: x- exact committed RGBA8
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:88)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: x- Undo restores transparent hidden RGB
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:90)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: x- Redo restores exact Brush pixel
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:92)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: y+ rejects unpublishable Brush dab
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:73)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: y+ invalid Brush cannot access lazy source or stage preview
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:75)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: y+ invalid Brush cannot mark coverage
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:78)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: y+ legal edge retry stages one pixel from one source
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:82)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: y- rejects unpublishable Brush dab
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:73)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: y- invalid Brush cannot access lazy source or stage preview
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:75)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: y- invalid Brush cannot mark coverage
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:78)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: y- legal edge retry stages one pixel from one source
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:82)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: y- legal Brush commits
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:84)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: y- exact committed RGBA8
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:88)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: y- Undo restores transparent hidden RGB
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:90)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: y- Redo restores exact Brush pixel
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _case (res://tests/t295_brush_native_projection.gd:92)
+       [2] _run (res://tests/t295_brush_native_projection.gd:131)
+ERROR: T295_BRUSH_PROJECTION_FAILED: mixed per-pixel stage rejects native-unpublishable coordinate
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _mixed_deferred (res://tests/t295_brush_native_projection.gd:109)
+       [2] _run (res://tests/t295_brush_native_projection.gd:132)
+ERROR: T295_BRUSH_PROJECTION_FAILED: rejected mixed pixel leaves accepted Brush deferred and source untouched
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _mixed_deferred (res://tests/t295_brush_native_projection.gd:111)
+       [2] _run (res://tests/t295_brush_native_projection.gd:132)
+ERROR: T295_BRUSH_PROJECTION_FAILED: accepted Brush commits after invalid mixed pixel
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _mixed_deferred (res://tests/t295_brush_native_projection.gd:115)
+       [2] _run (res://tests/t295_brush_native_projection.gd:132)
+ERROR: T295_BRUSH_PROJECTION_FAILED: only accepted Brush pixel appears in document
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _mixed_deferred (res://tests/t295_brush_native_projection.gd:117)
+       [2] _run (res://tests/t295_brush_native_projection.gd:132)
+ERROR: T295_BRUSH_PROJECTION_FAILED: Undo removes only accepted Brush pixel
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _mixed_deferred (res://tests/t295_brush_native_projection.gd:120)
+       [2] _run (res://tests/t295_brush_native_projection.gd:132)
+ERROR: T295_BRUSH_PROJECTION_FAILED: Redo restores accepted Brush pixel
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t295_brush_native_projection.gd:24)
+       [1] _mixed_deferred (res://tests/t295_brush_native_projection.gd:123)
+       [2] _run (res://tests/t295_brush_native_projection.gd:132)
+T295_BRUSH_PROJECTION_FAILED checks=50 failures=30
