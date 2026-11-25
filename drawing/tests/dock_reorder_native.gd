@@ -315,7 +315,7 @@ func run() -> void:
 		var panel: String = entry["panel"]
 		unique[panel] = true
 		check(app.dock_views[panel].get_parent() != null, "source panel Control survives: " + panel)
-	check(unique.size() + 1 == app.dock_views.size() and
+	check(unique.size() + 2 == app.dock_views.size() and not unique.has("text_options") and
 		layout.owner_of("brushes") == "right" and not unique.has("brushes"),
 		"all fixture-visible panels plus hidden Brushes remain uniquely owned")
 	check(app.current_document().revision == baseline_revision and app.current_document().is_dirty() == baseline_dirty, "dock reorganization never edits drawing history or dirty state")

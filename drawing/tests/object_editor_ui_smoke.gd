@@ -54,12 +54,12 @@ func _run() -> void:
 		"frame UI controls update authoring guides without raster edits")
 	app._change_tool("Text")
 	app._edit_text_at(Vector2i(6, -4))
-	app.text_dialog.hide()
+	app._cancel_text()
 	await process_frame
 	app._edit_text_at(Vector2i(6, -4))
 	app.text_edit.text = "Object label"
 	app._commit_text_dialog()
-	app.text_dialog.hide()
+	app._cancel_text()
 	await process_frame
 	var text_id: String = app.current_layer()
 	_check(session.document.inspect_node(text_id).text_element.content == "Object label",

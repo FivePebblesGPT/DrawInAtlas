@@ -30,9 +30,9 @@ func _run() -> void:
 	_check(doc.revision == starting_revision, "Switching tools has no content effect")
 	var world_point: Vector2i = Vector2i(-24, -19)
 	app._edit_text_at(world_point)
-	_check(doc.revision == starting_revision and app.text_dialog.visible,
+	_check(doc.revision == starting_revision and app.text_panel.is_visible_in_tree() and app.text_edit.editable,
 		"Opening text dialog creates no layer")
-	app.text_dialog.hide()
+	app._cancel_text()
 	_check(doc.revision == starting_revision and doc.layer_count() == first_count,
 		"Cancel creates no layer")
 	app._edit_text_at(world_point)

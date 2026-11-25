@@ -282,13 +282,17 @@ are transient and can exceed that limit for one submitted frame, but in-view
 retained entries avoid full-cache LRU churn. First-time zoom-out population
 may still be slow. See [T-086 measurements](../docs/Tickets/T-086.md).
 
-## Editable text (T-058)
+## Editable text (T-058, T-307)
 
-Choose **Text** then click the canvas to open a text dialog; **Cancel** or an
-empty commit does not create a layer. The first successful commit atomically
-creates one text layer/element. Select that text layer and use Text to edit
-its content, point size, Regular/Bold/Italic font, color, alignment and
-rotation. The Layer menu's **Rasterize text layer** command explicitly converts
+Choose **Text** then click the canvas to reveal the dockable **Text Options** panel.
+Type or change style, size, pigment, alignment and rotation for a live in-canvas
+preview at the original layer position. **Apply** (Ctrl+Enter) atomically creates
+or updates one editable text element; **Cancel** (Escape) restores the initial
+view, and empty content cannot commit. Select an existing text layer and use
+**Text → Edit selected text** or click with the Text tool. **Text → Text Options**
+reveals the same panel, including when floated; style, alignment and size menu
+commands share the draft controls. Tab/tool/layer changes cancel a draft; apply
+or cancel before Save, Close or Export. The Layer menu's **Rasterize text layer** command explicitly converts
 editable text to ordinary pixels; Undo restores the original text and stable
 layer ID. Paint/Erase can then edit the rasterized layer. Layer names and label
 contents can be searched in the paged Layers view (200 rows per page).
@@ -303,7 +307,7 @@ Missing/modified fonts fail explicitly, while unsupported glyphs show a visible
 `?` replacement with a `GLYPH_FALLBACK` warning; original editable text is intact.
 Arbitrary system fonts are never silently embedded. The same glyph atlas CPU path is used for
 editable preview and rasterization so their RGBA8 output matches exactly at
-native pixel density. Advanced typography, full Unicode fallback and Atlas-wide Object Editor integration remain downstream work.
+native pixel density. Advanced typography and full Unicode fallback remain downstream work. The same panel and preview are used in the hosted Atlas Object Editor (T-307).
 
 ```sh
 # Import after each fresh --in-place staging to rebuild FontFile resources.
@@ -311,6 +315,7 @@ godot --headless --editor --path drawing --import --quit
 godot --headless --path drawing --script res://tests/text_editor_smoke.gd
 xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
   --path drawing --script res://tests/native_text.gd
+make test-text-options
 ```
 
 Validate the font bundle **inside an exported Linux `.pck`** after building

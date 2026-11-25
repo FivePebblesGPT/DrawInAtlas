@@ -304,7 +304,7 @@ func run() -> void:
 		"HiDPI move and hide actions remain keyboard-focusable")
 	check(app.current_document().revision == revision and app.current_document().is_dirty() == dirty,
 		"dock operations never change Drawing revision or dirty state")
-	check(app.dock_views.size() == 6 and layout.snapshot()["panels"].size() == 6,
+	check(app.dock_views.size() == 7 and layout.snapshot()["panels"].size() == 7,
 		"six registered Controls (five fixture-visible), unique model IDs")
 	print("T081_FLOAT_NATIVE: %d checks; %d failed" % [checks, failures])
 	if failures == 0:

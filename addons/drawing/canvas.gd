@@ -568,17 +568,54 @@ func _mark_occupied(area: Rect2i) -> void:
 				return
 
 
+## Display-only draft. Dirty just the old/new glyph footprints on a warm
+## document; untouched raster textures remain reusable during typing.
+var text_preview: Dictionary = {}
+
+
+func set_text_preview(draft: Dictionary) -> void:
+	if draft.is_empty() and text_preview.is_empty():
+		return
+	if document == null or _cache_document != document or _cache_revision != document.revision \
+			or _cache_source_epoch != document.display_source_epoch \
+			or (not text_preview.is_empty() and _current_text_preview().is_empty()):
+		_display_tiles.clear()
+		_cache_revision = -1
+	else:
+		for item: Dictionary in [text_preview, draft]:
+			for field: String in ["bounds", "source_bounds"]:
+				var area: Rect2i = item.get(field, Rect2i())
+				if not area.has_area():
+					continue
+				_mark_occupied(area)
+				for key: String in _display_tiles:
+					if area.intersects(_display_tiles[key]["area"] as Rect2i):
+						_display_tiles[key]["dirty"] = true
+	text_preview = draft
+	if draft.is_empty() and _occupancy_unknown:
+		_cache_revision = -1
+	_reported_render_errors.clear()
+	queue_redraw()
+
+
+func _current_text_preview() -> Dictionary:
+	if text_preview.get("document") != document or text_preview.get("revision") != document.revision:
+		return {}
+	return text_preview
+
+
 func _rebuild_occupancy() -> void:
 	_occupied_display_tiles.clear()
 	_occupancy_unknown = false
 	var visible: Array[String] = []
-	DrawingRenderer._collect_visible(document, DrawingDocument.ROOT_ID, visible)
+	var draft: Dictionary = _current_text_preview()
+	DrawingRenderer._collect_visible(document, DrawingDocument.ROOT_ID, visible, draft)
 	for node_id: String in visible:
 		var metadata: Dictionary = document.node_metadata(node_id)
-		if metadata["kind"] == DrawingLayerNode.TEXT:
-			var text_node: DrawingLayerNode = document.inspect_node(node_id)
-			if text_node.text_element != null:
-				var measured: DrawingResult = DrawingTextRaster.bounds(text_node.text_element)
+		if node_id == DrawingRenderer.DRAFT_TEXT_ID or metadata["kind"] == DrawingLayerNode.TEXT:
+			var element: DrawingTextElement = DrawingRenderer.visible_text(document, node_id, draft)
+			if element != null:
+				var measured: DrawingResult = DrawingTextRaster.bounds(element)
 				if not measured.ok:
 					_occupancy_unknown = true
 					_occupied_display_tiles.clear()
@@ -1113,6 +1150,8 @@ func _draw() -> void:
 		last_frame_metrics = metrics
 		return
 	_draw_image_backdrop()
+	if not text_preview.is_empty() and _current_text_preview().is_empty():
+		set_text_preview({})
 	_sync_display_cache()
 	var left_top: Vector2i = Vector2i(floori(camera.x - size.x / zoom * 0.5),
 		floori(camera.y - size.y / zoom * 0.5))
@@ -1211,7 +1250,7 @@ func _draw() -> void:
 					metrics["cold_tiles_deferred"] = int(metrics["cold_tiles_deferred"]) + 1
 					continue
 				if visible_plan.is_empty():
-					visible_plan = DrawingRenderer.prepare_visible_layers(document)
+					visible_plan = DrawingRenderer.prepare_visible_layers(document, _current_text_preview())
 					metrics["visible_layer_plan_builds"] = int(metrics["visible_layer_plan_builds"]) + 1
 				var start_compose: int = Time.get_ticks_usec()
 				var composite: DrawingResult = DrawingRenderer.render(document, area,

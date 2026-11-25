@@ -80,8 +80,8 @@ func run() -> void:
 	var names: Array[String] = []
 	for menu: Control in top._menus:
 		names.append((menu as MenuButton).text)
-	check(names == ["File", "Object", "Edit", "View", "Image", "Layers", "Selection", "Window", "Help"],
-		"exact nine fixed menu names in intended order")
+	check(names == ["File", "Object", "Edit", "View", "Image", "Layers", "Selection", "Window", "Text", "Help"],
+		"exact ten fixed menu names in intended order")
 	var tool_names: Array[String] = ["Brush", "Eraser", "Bucket", "Shapes", "Select", "Move", "Text", "Pan"]
 	check(app.tool_buttons.size() == tool_names.size() and app.dock_split.get_child_count() == 2,
 		"current tools share the icon rail and resizable workspace")
@@ -95,8 +95,8 @@ func run() -> void:
 		and not app.tool_buttons["Brush"].button_pressed,
 		"icon button selects the active tool and updates pressed state")
 	app._change_tool("Brush")
-	check(not top.more_menu.visible and top._menus[8].visible,
-		"full desktop displays all nine application menus")
+	check(not top.more_menu.visible and top._menus[9].visible,
+		"full desktop displays all ten application menus")
 	await snapshot("drawing-1280")
 	check(top.options_region.get_child_count() == 2 and top.active_options == "Brush",
 		"brush options show native preset and width without a snap toggle")
@@ -233,7 +233,7 @@ func run() -> void:
 		top._more_selected(about_index)
 		check(app.get_node("WorkspaceAbout").visible, "More invokes the original Help action")
 		app.get_node("WorkspaceAbout").hide()
-	check(not top._menus[8].visible and top._more_actions.size() > 0,
+	check(not top._menus[9].visible and top._more_actions.size() > 0,
 		"hidden menus remain represented by live More commands")
 	check(top.options_region.get_child_count() == 2 and top.more_menu.visible,
 		"narrow options preserve real controls and the overflow menu")

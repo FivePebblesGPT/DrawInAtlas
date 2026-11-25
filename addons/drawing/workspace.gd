@@ -175,7 +175,19 @@ var _restoring_context: bool = false
 var drawing_clipboard: DrawingClipboard
 var _paste_serial: int = 0
 var selection_mode_control: OptionButton
-var text_dialog: ConfirmationDialog
+const TEXT_FONTS: Array[String] = ["lato-regular-v1", "lato-bold-v1", "lato-italic-v1"]
+const TEXT_ALIGNMENTS: Array[String] = ["left", "center", "right"]
+const TEXT_STYLE_LABELS: Array[String] = ["Regular", "Bold", "Italic"]
+const TEXT_ALIGNMENT_LABELS: Array[String] = ["Left", "Center", "Right"]
+var text_panel: VBoxContainer
+var text_apply: Button
+var text_cancel: Button
+var text_notice: Label
+var _text_loading: bool = false
+var _text_scale: Vector2 = Vector2.ONE
+var _text_parent: String = DrawingDocument.ROOT_ID
+var _text_source_bounds: Rect2i = Rect2i()
+var _text_original_angle: float = 0.0
 var text_edit: TextEdit
 var text_font: OptionButton
 var text_size: SpinBox
@@ -298,6 +310,11 @@ func _build_interface() -> void:
 		Callable(self, "reset_workspace_layout"), Callable(self, "_ask_asset_browser")],
 		{3: KEY_MASK_CTRL | KEY_TAB, 4: KEY_MASK_CTRL | KEY_MASK_SHIFT | KEY_TAB})
 	top_bar.set_menu_checked("Window", 2, show_document_tabs)
+	top_bar.add_menu_spec("Text", ["Text Options", "Edit selected text", "Apply text", "Cancel text", "Style", "Alignment", "Increase size", "Decrease size"],
+		[Callable(self, "_show_text_options"), Callable(self, "_edit_selected_text"), Callable(self, "_confirm_text"),
+		Callable(self, "_cancel_text"), Callable(), Callable(), Callable(self, "_adjust_text_size").bind(1), Callable(self, "_adjust_text_size").bind(-1)], {2: KEY_MASK_CTRL | KEY_ENTER, 3: KEY_ESCAPE})
+	top_bar.add_radio_submenu("Text", 4, TEXT_STYLE_LABELS, Callable(self, "_text_style_from_menu"))
+	top_bar.add_radio_submenu("Text", 5, TEXT_ALIGNMENT_LABELS, Callable(self, "_text_alignment_from_menu"))
 	top_bar.add_menu_spec("Help", ["About Drawing workspace"],
 		[Callable(self, "_show_about_workspace")])
 	width_spin = SpinBox.new()
@@ -390,6 +407,9 @@ func _build_interface() -> void:
 	tab_bar.tab_close_display_policy = TabBar.CLOSE_BUTTON_SHOW_ALWAYS
 	tab_bar.tab_close_pressed.connect(_request_close_tab)
 	tab_bar.clip_tabs = true
+	# A long inactive filename must not make the entire canvas/dock wider than
+	# a narrow HiDPI viewport. Godot clips the text and retains the close target.
+	tab_bar.max_tab_width = 180
 	tabs_line.add_child(tab_bar)
 	dock_split = HSplitContainer.new()
 	dock_split.name = "WorkspaceSplit"
@@ -601,6 +621,7 @@ func _build_interface() -> void:
 			if dock_layout.attach_panel(panel_id, "right", panel_id):
 				dock_views[panel_id] = view
 				dock_stash.add_child(view)
+	_build_text_panel()
 	_render_dock()
 	resized.connect(_clamp_floating_hosts)
 	status = Label.new()
@@ -741,7 +762,6 @@ func _build_interface() -> void:
 	variant_form.add_child(variant_name)
 	variant_dialog.confirmed.connect(_variant_dialog_confirmed)
 	variant_dialog.canceled.connect(_variant_dialog_cancelled)
-	_build_text_dialog()
 
 
 ## Register one existing panel Control against the T-078 model; no parallel ownership list.
@@ -1443,9 +1463,16 @@ func _input(event: InputEvent) -> void:
 			_suppress_drag_release = not _drag_candidate_id.is_empty()
 			_cancel_cross_drop(true)
 			get_viewport().set_input_as_handled()
+		elif _authoring_dialog_targets.has("text"):
+			_cancel_text()
+			get_viewport().set_input_as_handled()
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if dock_drag.is_dragging() or not _drag_candidate_id.is_empty():
+			return
+		if _authoring_dialog_targets.has("text") and event.keycode in [KEY_ENTER, KEY_KP_ENTER] and (event.ctrl_pressed or event.meta_pressed):
+			_confirm_text()
+			get_viewport().set_input_as_handled()
 			return
 		# Shift+F10 / Menu opens the focused panel's or group's menu
 		# without changing the active tab or its collapsed state.
@@ -1824,8 +1851,14 @@ func _dock_target_at(position: Vector2) -> Dictionary:
 			"rect": Rect2(frame_rect.position, Vector2(frame_rect.size.x, minf(frame_rect.size.y, 44.0)))}
 	if groups.is_empty():
 		return _dock_group_gap(0, dock_panels.global_position.y)
-	var first: VBoxContainer = dock_group_frames.get(String(groups[0]["id"])) as VBoxContainer
-	var last: VBoxContainer = dock_group_frames.get(String(groups[-1]["id"])) as VBoxContainer
+	var first: VBoxContainer = null
+	var last: VBoxContainer = null
+	for group: Dictionary in groups:
+		var visible_frame: VBoxContainer = dock_group_frames.get(String(group["id"])) as VBoxContainer
+		if visible_frame != null:
+			if first == null:
+				first = visible_frame
+			last = visible_frame
 	if first != null and position.y <= first.global_position.y:
 		return _dock_group_gap(0, first.global_position.y)
 	if last != null and position.y >= last.get_global_rect().end.y:
@@ -2053,9 +2086,16 @@ func _dock_keyboard_command(event: InputEventKey) -> bool:
 		for group_id: String in dock_group_handles:
 			if focused == dock_group_handles[group_id]:
 				var group_index: int = _dock_group_position(group_id)
-				var count: int = dock_layout.container_info("right")["groups"].size()
-				var target_index: int = group_index - 1 if event.keycode == KEY_UP else group_index + 2
-				if target_index >= 0 and target_index <= count:
+				var groups: Array = dock_layout.container_info("right")["groups"]
+				var direction: int = -1 if event.keycode == KEY_UP else 1
+				var neighbor: int = group_index + direction
+				while neighbor >= 0 and neighbor < groups.size() and not dock_group_frames.has(groups[neighbor]["id"]):
+					neighbor += direction
+				var target_index: int = neighbor if direction < 0 else neighbor + 1
+				if direction > 0:
+					while target_index < groups.size() and not dock_group_frames.has(groups[target_index]["id"]):
+						target_index += 1
+				if neighbor >= 0 and neighbor < groups.size():
 					_dock_apply(DrawingDockDrag.GROUP, group_id, {"kind": DrawingDockDrag.GROUP_SLOT,
 						"container": "right", "index": target_index}, "drag-group:" + group_id)
 				return true
@@ -2930,6 +2970,9 @@ func _save_as_named_object() -> void:
 ## intentional: synchronous draining on Save would stall the input loop.
 ## The user can Save or Close again after normal frame-budgeted commit.
 func _can_persist_or_close(action: String) -> bool:
+	if _authoring_dialog_targets.has("text") and (action.begins_with("Save") or action.begins_with("Close")):
+		_show_error("Apply or cancel the text draft before " + action)
+		return false
 	if not canvas.has_pending_stroke():
 		return true
 	if _close_after_save:
@@ -3074,6 +3117,8 @@ func _activate(index: int) -> void:
 	if active_tab >= 0 and active_tab < tabs.size() and active_tab != index:
 		tabs[active_tab]["camera"] = canvas.camera
 		tabs[active_tab]["zoom"] = canvas.zoom
+	if index != active_tab and _authoring_dialog_targets.has("text"):
+		_cancel_text()
 	active_tab = index
 	tab_bar.current_tab = index
 	canvas.document = current_document()
@@ -3173,6 +3218,8 @@ func _select_layer_node(node_id: String, record_context: bool = true) -> void:
 				break
 			item = item.get_next()
 		return
+	if node_id != selected_layer_node() and _authoring_dialog_targets.has("text"):
+		_cancel_text()
 	var before: DrawingHistoryContext = _capture_context() if record_context else null
 	var kind: String = String(current_document().node_metadata(node_id).get("kind", ""))
 	tabs[active_tab]["selected_node"] = node_id
@@ -3395,95 +3442,258 @@ func _commit_layer_rename() -> void:
 	_apply_structure(current_document().rename_layer(selected_layer_node(), name, true), before, true)
 
 
-func _build_text_dialog() -> void:
-	text_dialog = ConfirmationDialog.new()
-	text_dialog.title = "Editable text (one element per layer)"
-	text_dialog.size = Vector2i(470, 350)
-	add_child(text_dialog)
-	var form: VBoxContainer = VBoxContainer.new()
-	text_dialog.add_child(form)
-	var font_label: Label = Label.new()
-	font_label.text = "Bundled Lato · OFL 1.1"
-	form.add_child(font_label)
+func _build_text_panel() -> void:
+	text_panel = VBoxContainer.new()
+	text_panel.name = "TextOptions"
+	assert(dock_layout.register_panel("text_options"))
+	assert(dock_layout.attach_panel("text_options", "right", "text_options"))
+	dock_layout.set_group_collapsed("text_options", true)
+	dock_layout.set_panel_visible("text_options", false)
+	dock_views["text_options"] = text_panel
+	dock_stash.add_child(text_panel)
+	var title: Label = Label.new()
+	title.text = "Text Options · Lato"
+	text_panel.add_child(title)
+	text_edit = TextEdit.new()
+	text_edit.placeholder_text = "Click the canvas with Text to start…"
+	text_edit.tooltip_text = "Ctrl+Enter applies; Escape cancels. Enter inserts a new line."
+	text_edit.custom_minimum_size.y = 88
+	text_edit.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+	text_panel.add_child(text_edit)
+	var controls: GridContainer = GridContainer.new()
+	controls.columns = 2
+	text_panel.add_child(controls)
 	text_font = OptionButton.new()
 	for entry: String in ["Regular", "Bold", "Italic"]:
 		text_font.add_item(entry)
-	form.add_child(text_font)
-	text_edit = TextEdit.new()
-	text_edit.custom_minimum_size = Vector2(420, 110)
-	form.add_child(text_edit)
-	var controls: HBoxContainer = HBoxContainer.new()
-	form.add_child(controls)
+	_text_option(controls, "Style", text_font)
 	text_size = SpinBox.new()
 	text_size.min_value = 6
 	text_size.max_value = 256
 	text_size.value = 24
-	text_size.prefix = "Size"
-	controls.add_child(text_size)
+	text_size.suffix = "px"
+	_text_option(controls, "Size", text_size)
 	text_angle = SpinBox.new()
-	text_angle.min_value = -360
-	text_angle.max_value = 360
-	text_angle.prefix = "Angle °"
-	controls.add_child(text_angle)
+	text_angle.min_value = -5760
+	text_angle.max_value = 5760
+	text_angle.step = 0.0
+	text_angle.suffix = "°"
+	_text_option(controls, "Angle", text_angle)
 	text_alignment = OptionButton.new()
-	for name: String in ["left", "center", "right"]:
+	for name: String in TEXT_ALIGNMENTS:
 		text_alignment.add_item(name.capitalize())
-	controls.add_child(text_alignment)
+	_text_option(controls, "Align", text_alignment)
 	text_color = ColorPickerButton.new()
 	text_color.text = "Color"
-	form.add_child(text_color)
-	text_dialog.confirmed.connect(_confirm_text)
-	text_dialog.canceled.connect(_cancel_authoring_dialog.bind("text"))
+	_text_option(controls, "Pigment", text_color)
+	var actions: HBoxContainer = HBoxContainer.new()
+	text_panel.add_child(actions)
+	text_apply = Button.new()
+	text_apply.text = "Apply"
+	text_apply.pressed.connect(_confirm_text)
+	actions.add_child(text_apply)
+	text_cancel = Button.new()
+	text_cancel.text = "Cancel"
+	text_cancel.pressed.connect(_cancel_text)
+	actions.add_child(text_cancel)
+	text_notice = Label.new()
+	text_notice.clip_text = true
+	text_notice.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	text_panel.add_child(text_notice)
+	text_edit.text_changed.connect(_refresh_text_preview)
+	text_font.item_selected.connect(func(_index: int) -> void: _refresh_text_preview())
+	text_size.value_changed.connect(func(_value: float) -> void: _refresh_text_preview())
+	text_angle.value_changed.connect(func(_value: float) -> void: _refresh_text_preview())
+	text_alignment.item_selected.connect(func(_index: int) -> void: _refresh_text_preview())
+	text_color.color_changed.connect(func(_value: Color) -> void: _refresh_text_preview())
+	_set_text_controls_active(false)
 
 
-func _edit_text_at(point: Vector2i) -> void:
+func _text_option(grid: GridContainer, label: String, control: Control) -> void:
+	var caption: Label = Label.new()
+	caption.text = label
+	grid.add_child(caption)
+	control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_child(control)
+
+
+func _set_text_controls_active(active: bool) -> void:
+	text_edit.editable = active
+	text_font.disabled = not active
+	text_size.editable = active
+	text_angle.editable = active
+	text_alignment.disabled = not active
+	text_color.disabled = not active
+	text_apply.disabled = not active
+	text_cancel.disabled = not active
+	text_notice.text = "Preview · Apply or Cancel" if active else "Choose Text and click canvas"
+	text_notice.tooltip_text = text_notice.text
+
+
+func _show_text_options() -> void:
+	var group: String = dock_layout.group_of("text_options")
+	var owner: String = dock_layout.owner_of("text_options")
+	dock_layout.set_panel_visible("text_options", true)
+	dock_layout.select_panel("text_options")
+	dock_layout.set_group_collapsed(group, false)
+	if owner == "right":
+		# A minimized flyout overlays the canvas; expand to make both visible.
+		dock_layout.set_minimized("right", false)
+	elif floating_hosts.has(owner):
+		(floating_hosts[owner] as Control).show()
+	_render_dock()
+	if owner == "right":
+		call_deferred("_scroll_text_panel")
+
+
+func _scroll_text_panel() -> void:
+	# Reparented dock groups settle their container sizes on the next frame.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if text_panel.is_visible_in_tree() and inspector.is_ancestor_of(text_panel):
+		inspector.ensure_control_visible(text_panel)
+
+
+func _edit_selected_text() -> void:
 	if active_tab < 0:
 		return
 	var node: DrawingLayerNode = current_document().inspect_node(current_layer())
+	if node == null or node.kind != DrawingLayerNode.TEXT:
+		_show_error("Select an editable text layer first")
+		return
+	_change_tool("Text")
+	_edit_text_at(node.text_element.position)
+
+
+func _text_style_from_menu(style: String) -> void:
+	if not _authoring_dialog_targets.has("text"):
+		_show_error("Start a text draft first")
+		return
+	text_font.select(["Regular", "Bold", "Italic"].find(style))
+	_refresh_text_preview()
+
+
+func _text_alignment_from_menu(alignment: String) -> void:
+	if not _authoring_dialog_targets.has("text"):
+		_show_error("Start a text draft first")
+		return
+	text_alignment.select(TEXT_ALIGNMENTS.find(alignment.to_lower()))
+	_refresh_text_preview()
+
+
+func _adjust_text_size(delta: int) -> void:
+	if _authoring_dialog_targets.has("text"):
+		text_size.value += delta
+
+
+func _text_target_current() -> bool:
+	var target: Dictionary = _authoring_dialog_targets.get("text", {})
+	return _save_target_is_current(target) and current_document().revision == int(target["revision"]) \
+		and current_layer() == target["layer"] and selected_layer_node() == target["selected_node"]
+
+
+func _edit_text_at(point: Vector2i) -> void:
+	if active_tab < 0 or not _can_persist_or_close("Start Text"):
+		return
+	if _text_target_current():
+		_show_text_options()
+		text_edit.grab_focus()
+		return
+	_cancel_text()
+	var node: DrawingLayerNode = current_document().inspect_node(current_layer())
 	text_target = current_layer() if node != null and node.kind == DrawingLayerNode.TEXT else ""
-	text_position = point
+	_text_parent = node.parent_id if node != null else String(_insertion_target()["parent"])
+	if not current_document()._editable(text_target if not text_target.is_empty() else _text_parent):
+		_show_error("Text target or group is locked or hidden")
+		return
 	var existing: DrawingTextElement = node.text_element if not text_target.is_empty() else null
+	_text_loading = true
+	text_position = existing.position if existing != null else point
+	_text_scale = existing.scale if existing != null else Vector2.ONE
+	_text_original_angle = existing.angle if existing != null else 0.0
+	_text_source_bounds = Rect2i()
+	if existing != null:
+		var measured: DrawingResult = DrawingTextRaster.bounds(existing)
+		if measured.ok:
+			_text_source_bounds = measured.value as Rect2i
 	text_edit.text = existing.content if existing != null else ""
-	text_font.select(["lato-regular-v1", "lato-bold-v1", "lato-italic-v1"].find(existing.font_id) if existing != null else 0)
+	text_font.select(TEXT_FONTS.find(existing.font_id) if existing != null else 0)
 	text_size.value = existing.font_size if existing != null else 24
 	text_angle.value = rad_to_deg(existing.angle) if existing != null else 0.0
-	text_alignment.select(["left", "center", "right"].find(existing.alignment) if existing != null else 0)
-	text_color.color = Color8(32, 40, 64) if existing == null else Color(
-		float(existing.color_rgba & 255) / 255.0,
-		float((existing.color_rgba >> 8) & 255) / 255.0,
-		float((existing.color_rgba >> 16) & 255) / 255.0,
-		float((existing.color_rgba >> 24) & 255) / 255.0)
-	if existing != null:
-		text_position = existing.position
+	text_alignment.select(TEXT_ALIGNMENTS.find(existing.alignment) if existing != null else 0)
+	text_color.color = active_color if existing == null else Color8(existing.color_rgba & 255,
+		(existing.color_rgba >> 8) & 255, (existing.color_rgba >> 16) & 255, (existing.color_rgba >> 24) & 255)
 	_capture_authoring_dialog_target("text")
-	text_dialog.popup_centered()
+	_text_loading = false
+	_set_text_controls_active(true)
+	_show_text_options()
+	_refresh_text_preview()
 	text_edit.grab_focus()
+
+
+func _text_draft() -> DrawingTextElement:
+	var draft: DrawingTextElement = DrawingTextElement.new()
+	draft.content = text_edit.text
+	draft.font_id = TEXT_FONTS[text_font.selected] if text_font.selected >= 0 else ""
+	draft.position = text_position
+	draft.scale = _text_scale
+	draft.font_size = int(text_size.value)
+	draft.angle = _text_original_angle if text_angle.value == rad_to_deg(_text_original_angle) else deg_to_rad(text_angle.value)
+	draft.alignment = TEXT_ALIGNMENTS[text_alignment.selected]
+	draft.color_rgba = _pack_color(text_color.color)
+	return draft
+
+
+func _refresh_text_preview() -> void:
+	if _text_loading or not _text_target_current():
+		return
+	var draft: DrawingTextElement = _text_draft()
+	top_bar.set_radio_submenu_selected("Text", 4, text_font.selected)
+	top_bar.set_radio_submenu_selected("Text", 5, text_alignment.selected)
+	var valid: DrawingResult = draft.validated()
+	var measured: DrawingResult = DrawingTextRaster.bounds(draft) if valid.ok else valid
+	text_apply.disabled = not measured.ok
+	text_notice.text = "Preview · Apply or Cancel" if measured.ok and measured.code != "GLYPH_FALLBACK" else measured.message
+	text_notice.tooltip_text = text_notice.text
+	if not measured.ok and (draft.content.length() > DrawingTextElement.MAX_CHARS or not draft.content.strip_edges().is_empty()):
+		canvas.set_text_preview({})
+		return
+	# Empty content replaces old text with an empty preview, but cannot commit.
+	canvas.set_text_preview({"document": current_document(), "revision": current_document().revision,
+		"layer": text_target, "parent": _text_parent, "element": draft if measured.ok else null,
+		"bounds": measured.value if measured.ok else Rect2i(), "source_bounds": _text_source_bounds})
+
+
+func _cancel_text() -> void:
+	_cancel_authoring_dialog("text")
+	if canvas != null:
+		canvas.set_text_preview({})
+	if text_panel != null:
+		_text_loading = true
+		text_edit.clear()
+		_text_loading = false
+		_set_text_controls_active(false)
 
 
 func _commit_text_dialog() -> void:
 	if active_tab < 0 or not _can_persist_or_close("Commit Text"):
 		return
+	if not _text_target_current():
+		_cancel_text()
+		_show_error("Text draft belongs to another document, layer or revision; reopen it")
+		return
 	var document: DrawingDocument = current_document()
-	var draft: DrawingTextElement = DrawingTextElement.new()
-	draft.content = text_edit.text
-	draft.font_id = ["lato-regular-v1", "lato-bold-v1", "lato-italic-v1"][text_font.selected]
-	draft.position = text_position
-	draft.font_size = int(text_size.value)
-	draft.angle = deg_to_rad(text_angle.value)
-	draft.alignment = ["left", "center", "right"][text_alignment.selected]
-	draft.color_rgba = _pack_color(text_color.color)
-	var selected_node: DrawingLayerNode = document.inspect_node(current_layer())
-	var parent: String = selected_node.parent_id if selected_node != null else DrawingDocument.ROOT_ID
+	var draft: DrawingTextElement = _text_draft()
 	var before: DrawingHistoryContext = _capture_context()
-	var committed: DrawingResult = document.commit_text(text_target, draft, document.revision, parent)
+	var revision: int = document.revision
+	var committed: DrawingResult = document.commit_text(text_target, draft, revision, _text_parent)
 	if not committed.ok:
 		_show_error(committed.message)
 		return
-	# Text creation is also a structural row insertion. Keep the selected Tree
-	# row and paint target in sync, including Object Editor tabs; otherwise a
-	# subsequent Tree rebuild can silently retarget the old raster layer.
+	_cancel_text()
 	_select_layer_node(String(committed.value), false)
-	document.annotate_latest_gesture(before, _capture_context())
+	if document.revision != revision:
+		document.annotate_latest_gesture(before, _capture_context())
 	_reveal_selected_layer()
 	_after_edit()
 
@@ -3533,6 +3743,8 @@ func _toggle_visibility() -> void:
 
 
 func _change_tool(name: String) -> void:
+	if name != "Text" and _authoring_dialog_targets.has("text"):
+		_cancel_text()
 	if canvas.has_floating_move() and not canvas.confirm_floating_move():
 		return
 	active_tool = name
@@ -3970,6 +4182,8 @@ func _canvas_changed(_result: DrawingResult) -> void:
 
 
 func _after_edit() -> void:
+	if _authoring_dialog_targets.has("text") and not _text_target_current():
+		_cancel_text()
 	_refresh_layers()
 	_update_status()
 	canvas.queue_redraw()
@@ -4009,6 +4223,8 @@ func _update_status() -> void:
 		document.history_length(), "Unsaved changes" if dirty else "Saved"]
 	if canvas.has_floating_move():
 		status.text += " | Floating Move: Enter drop / Esc cancel"
+	if _authoring_dialog_targets.has("text"):
+		status.text += " | Text draft: Ctrl+Enter apply / Esc cancel"
 	status.tooltip_text = status.text
 	_refresh_history()
 
@@ -4187,7 +4403,7 @@ func _export_bounds() -> Rect2i:
 
 func _export_edit_pending() -> bool:
 	return canvas.has_pending_stroke() or canvas.has_floating_move() or canvas.dragging \
-		or current_document().has_unpublished_edit()
+		or _authoring_dialog_targets.has("text") or current_document().has_unpublished_edit()
 
 
 func _export_target_current() -> bool:
@@ -4197,6 +4413,9 @@ func _export_target_current() -> bool:
 
 
 func _ask_export() -> void:
+	if _authoring_dialog_targets.has("text"):
+		_show_error("Apply or cancel the text draft before Export")
+		return
 	_cancel_export()
 	if active_tab < 0:
 		return
@@ -4317,8 +4536,7 @@ func _confirm_layer_rename() -> void:
 
 
 func _confirm_text() -> void:
-	if _authoring_dialog_is_current("text", true):
-		_commit_text_dialog()
+	_commit_text_dialog()
 
 
 func _confirm_object_rename() -> void:
@@ -4553,6 +4771,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	var key: InputEventKey = event
 	if not key.pressed or key.echo:
 		return
+	var text_focus: Control = get_viewport().gui_get_focus_owner()
+	if _authoring_dialog_targets.has("text") and (text_focus is TextEdit or text_focus is LineEdit):
+		return
 	if not key.ctrl_pressed and not key.meta_pressed:
 		if key.keycode in [KEY_BRACKETLEFT, KEY_BRACKETRIGHT] and not key.alt_pressed:
 			var focused: Control = get_viewport().gui_get_focus_owner()
@@ -4678,11 +4899,16 @@ func reset_workspace_layout() -> void:
 	for panel_id: String in dock_views:
 		dock_layout.register_panel(panel_id)
 		dock_layout.attach_panel(panel_id, "right", panel_id)
+	var text_active: bool = _authoring_dialog_targets.has("text")
+	dock_layout.set_panel_visible("text_options", text_active)
+	dock_layout.set_group_collapsed("text_options", not text_active)
 	dock_drag = DOCK_DRAG_SCRIPT.new(dock_layout) as DrawingDockDrag
 	_expanded_dock_width = DEFAULT_DOCK_WIDTH
 	_expanded_scroll = 0
 	_render_dock()
 	call_deferred("_apply_saved_dock_geometry")
+	if text_active:
+		call_deferred("_scroll_text_panel")
 	_schedule_layout_save()
 
 

@@ -241,7 +241,8 @@ static func save(document: DrawingDocument, path: String,
 				(encoded.value as Dictionary)["image_frame"] = IMAGE_FRAME.encode(checked.value as Rect2i)
 			else:
 				return DrawingResult.failure("METADATA", "Unrecognized standalone document metadata")
-	var text_data: String = JSON.stringify(encoded.value)
+	# Text rotation is a float64; retain round-trip precision for editable transforms.
+	var text_data: String = JSON.stringify(encoded.value, "", true, true)
 	if text_data.to_utf8_buffer().size() > MAX_FILE_BYTES:
 		return DrawingResult.failure("FILE_LIMIT", "Drawing file exceeds standalone limit")
 	var temporary: String = path + ".pending-" + DrawingDocument.new_id()

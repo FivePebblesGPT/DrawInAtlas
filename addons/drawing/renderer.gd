@@ -9,13 +9,16 @@ const TILES: Script = preload("res://addons/drawing/signed_tiles.gd")
 ## Snapshot the visible layer order once, rather than walking the document tree
 ## for every tile. Plans are deliberately ephemeral and revision/epoch pinned:
 ## neither edits nor lazy-source registrations may reuse an older plan.
-static func prepare_visible_layers(document: DrawingDocument) -> Dictionary:
+const DRAFT_TEXT_ID: String = "@text-draft"
+
+
+static func prepare_visible_layers(document: DrawingDocument, text_preview: Dictionary = {}) -> Dictionary:
 	if document == null:
 		return {}
 	var layers: Array[String] = []
-	_collect_visible(document, DrawingDocument.ROOT_ID, layers)
+	_collect_visible(document, DrawingDocument.ROOT_ID, layers, text_preview)
 	return {"document": document, "revision": document.revision,
-		"source_epoch": document.display_source_epoch, "layers": layers,
+		"source_epoch": document.display_source_epoch, "layers": layers, "text_preview": text_preview,
 		# A frame-local read-only cache shared by adjacent display tiles. 256
 		# references maximum; canonical sparse tiles remain document-owned.
 		"source_chunks": {}}
@@ -92,9 +95,10 @@ static func render(document: DrawingDocument, view: Rect2i,
 	var bytes: PackedByteArray = PackedByteArray()
 	bytes.resize(view.size.x * view.size.y * 4)
 	var font_warnings: Array[String] = []
+	var text_preview: Dictionary = visible_plan.get("text_preview", {})
 	for layer_id: String in leaf_layers:
-		if document.node_metadata(layer_id)["kind"] == DrawingLayerNode.TEXT:
-			var element: DrawingTextElement = document.inspect_node(layer_id).text_element
+		if layer_id == DRAFT_TEXT_ID or document.node_metadata(layer_id)["kind"] == DrawingLayerNode.TEXT:
+			var element: DrawingTextElement = visible_text(document, layer_id, text_preview)
 			if element != null:
 				if world_x < -1073741824 or world_x > 1073741824 \
 						or world_y < -1073741824 or world_y > 1073741824:
@@ -131,15 +135,25 @@ static func render(document: DrawingDocument, view: Rect2i,
 
 
 static func _collect_visible(document: DrawingDocument, parent_id: String,
-		leaf_layers: Array[String]) -> void:
+		leaf_layers: Array[String], text_preview: Dictionary = {}) -> void:
 	for node_id: String in document.list_children(parent_id):
 		var metadata: Dictionary = document.node_metadata(node_id)
 		if metadata.is_empty() or not metadata["visible"]:
 			continue
 		if metadata["kind"] == DrawingLayerNode.GROUP:
-			_collect_visible(document, node_id, leaf_layers)
+			_collect_visible(document, node_id, leaf_layers, text_preview)
 		elif metadata["kind"] in [DrawingLayerNode.RASTER, DrawingLayerNode.TEXT]:
 			leaf_layers.append(node_id)
+	if not text_preview.is_empty() and text_preview.get("layer") == "" \
+			and text_preview.get("parent") == parent_id:
+		leaf_layers.append(DRAFT_TEXT_ID)
+
+
+static func visible_text(document: DrawingDocument, layer_id: String,
+		text_preview: Dictionary = {}) -> DrawingTextElement:
+	if layer_id == DRAFT_TEXT_ID or text_preview.get("layer") == layer_id:
+		return text_preview.get("element") as DrawingTextElement
+	return document.inspect_node(layer_id).text_element
 
 
 ## Tile-run compositor: avoids allocating DrawingResult and parsing signed keys

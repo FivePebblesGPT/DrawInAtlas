@@ -54,7 +54,7 @@ func run() -> void:
 	await frames(15)
 	check(workspace.dock_toggle != null and workspace.dock_toggle.is_visible_in_tree(),
 		"Atlas embedded workspace owns compact overlay")
-	check(workspace.dock_views.size() == workspace.dock_layout.rail_icons("right").size(),
+	check(workspace.dock_views.size() == workspace.dock_layout.rail_icons("right").size() + 1 and workspace.dock_views.has("text_options"),
 		"one view/control per stable dock panel")
 	check(workspace.get_parent() == host and not workspace._window_quit_guard_enabled,
 		"Drawing does not usurp Atlas window quit policy")

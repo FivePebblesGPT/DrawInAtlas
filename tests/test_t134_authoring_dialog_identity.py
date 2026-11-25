@@ -23,7 +23,6 @@ class AuthoringDialogIdentityContracts(unittest.TestCase):
     def test_all_six_real_confirm_signals_are_guarded(self) -> None:
         controls = (
             ("layer_rename_dialog", "layer_rename", "_ask_layer_rename", "_commit_layer_rename"),
-            ("text_dialog", "text", "_edit_text_at", "_commit_text_dialog"),
             ("rename_dialog", "object_rename", "_ask_rename_object", "_rename_object"),
             ("frame_dialog", "object_frame", "_ask_object_frame", "_change_object_frame"),
             ("grid_dialog", "grid", "_ask_grid_settings", "_apply_grid_settings"),
@@ -47,6 +46,18 @@ class AuthoringDialogIdentityContracts(unittest.TestCase):
                     wrapper.index("_authoring_dialog_is_current"),
                     wrapper.index(legacy_mutation + "()"),
                 )
+
+    def test_text_panel_apply_has_same_identity_guard(self) -> None:
+        self.assertIn("text_apply.pressed.connect(_confirm_text)", self.source)
+        self.assertIn("text_cancel.pressed.connect(_cancel_text)", self.source)
+        self.assertIn('_capture_authoring_dialog_target("text")', self.method(self.source, "_edit_text_at"))
+        commit = self.method(self.source, "_commit_text_dialog")
+        self.assertLess(commit.index("_text_target_current()"), commit.index("document.commit_text("))
+        guard = self.method(self.source, "_text_target_current")
+        for condition in ('_save_target_is_current(target)', 'current_document().revision',
+                          'current_layer()', 'selected_layer_node()'):
+            self.assertIn(condition, guard)
+        self.assertIn('_cancel_authoring_dialog("text")', self.method(self.source, "_cancel_text"))
 
     def test_guard_requires_exact_tab_document_object_and_layer(self) -> None:
         capture = self.method(self.source, "_capture_authoring_dialog_target")

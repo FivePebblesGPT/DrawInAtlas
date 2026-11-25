@@ -57,8 +57,8 @@ func test_drawing_dialogs() -> void:
 	app._edit_text_at(Vector2i(13, 24))
 	app.text_edit.text = "Wrong document text"
 	app._activate(1)
-	app.text_dialog.confirmed.emit()
-	app.text_dialog.hide()
+	app.text_apply.pressed.emit()
+	app._cancel_text()
 	check(other.layer_count() == old_count,
 		"stale Text editor cannot create a layer in another tab")
 	check(original.layer_count() == old_count_original,
@@ -110,8 +110,8 @@ func test_drawing_dialogs() -> void:
 	app._edit_text_at(Vector2i(17, -11))
 	app.text_edit.text = "Authorized text"
 	var before_text: int = other.layer_count()
-	app.text_dialog.confirmed.emit()
-	app.text_dialog.hide()
+	app.text_apply.pressed.emit()
+	app._cancel_text()
 	check(other.layer_count() == before_text + 1,
 		"current-tab Text dialog commits to original document")
 	app._ask_grid_settings()
