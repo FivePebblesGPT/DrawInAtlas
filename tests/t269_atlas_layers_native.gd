@@ -63,7 +63,7 @@ func click_eye(workspace: Control, node_id: String) -> bool:
 	var tree: Tree = workspace.layers
 	var item: TreeItem = tree.get_root().get_first_child()
 	while item != null and String(item.get_metadata(0)) != node_id:
-		item = item.get_next()
+		item = item.get_next_in_tree()
 	if item == null:
 		return false
 	var rect: Rect2 = tree.get_item_area_rect(item, 0, 0)
@@ -150,7 +150,7 @@ func run() -> void:
 	check(workspace.current_document() == document and workspace.canvas.document == document and
 		workspace.layers.get_root() != null,
 		"Atlas embeds the canonical Drawing layer view, not a copied model")
-	check(workspace.layers.get_root().get_child_count() >= 3 and
+	check(workspace._layer_items.size() >= 3 and
 		workspace.history_undo.disabled and workspace.history_redo.disabled,
 		"layer rows render while local History remains host-disabled")
 	var first: Color = framebuffer_color(workspace)

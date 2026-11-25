@@ -104,7 +104,15 @@ its Godot template on the build host.
   to toggle visibility/lock and Ctrl+Alt+R to rename. Guarded creation,
   removal, rename, reorder, visibility and lock are each one undoable step
   in standalone Drawing; the selected row/paint target are restored by Undo.
-  Layer names and text are searchable with 200-row bounded pages. Atlas API
+  Click the group's chevron or use Left/Right with its row focused to
+  collapse/expand its actual nested TreeItems. Folding is view-only, not
+  visibility or history. If a descendant was selected, collapse selects the
+  group and clears the paint target (blocked while a source stroke is pending).
+  Disclosure survives tab switching and dock layout changes; new/reopened
+  documents start expanded. Search includes collapsed descendants and their
+  ancestor context; clearing the filter restores folds, except ancestors of a
+  newly selected result. Pages contain up to 200 matches plus ancestor context
+  and, at a page boundary, a nonselectable child-page hint. Atlas API
   callers retain their own external/legacy structural chronology. The **Edit → Preferences… → Record selection changes in Undo History**
   checkbox (OFF by default)
   optionally adds separate clean selection steps; content undo always restores
@@ -490,6 +498,8 @@ xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
 
 T-089 model 62/62 and software Xvfb/Mesa native 32/32 are engineering evidence;
 physical Windows/Linux pointer/DPI owner approval is still separate in T-059.
+T-311 extends `make test-layer-hierarchy` with native pointer/keyboard disclosure,
+search/page and hosted Object Editor witnesses; see the [T-311 evidence](../docs/evidence/T-311-2026-11-25-layer-disclosure.md).
 
 ### Responsive chrome and tool-width input (T-090)
 

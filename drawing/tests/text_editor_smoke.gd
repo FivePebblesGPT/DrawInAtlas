@@ -57,7 +57,7 @@ func _run() -> void:
 	_check(doc.inspect_node(text_id).kind == DrawingLayerNode.TEXT, "Undo restores editable text")
 	app.layer_search.text = "harbor"
 	app._refresh_layers()
-	_check(app.layers.get_root().get_child_count() == 1, "Search filters layer rows")
+	_check(app._layer_items.has(text_id) and app.layer_page_label.text.ends_with("· 1"), "Search filters layer rows")
 	app.layer_search.text = ""
 	app._refresh_layers()
 	var path: String = OS.get_cache_dir().path_join("text-ui-t058.drawing")

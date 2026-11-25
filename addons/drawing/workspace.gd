@@ -203,6 +203,8 @@ var layer_rename_dialog: ConfirmationDialog
 var layer_rename_field: LineEdit
 var layer_page: int = 0
 var layer_page_label: Label
+var _layer_items: Dictionary[String, TreeItem] = {}
+var _refreshing_layers: bool = false
 var object_open_dialog: FileDialog
 var close_dialog: ConfirmationDialog
 var rename_dialog: ConfirmationDialog
@@ -554,8 +556,11 @@ func _build_interface() -> void:
 		layer_actions.add_child(action)
 	layer_search = LineEdit.new()
 	layer_search.placeholder_text = "Find layers and text labels…"
+	layer_search.tooltip_text = "Search includes collapsed descendants and their ancestors; clear to resume folding."
 	layer_search.text_changed.connect(func(_value: String) -> void:
 		layer_page = 0
+		if _value.strip_edges().is_empty():
+			_reveal_selected_layer()
 		_refresh_layers())
 	layer_pane.add_child(layer_search)
 	var pages: HBoxContainer = HBoxContainer.new()
@@ -571,10 +576,13 @@ func _build_interface() -> void:
 		layer_icons[icon_name] = load("res://addons/drawing/icons/%s.svg" % icon_name) as Texture2D
 	layers = Tree.new()
 	layers.hide_root = true
+	layers.add_theme_icon_override("arrow", load("res://addons/drawing/icons/layer_expanded.svg") as Texture2D)
+	layers.add_theme_icon_override("arrow_collapsed", load("res://addons/drawing/icons/layer_collapsed.svg") as Texture2D)
 	# Fixed viewport for the tree: the dock scrolls as a whole, and the tree
 	# keeps its own row scrolling without expanding indefinitely.
 	layers.custom_minimum_size.y = 230
 	layers.item_selected.connect(_layer_selected)
+	layers.item_collapsed.connect(_layer_item_collapsed)
 	# Tree.button_clicked is not emitted reliably for synthetic and some
 	# forwarded GUI pointer sequences; resolve the row/icon on mouse-down.
 	layers.gui_input.connect(_layer_tree_input)
@@ -3243,6 +3251,7 @@ func _close_index(index: int) -> void:
 	if tabs.is_empty():
 		canvas.document = null
 		canvas.layer_id = ""
+		_layer_items.clear()
 		layers.clear()
 		status.text = "No document open"
 	else:
@@ -3295,8 +3304,11 @@ func _activate(index: int) -> void:
 	if active_tab >= 0 and active_tab < tabs.size() and active_tab != index:
 		tabs[active_tab]["camera"] = canvas.camera
 		tabs[active_tab]["zoom"] = canvas.zoom
+		tabs[active_tab]["layer_page"] = layer_page
 	if index != active_tab and _authoring_dialog_targets.has("text"):
 		_cancel_text()
+	if index != active_tab:
+		layer_page = int(tabs[index].get("layer_page", 0))
 	active_tab = index
 	tab_bar.current_tab = index
 	canvas.document = current_document()
@@ -3329,23 +3341,60 @@ func _activate(index: int) -> void:
 	_update_status()
 
 
-func _flatten_layer_ids(parent: String, depth: int, output: Array[Dictionary]) -> void:
+## Disclosure belongs to the live tab, not the saved document or its history.
+func _collapsed_layer_groups() -> Dictionary:
+	if not tabs[active_tab].has("collapsed_layer_groups"):
+		tabs[active_tab]["collapsed_layer_groups"] = {}
+	return tabs[active_tab]["collapsed_layer_groups"]
+
+
+func _flatten_layer_ids(parent: String, output: Array[Dictionary],
+		include_collapsed: bool = false) -> void:
+	var collapsed: Dictionary = _collapsed_layer_groups()
 	for node_id: String in current_document().list_children(parent):
 		var info: Dictionary = current_document().node_metadata(node_id)
-		output.append({"id": node_id, "depth": depth, "info": info})
-		if info["kind"] == DrawingLayerNode.GROUP:
-			_flatten_layer_ids(node_id, depth + 1, output)
+		output.append({"id": node_id, "info": info})
+		if info["kind"] == DrawingLayerNode.GROUP and (include_collapsed or not collapsed.has(node_id)):
+			_flatten_layer_ids(node_id, output, include_collapsed)
 
 
-func _refresh_layers() -> void:
+## A page contains up to ROW_PAGE matching rows. Ancestors of those rows are
+## included as context even if they do not match or belong to another page.
+## Native TreeItem parenting supplies real indentation, folding and hit tests.
+func _ensure_layer_item(node_id: String, root: TreeItem) -> TreeItem:
+	if _layer_items.has(node_id):
+		return _layer_items[node_id]
+	var info: Dictionary = current_document().node_metadata(node_id)
+	var parent_id: String = info["parent"]
+	var parent: TreeItem = root if parent_id == DrawingDocument.ROOT_ID else _ensure_layer_item(parent_id, root)
+	var item: TreeItem = layers.create_item(parent)
+	_layer_items[node_id] = item
+	var kind_marker: String = "" if info["kind"] == DrawingLayerNode.GROUP else ("T " if info["kind"] == DrawingLayerNode.TEXT else "◉ ")
+	item.set_text(0, kind_marker + info["name"])
+	item.set_tooltip_text(0, "%s · %s%s" % [info["name"], info["kind"],
+		" · inherited visibility/lock applies" if parent_id != DrawingDocument.ROOT_ID else ""])
+	item.set_metadata(0, node_id)
+	item.add_button(0, layer_icons["layer_visible"] if info["visible"] else layer_icons["layer_hidden"], ROW_EYE,
+		false, "Hide this row/group" if info["visible"] else "Show this row/group")
+	item.add_button(0, layer_icons["layer_locked"] if info["locked"] else layer_icons["layer_unlocked"], ROW_LOCK,
+		false, "Unlock this row/group" if info["locked"] else "Lock this row/group")
+	return item
+
+
+func _refresh_layers(focus_id: String = "") -> void:
+	_refreshing_layers = true
+	_layer_items.clear()
 	layers.clear()
 	var root: TreeItem = layers.create_item()
 	if current_document() == null:
+		_refreshing_layers = false
 		return
-	var all_rows: Array[Dictionary] = []
-	_flatten_layer_ids(DrawingDocument.ROOT_ID, 0, all_rows)
-	var matches: Array[Dictionary] = []
 	var query: String = layer_search.text.strip_edges().to_lower()
+	if query.is_empty():
+		_expand_selected_ancestors()
+	var all_rows: Array[Dictionary] = []
+	_flatten_layer_ids(DrawingDocument.ROOT_ID, all_rows, not query.is_empty())
+	var matches: Array[Dictionary] = []
 	for row: Dictionary in all_rows:
 		var info: Dictionary = row["info"]
 		var content: String = ""
@@ -3355,26 +3404,75 @@ func _refresh_layers() -> void:
 		if query.is_empty() or String(info["name"]).to_lower().contains(query) or content.to_lower().contains(query):
 			matches.append(row)
 	var page_count: int = maxi(1, ceili(float(matches.size()) / ROW_PAGE))
+	# Folding an ancestor presented as page context may move it to an earlier
+	# page. Keep the clicked group reachable instead of jumping away from it.
+	if not focus_id.is_empty():
+		for index: int in range(matches.size()):
+			if matches[index]["id"] == focus_id:
+				layer_page = index / ROW_PAGE
+				break
 	layer_page = clampi(layer_page, 0, page_count - 1)
 	layer_page_label.text = "%d/%d · %d" % [layer_page + 1, page_count, matches.size()]
-	layer_page_label.tooltip_text = "%d matching layers/labels" % matches.size()
+	layer_page_label.tooltip_text = "%d matching layers/labels (plus ancestor context)" % matches.size()
 	var first: int = layer_page * ROW_PAGE
 	for index: int in range(first, mini(first + ROW_PAGE, matches.size())):
-		var row: Dictionary = matches[index]
-		var info: Dictionary = row["info"]
-		var item: TreeItem = layers.create_item(root)
-		var kind_marker: String = "▸ " if info["kind"] == DrawingLayerNode.GROUP else ("T " if info["kind"] == DrawingLayerNode.TEXT else "◉ ")
-		item.set_text(0, "  ".repeat(mini(int(row["depth"]), 12)) + kind_marker + info["name"])
-		item.set_tooltip_text(0, "%s · %s%s" % [info["name"], info["kind"],
-			" · inherited visibility/lock applies" if int(row["depth"]) > 0 else ""])
-		item.set_metadata(0, row["id"])
-		item.add_button(0, layer_icons["layer_visible"] if info["visible"] else layer_icons["layer_hidden"], ROW_EYE,
-			false, "Hide this row/group" if info["visible"] else "Show this row/group")
-		item.add_button(0, layer_icons["layer_locked"] if info["locked"] else layer_icons["layer_unlocked"], ROW_LOCK,
-			false, "Unlock this row/group" if info["locked"] else "Lock this row/group")
-		if row["id"] == selected_layer_node():
-			item.select(0)
-			layers.scroll_to_item(item)
+		_ensure_layer_item(matches[index]["id"], root)
+	var collapsed: Dictionary = _collapsed_layer_groups()
+	for node_id: String in _layer_items:
+		var item: TreeItem = _layer_items[node_id]
+		if current_document().node_metadata(node_id)["kind"] != DrawingLayerNode.GROUP:
+			continue
+		# The native arrow is drawn only for a group with a visible child.
+		# A nonselectable placeholder is hidden by the collapsed parent; on
+		# a page boundary it explains why children aren't on this page.
+		if query.is_empty() and item.get_first_child() == null and not current_document().list_children(node_id).is_empty():
+			var sentinel: TreeItem = layers.create_item(item)
+			sentinel.set_selectable(0, false)
+			sentinel.set_text(0, "Children on another page")
+			sentinel.set_custom_color(0, layers.get_theme_color("font_disabled_color"))
+		item.set_disable_folding(not query.is_empty())
+		item.collapsed = query.is_empty() and collapsed.has(node_id)
+	var selected: TreeItem = _layer_items.get(selected_layer_node())
+	if selected != null:
+		selected.select(0)
+	var focus: TreeItem = _layer_items.get(focus_id, selected)
+	if focus != null:
+		layers.scroll_to_item(focus)
+	_refreshing_layers = false
+
+
+func _layer_item_collapsed(item: TreeItem) -> void:
+	if _refreshing_layers or item == null or active_tab < 0 or item.get_metadata(0) == null:
+		return
+	# Rebuild after the native Tree finishes dispatching the fold click.
+	call_deferred("_set_layer_group_collapsed", current_document(), String(item.get_metadata(0)), item.collapsed)
+
+
+func _set_layer_group_collapsed(document: DrawingDocument, node_id: String, collapse: bool) -> void:
+	if document != current_document() or not layer_search.text.strip_edges().is_empty():
+		return
+	if document.node_metadata(node_id).get("kind") != DrawingLayerNode.GROUP or document.list_children(node_id).is_empty():
+		return
+	var collapsed: Dictionary = _collapsed_layer_groups()
+	if collapse == collapsed.has(node_id):
+		return
+	if collapse:
+		# Do not leave the paint target hidden in the view. Selection relocation
+		# is view-only, not a history event, and cannot interrupt a queued edit.
+		var ancestor: String = selected_layer_node()
+		while not ancestor.is_empty() and ancestor != DrawingDocument.ROOT_ID:
+			ancestor = String(document.node_metadata(ancestor).get("parent", ""))
+			if ancestor == node_id:
+				if not _can_persist_or_close("Collapse Layer Group"):
+					_refresh_layers(node_id)
+					return
+				_select_layer_node(node_id, false)
+				_last_selection_context = _capture_context()
+				break
+		collapsed[node_id] = true
+	else:
+		collapsed.erase(node_id)
+	_refresh_layers(node_id)
 
 
 func _change_layer_page(direction: int) -> void:
@@ -3392,12 +3490,9 @@ func _select_layer_node(node_id: String, record_context: bool = true) -> void:
 	# Switching source layers invalidates a queued Brush stroke even without
 	# changing document pixels. Restore the Tree selection if a click is refused.
 	if node_id != selected_layer_node() and not _can_persist_or_close("Change Layer"):
-		var item: TreeItem = layers.get_root().get_first_child() if layers.get_root() != null else null
-		while item != null:
-			if String(item.get_metadata(0)) == selected_layer_node():
-				item.select(0)
-				break
-			item = item.get_next()
+		var item: TreeItem = _layer_items.get(selected_layer_node())
+		if item != null:
+			item.select(0)
 		return
 	if node_id != selected_layer_node() and _authoring_dialog_targets.has("text"):
 		_cancel_text()
@@ -3412,9 +3507,16 @@ func _select_layer_node(node_id: String, record_context: bool = true) -> void:
 
 
 func _layer_selected() -> void:
+	if _refreshing_layers or active_tab < 0:
+		return
 	var selected_item: TreeItem = layers.get_selected()
-	if selected_item != null:
-		_select_layer_node(String(selected_item.get_metadata(0)))
+	if selected_item != null and selected_item.get_metadata(0) != null:
+		var node_id: String = selected_item.get_metadata(0)
+		# Native collapse may move selection from a hidden child to the group.
+		# The pending fold owns that relocation, not selection history.
+		if current_document().node_metadata(node_id).get("kind") == DrawingLayerNode.GROUP and layer_search.text.strip_edges().is_empty() and selected_item.collapsed != _collapsed_layer_groups().has(node_id):
+			return
+		_select_layer_node(node_id)
 
 
 ## Keyboard-accessible row actions operate only when the layer Tree has focus;
@@ -3426,7 +3528,7 @@ func _layer_tree_input(event: InputEvent) -> void:
 			return
 		var row: TreeItem = layers.get_item_at_position(mouse.position)
 		var action: int = layers.get_button_id_at_position(mouse.position)
-		if row == null or action not in [ROW_EYE, ROW_LOCK]:
+		if row == null or row.get_metadata(0) == null or action not in [ROW_EYE, ROW_LOCK]:
 			return
 		# Defer tree rebuild until the GUI dispatch finishes: never free its
 		# currently hit-tested TreeItem while Godot is processing that event.
@@ -3436,7 +3538,18 @@ func _layer_tree_input(event: InputEvent) -> void:
 	if not event is InputEventKey:
 		return
 	var key: InputEventKey = event as InputEventKey
-	if not key.pressed or key.echo or not (key.ctrl_pressed or key.meta_pressed) or not key.alt_pressed:
+	if not key.pressed or key.echo:
+		return
+	if active_tab < 0:
+		return
+	if not key.ctrl_pressed and not key.meta_pressed and not key.alt_pressed and not key.shift_pressed and key.keycode in [KEY_LEFT, KEY_RIGHT]:
+		var node_id: String = selected_layer_node()
+		if _layer_items.has(node_id) and current_document().node_metadata(node_id).get("kind") == DrawingLayerNode.GROUP:
+			if layer_search.text.strip_edges().is_empty():
+				call_deferred("_set_layer_group_collapsed", current_document(), node_id, key.keycode == KEY_LEFT)
+			layers.accept_event()
+			return
+	if not (key.ctrl_pressed or key.meta_pressed) or not key.alt_pressed:
 		return
 	match key.keycode:
 		KEY_UP: _move_selected_layer(-1)
@@ -3498,14 +3611,23 @@ func _add_layer() -> void:
 	_create_selected_layer(DrawingLayerNode.RASTER)
 
 
+func _expand_selected_ancestors() -> void:
+	var collapsed: Dictionary = _collapsed_layer_groups()
+	var ancestor: String = selected_layer_node()
+	while not ancestor.is_empty() and ancestor != DrawingDocument.ROOT_ID:
+		ancestor = String(current_document().node_metadata(ancestor).get("parent", ""))
+		collapsed.erase(ancestor)
+
+
 func _reveal_selected_layer() -> void:
 	if active_tab < 0:
 		return
 	# A new/moved item must not disappear behind an old filter/page.
 	if not layer_search.text.is_empty():
 		layer_search.text = ""
+	_expand_selected_ancestors()
 	var rows: Array[Dictionary] = []
-	_flatten_layer_ids(DrawingDocument.ROOT_ID, 0, rows)
+	_flatten_layer_ids(DrawingDocument.ROOT_ID, rows)
 	for index: int in range(rows.size()):
 		if rows[index]["id"] == selected_layer_node():
 			layer_page = index / ROW_PAGE
