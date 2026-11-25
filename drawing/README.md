@@ -335,12 +335,15 @@ editable text and layer-group tools. Object tabs display their own stable
 source ID and revision; unsaved changes to content, name, origin and bounds
 show `*`. **Save** publishes the current source; **Save As** from standalone
 Drawing saves a distinct portable `.drawing` source with fresh document/layer
-IDs and no Atlas binding. The Object menu includes rename, signed origin,
+IDs and no Atlas binding for flat sources. Linked/nested standalone sources
+require a graph-aware Save As policy and cannot use that command. The Object menu includes rename, signed origin,
 optional bounds guides, close tab and a Save/Discard/Cancel unsaved-close
 prompt. File-native Object metadata (`drawing-object-source-v1`) is optional
 inside the standard `.drawing` wrapper and is validated on load. Opening it
 as a regular drawing still reads its pixels. Object bounds guide the author
-but do not clip sparse pixels or discard transparent RGB.
+but do not clip sparse pixels or discard transparent RGB. T-308 restores the
+checkerboard transparency backdrop in Object Editor: finite frame if provided,
+otherwise the visible canvas. It is never saved as paint.
 
 The canonical drawing canvas and workspace scripts now reside **only** under
 `addons/drawing/`, not `drawing/scripts/`; this allows Atlas's host window
@@ -390,7 +393,25 @@ frame previews a 128×128 neighborhood of the Object origin. At most two new
 thumbnails are decoded per process frame; a 24-image content-hash cache is
 invalidated on refresh or successful local Object Editor publication. External
 changes require **Refresh** and cannot be opened from a stale listing. This
-is **not yet** an Atlas instance-placement, source-deletion or NULL-repair UI.
+is **not** an Atlas instance-placement, source-deletion or NULL-repair UI.
+
+**Standalone placement (T-308):** Drag a saved loose `.drawing` source row
+onto the ordinary Drawing canvas or a local Object Editor tab. The source
+origin snaps to the signed integer pixel under the pointer; a cyan frame
+outline and thumbnail identify the prospective link. Escape or an invalid
+drop cancels without edits. One drop adds a named semantic Object layer with
+a stable source ID and local position; Undo/Redo preserves that identity.
+No pixel copy or filesystem path is embedded. Sources resolve only from the
+explicitly selected flat standalone `Objects/` catalog; registry-owned roots
+and version directories cannot be linked this way. Re-select the catalog
+after relaunch to resolve a saved document; until then, unresolved links
+show NULL markers and raster export refuses incomplete artwork. Refresh or
+successful local source publication resolves the current saved revisions
+(including nested dependencies); unsaved source edits never propagate.
+Hidden/locked destinations, stale or unsafe sources, and self/cyclic graphs
+are rejected. Linked local Object sources must be saved directly in the
+authorized catalog. Nested Save As, single-source Import/Export and generic
+subtree transfer fail closed pending an explicit link/copy policy.
 **Import…** copies a separate valid `.drawing` into a standalone portable
 `Objects/` root under its embedded stable ID; it refuses duplicate identities
 and an Atlas-managed registry root because that requires campaign registration.

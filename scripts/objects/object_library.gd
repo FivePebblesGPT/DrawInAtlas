@@ -772,6 +772,8 @@ func load_snapshot(snapshot: Dictionary) -> DrawingResult:
 func _clone_document(source: DrawingDocument, fresh_ids: bool) -> DrawingResult:
 	if source == null:
 		return DrawingResult.failure("DOCUMENT", "Missing Drawing source")
+	if not source.linked_records().is_empty():
+		return DrawingResult.failure("NESTED_IMPORT", "Standalone links cannot enter the Atlas registry without explicit graph import")
 	if not fresh_ids:
 		var encoded: DrawingResult = DrawingFileIO.encode(source)
 		return DrawingFileIO.decode(encoded.value) if encoded.ok else encoded
@@ -799,6 +801,8 @@ func _discard_staged(record: Dictionary) -> void:
 func _stage_asset(source: DrawingDocument, asset_id: String,
 		version: int, label: String, origin: Vector2i = Vector2i.ZERO,
 		bounds: Rect2i = Rect2i()) -> DrawingResult:
+	if not source.linked_records().is_empty():
+		return DrawingResult.failure("NESTED_IMPORT", "Standalone linked Object sources require an explicit Atlas registry graph import")
 	var dir: String = root_path.path_join(asset_id)
 	if _linked_component(asset_id, version):
 		return DrawingResult.failure("PATH", "Object file or parent directory is a symlink")
@@ -967,6 +971,8 @@ func _published_document(asset_id: String) -> DrawingResult:
 		var opened: DrawingResult = DrawingFileIO.open(_absolute(_assets[asset_id]["path"]))
 		if not opened.ok:
 			return opened
+		if not (opened.value as DrawingDocument).linked_records().is_empty():
+			return DrawingResult.failure("NESTED_IMPORT", "Standalone links are not Atlas registry child records")
 		_cache[asset_id] = opened.value
 	return DrawingResult.success(_cache[asset_id], _assets[asset_id]["revision"])
 

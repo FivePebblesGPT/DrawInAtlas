@@ -11,6 +11,10 @@ signal view_changed()
 ## Used by the shared workspace status bar; never creates history or content edits.
 signal cursor_moved()
 signal text_requested(pixel: Vector2i)
+var object_drop_check: Callable
+var object_drop_commit: Callable
+var _object_drop_area: Rect2i = Rect2i()
+var _object_drop_anchor: Vector2i = Vector2i.ZERO
 
 var document: DrawingDocument:
 	set(value):
@@ -224,6 +228,8 @@ var _floating_active: bool = false
 ## the infinite sparse canvas; the origin and optional bounds are source-local.
 var asset_origin: Vector2i = Vector2i.ZERO
 var asset_bounds: Rect2i = Rect2i()
+## Object frames are presentation-only; unbounded sources use a viewport checker.
+var object_backdrop: bool = false
 var session: DrawingEditSession
 var dragging: bool = false
 var panning: bool = false
@@ -425,6 +431,9 @@ func _ready() -> void:
 
 
 func _notification(what: int) -> void:
+	if what in [NOTIFICATION_DRAG_END, NOTIFICATION_MOUSE_EXIT, NOTIFICATION_WM_WINDOW_FOCUS_OUT, NOTIFICATION_APPLICATION_FOCUS_OUT]:
+		_object_drop_area = Rect2i()
+		queue_redraw()
 	if (_bucket_capture or _shape_capture) and what in [NOTIFICATION_WM_WINDOW_FOCUS_OUT,
 			NOTIFICATION_APPLICATION_FOCUS_OUT]:
 		cancel_gesture()
@@ -621,6 +630,9 @@ func _rebuild_occupancy() -> void:
 					_occupied_display_tiles.clear()
 					return
 				_mark_occupied(measured.value as Rect2i)
+		elif metadata["kind"] == DrawingLayerNode.OBJECTS:
+			for link: Dictionary in document.layer_links(node_id):
+				_mark_occupied(DrawingLinkedObjects.link_coverage(link, document.linked_sources))
 		else:
 			for tile_key: String in document.tile_keys(node_id):
 				var coords: PackedStringArray = tile_key.split(",")
@@ -689,6 +701,9 @@ func _prune_erased_display_tiles(regions: Array) -> void:
 				if not measured.ok:
 					return
 				text_areas.append(measured.value as Rect2i)
+		elif metadata.get("kind") == DrawingLayerNode.OBJECTS:
+			for link: Dictionary in document.layer_links(layer):
+				text_areas.append(DrawingLinkedObjects.link_coverage(link, document.linked_sources))
 		else:
 			raster_layers.append(layer)
 	for key: String in candidates:
@@ -887,11 +902,15 @@ func _reserve_display_slot(visible_tile_range: Rect2i, candidate: Vector2i,
 ## Draw the transparency guide in fixed *screen* pixels, not source pixels.
 ## It is a backdrop only: sparse tiles outside this frame are still visible.
 func _draw_image_backdrop() -> void:
-	if not image_bounds.has_area() or _checker_texture == null:
+	if _checker_texture == null:
 		return
-	var frame: Rect2 = Rect2(pixel_to_position(Vector2(image_bounds.position)),
-		Vector2(image_bounds.size) * zoom)
-	var visible: Rect2 = frame.intersection(Rect2(Vector2.ZERO, size))
+	var bounds: Rect2i = asset_bounds if object_backdrop else image_bounds
+	if not bounds.has_area() and not object_backdrop:
+		return
+	var visible: Rect2 = Rect2(Vector2.ZERO, size)
+	if bounds.has_area():
+		var frame: Rect2 = Rect2(pixel_to_position(Vector2(bounds.position)), Vector2(bounds.size) * zoom)
+		visible = frame.intersection(visible)
 	if visible.has_area():
 		# A tiled rect starts its UVs at visible.position, which changes as the
 		# image enters/leaves each edge. Source UVs must instead be anchored to
@@ -1256,7 +1275,7 @@ func _draw() -> void:
 				var composite: DrawingResult = DrawingRenderer.render(document, area,
 					0, 0, 1048576, preview_session, visible_plan)
 				metrics["compose_cpu_us"] = int(metrics["compose_cpu_us"]) + Time.get_ticks_usec() - start_compose
-				if not composite.ok or composite.code == "GLYPH_FALLBACK":
+				if not composite.ok or composite.code in ["GLYPH_FALLBACK", "LINK_MISSING"]:
 					if not _reported_render_errors.has(composite.code):
 						_reported_render_errors[composite.code] = true
 						canvas_error.emit(composite.message)
@@ -1340,6 +1359,13 @@ func _draw() -> void:
 
 	_draw_grid_overlay()
 	_draw_pixel_grid_overlay()
+	if _object_drop_area.has_area():
+		var preview_rect: Rect2 = Rect2(pixel_to_position(Vector2(_object_drop_area.position)), Vector2(_object_drop_area.size) * zoom)
+		draw_rect(preview_rect, Color(0.3, 0.8, 1.0, 0.12))
+		draw_rect(preview_rect, Color(0.3, 0.8, 1.0), false, 2.0)
+		var drop_anchor: Vector2 = pixel_to_position(Vector2(_object_drop_anchor))
+		draw_line(drop_anchor - Vector2(7, 0), drop_anchor + Vector2(7, 0), Color(0.3, 0.8, 1.0), 2.0)
+		draw_line(drop_anchor - Vector2(0, 7), drop_anchor + Vector2(0, 7), Color(0.3, 0.8, 1.0), 2.0)
 	if image_bounds.has_area():
 		draw_rect(Rect2(pixel_to_position(Vector2(image_bounds.position)),
 			Vector2(image_bounds.size) * zoom), Color(0.92, 0.94, 0.96), false, 1.5)
@@ -1614,6 +1640,27 @@ func _draw_selection_outline() -> void:
 		screen_edges.append(pixel_to_position(source_point))
 	if not screen_edges.is_empty():
 		draw_multiline(screen_edges, Color(0.2, 0.65, 1.0, 0.95), 1.5)
+
+
+func _can_drop_data(at_position: Vector2, data: Variant) -> bool:
+	_object_drop_area = Rect2i()
+	if not at_position.is_finite() or not Rect2(Vector2.ZERO, size).has_point(at_position) or \
+			not data is Dictionary or not object_drop_check.is_valid():
+		queue_redraw()
+		return false
+	var anchor: Vector2i = position_to_pixel(at_position)
+	var preview: Rect2i = object_drop_check.call(data, anchor)
+	_object_drop_area = preview
+	_object_drop_anchor = anchor
+	queue_redraw()
+	return preview.has_area()
+
+
+func _drop_data(at_position: Vector2, data: Variant) -> void:
+	if _can_drop_data(at_position, data) and object_drop_commit.is_valid():
+		object_drop_commit.call(data, position_to_pixel(at_position))
+	_object_drop_area = Rect2i()
+	queue_redraw()
 
 
 func _gui_input(event: InputEvent) -> void:

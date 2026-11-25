@@ -59,6 +59,10 @@ jobs:
           set -euo pipefail
           T307_SCREENSHOTS=/tmp/t090-screenshots make test-text-options TOOLCHAIN=system 2>&1 | tee /tmp/t307-native.log
           T306_SCREENSHOTS=/tmp/t090-screenshots make test-srgb TOOLCHAIN=system 2>&1 | tee /tmp/t306-native.log
+      - name: Verify standalone Object linking and hosted background (T-308)
+        run: |
+          set -o pipefail
+          T308_SCREENSHOTS=/tmp/t090-screenshots make test-object-drop TOOLCHAIN=system 2>&1 | tee /tmp/t308-native.log
       - name: Upload software-only screenshots and diagnostic log
         if: always()
         uses: actions/upload-artifact@v4
@@ -72,5 +76,6 @@ jobs:
             /tmp/t305-native.log
             /tmp/t306-native.log
             /tmp/t307-native.log
+            /tmp/t308-native.log
             /tmp/t090-screenshots/
           if-no-files-found: warn

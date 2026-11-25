@@ -18,12 +18,16 @@ static func render(document: DrawingDocument, bounds: Rect2i) -> DrawingResult:
 		return DrawingResult.failure("EXPORT_BOUNDS", "Export frame is outside the supported signed range")
 	if document.has_unpublished_edit():
 		return DrawingResult.failure("EXPORT_PENDING", "Finish or cancel the pending edit before exporting")
+	if not document.linked_records().is_empty() and (document.linked_sources.is_empty() or not document.linked_source_error.is_empty()):
+		return DrawingResult.failure("LINK_MISSING", "Resolve linked Object sources before exporting")
 	var revision: int = document.revision
 	var epoch: int = document.display_source_epoch
 	var plan: Dictionary = DrawingRenderer.prepare_visible_layers(document)
 	var rendered: DrawingResult = DrawingRenderer.render(document, bounds, 0, 0, MAX_PIXELS, null, plan)
 	if not rendered.ok:
 		return rendered
+	if rendered.code == "LINK_MISSING":
+		return DrawingResult.failure("LINK_MISSING", rendered.message)
 	if document.revision != revision or document.display_source_epoch != epoch or document.has_unpublished_edit():
 		return DrawingResult.failure("EXPORT_STALE", "Document changed during export rendering")
 	return rendered

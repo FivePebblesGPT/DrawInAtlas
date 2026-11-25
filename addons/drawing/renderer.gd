@@ -26,7 +26,7 @@ static func prepare_visible_layers(document: DrawingDocument, text_preview: Dict
 
 static func render(document: DrawingDocument, view: Rect2i,
 		origin_x: int = 0, origin_y: int = 0, max_pixels: int = 1048576,
-		preview: DrawingEditSession = null, visible_plan: Dictionary = {}) -> DrawingResult:
+		preview: DrawingEditSession = null, visible_plan: Dictionary = {}, link_context: Dictionary = {}) -> DrawingResult:
 	if document == null or view.size.x <= 0 or view.size.y <= 0 or view.size.x > max_pixels or view.size.y > max_pixels / view.size.x:
 		return DrawingResult.failure("RENDER_LIMIT", "Viewport must be bounded")
 	# Never mix a stale or unrelated edit with committed document pixels.
@@ -95,6 +95,10 @@ static func render(document: DrawingDocument, view: Rect2i,
 	var bytes: PackedByteArray = PackedByteArray()
 	bytes.resize(view.size.x * view.size.y * 4)
 	var font_warnings: Array[String] = []
+	var link_warnings: Array[String] = []
+	var sources: Dictionary = link_context.get("sources", document.linked_sources)
+	var ancestors: Dictionary = link_context.get("ancestors", {}).duplicate()
+	ancestors[document.id] = true
 	var text_preview: Dictionary = visible_plan.get("text_preview", {})
 	for layer_id: String in leaf_layers:
 		if layer_id == DRAFT_TEXT_ID or document.node_metadata(layer_id)["kind"] == DrawingLayerNode.TEXT:
@@ -109,6 +113,14 @@ static func render(document: DrawingDocument, view: Rect2i,
 					return result
 				if result.code == "GLYPH_FALLBACK" and not font_warnings.has(result.message):
 					font_warnings.append(result.message)
+			continue
+		if document.node_metadata(layer_id)["kind"] == DrawingLayerNode.OBJECTS:
+			for link: Dictionary in document.layer_links(layer_id):
+				var composed: DrawingResult = _composite_link(link, sources, ancestors, world_x, world_y, view.size, bytes)
+				if not composed.ok:
+					return composed
+				if composed.code == "LINK_MISSING" and not link_warnings.has(composed.message):
+					link_warnings.append(composed.message)
 			continue
 		# The cold canvas passes a revision-pinned frame plan. Before walking
 		# thousands of absent pixels across sparse, separate layers, ask whether
@@ -128,7 +140,10 @@ static func render(document: DrawingDocument, view: Rect2i,
 			return raster
 	var rendered: DrawingResult = DrawingResult.success(Image.create_from_data(view.size.x, view.size.y,
 		false, Image.FORMAT_RGBA8, bytes), document.revision)
-	if not font_warnings.is_empty():
+	if not link_warnings.is_empty():
+		rendered.code = "LINK_MISSING"
+		rendered.message = "\n".join(link_warnings)
+	elif not font_warnings.is_empty():
 		rendered.code = "GLYPH_FALLBACK"
 		rendered.message = "\n".join(font_warnings)
 	return rendered
@@ -142,7 +157,8 @@ static func _collect_visible(document: DrawingDocument, parent_id: String,
 			continue
 		if metadata["kind"] == DrawingLayerNode.GROUP:
 			_collect_visible(document, node_id, leaf_layers, text_preview)
-		elif metadata["kind"] in [DrawingLayerNode.RASTER, DrawingLayerNode.TEXT]:
+		elif metadata["kind"] in [DrawingLayerNode.RASTER, DrawingLayerNode.TEXT] or \
+				(metadata["kind"] == DrawingLayerNode.OBJECTS and not document.layer_links(node_id).is_empty()):
 			leaf_layers.append(node_id)
 	if not text_preview.is_empty() and text_preview.get("layer") == "" \
 			and text_preview.get("parent") == parent_id:
@@ -154,6 +170,60 @@ static func visible_text(document: DrawingDocument, layer_id: String,
 	if layer_id == DRAFT_TEXT_ID or text_preview.get("layer") == layer_id:
 		return text_preview.get("element") as DrawingTextElement
 	return document.inspect_node(layer_id).text_element
+
+
+## Linked placement is just another ordered semantic layer. Render the
+## published child through the same canonical compositor, at a signed integer
+## translation. No copied raster layer or external filesystem access here.
+static func _composite_link(link: Dictionary, sources: Dictionary, ancestors: Dictionary,
+		world_x: int, world_y: int, view_size: Vector2i, bytes: PackedByteArray) -> DrawingResult:
+	if not DrawingDocument.valid_link(link):
+		return DrawingResult.failure("LINK_RECORD", "Malformed Object link")
+	var source_id: String = link["source_id"]
+	var available: bool = sources.has(source_id) and not ancestors.has(source_id) and ancestors.size() <= DrawingLinkedObjects.MAX_DEPTH
+	var area: Rect2i = DrawingLinkedObjects.link_coverage(link, sources if available else {})
+	if not area.has_area() or world_x > area.end.x or world_y > area.end.y or \
+			world_x + view_size.x <= area.position.x or world_y + view_size.y <= area.position.y:
+		return DrawingResult.success()
+	# Intersect using int64 before converting to Rect2i: Atlas may render at
+	# anchors outside Vector2i and must not wrap into an unrelated link.
+	var left: int = maxi(world_x, area.position.x)
+	var top: int = maxi(world_y, area.position.y)
+	var right: int = mini(world_x + view_size.x, area.end.x)
+	var bottom: int = mini(world_y + view_size.y, area.end.y)
+	if right <= left or bottom <= top:
+		return DrawingResult.success()
+	var overlap: Rect2i = Rect2i(left, top, right - left, bottom - top)
+	var offset: Vector2i = Vector2i(left - world_x, top - world_y)
+	var result: DrawingResult = DrawingResult.success()
+	var source_bytes: PackedByteArray = PackedByteArray()
+	if available:
+		var source: Dictionary = sources[source_id]
+		var local: Vector2i = overlap.position - Vector2i(link["position"]) + Vector2i(source["origin"])
+		var rendered: DrawingResult = render(source["document"], Rect2i(local, overlap.size), 0, 0,
+			view_size.x * view_size.y, null, {}, {"sources": sources, "ancestors": ancestors})
+		if not rendered.ok:
+			return rendered
+		source_bytes = (rendered.value as Image).get_data()
+		if rendered.code == "LINK_MISSING":
+			result.code = rendered.code
+			result.message = rendered.message
+	else:
+		result.code = "LINK_MISSING"
+		result.message = "Unresolved Object source: " + source_id
+	for y: int in range(overlap.size.y):
+		for x: int in range(overlap.size.x):
+			var rgba: int
+			if available:
+				rgba = source_bytes.decode_u32((y * overlap.size.x + x) * 4)
+			else:
+				var marker: Vector2i = overlap.position + Vector2i(x, y) - area.position
+				rgba = 0xffff00ff if marker.x == marker.y or marker.x + marker.y == 15 else 0xff382b38
+			if (rgba >> 24) == 0:
+				continue
+			var target: int = ((offset.y + y) * view_size.x + offset.x + x) * 4
+			bytes.encode_u32(target, rgba if (rgba >> 24) == 255 else DrawingEditSession._blend(rgba, bytes.decode_u32(target)))
+	return result
 
 
 ## Tile-run compositor: avoids allocating DrawingResult and parsing signed keys

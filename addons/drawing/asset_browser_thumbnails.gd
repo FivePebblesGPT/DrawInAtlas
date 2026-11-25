@@ -10,6 +10,8 @@ const MAX_RENDER_EDGE: int = 192
 var _images: Dictionary[String, Image] = {}
 var _order: Array[String] = []
 var renders: int = 0
+var _linked_keys: Dictionary = {}
+var _catalog_keys: Dictionary = {}
 
 
 func count() -> int:
@@ -19,6 +21,8 @@ func count() -> int:
 func clear() -> void:
 	_images.clear()
 	_order.clear()
+	_linked_keys.clear()
+	_catalog_keys.clear()
 
 
 ## Only a changed source's bytes should discard a previously rendered preview.
@@ -30,11 +34,14 @@ func reconcile(entries: Array[Dictionary], complete_index: bool = true) -> void:
 		var key: String = _key(entry)
 		keys[key] = true
 		revisions_by_id[String(entry.get("id", "")) + ":"] = key
+	var changed: bool = complete_index and keys != _catalog_keys
+	if complete_index:
+		_catalog_keys = keys
 	for key: String in _order.duplicate():
 		# Standalone scans are complete and can drop missing files. Atlas pages
 		# are *not* complete indexes: preserve off-page LRU entries, but evict
 		# a prior revision if the current page exposes changed bytes for its ID.
-		var invalid: bool = complete_index and not keys.has(key)
+		var invalid: bool = complete_index and (not keys.has(key) or (changed and _linked_keys.has(key)))
 		if not complete_index:
 			for prefix: String in revisions_by_id:
 				if key.begins_with(prefix) and key != revisions_by_id[prefix]:
@@ -42,6 +49,7 @@ func reconcile(entries: Array[Dictionary], complete_index: bool = true) -> void:
 					break
 		if invalid:
 			_images.erase(key)
+			_linked_keys.erase(key)
 			_order.erase(key)
 
 
@@ -65,6 +73,15 @@ func preview(index: DrawingAssetBrowserIndex, entry: Dictionary) -> DrawingResul
 			int(data["source_revision"]) != int(entry.get("embedded_revision", entry["revision"])) or \
 			FileAccess.get_sha256(String(entry["path"])) != entry["sha256"]:
 		return DrawingResult.failure("STALE_SOURCE", "Object source changed while making its preview")
+	var document: DrawingDocument = data["document"]
+	var linked: bool = not document.linked_records().is_empty()
+	if linked:
+		if not DrawingLinkedObjects.flat_entry(index, entry):
+			return DrawingResult.failure("LINK_ROOT", "Standalone links require a flat Object catalog")
+		var resolved: DrawingResult = DrawingLinkedObjects.resolve(document, index)
+		if not resolved.ok:
+			return resolved
+		document.set_linked_sources(resolved.value)
 	var bounds: Rect2i = data["bounds"]
 	var origin: Vector2i = data["origin"]
 	if bounds.size.x <= 0 or bounds.size.y <= 0:
@@ -88,9 +105,13 @@ func preview(index: DrawingAssetBrowserIndex, entry: Dictionary) -> DrawingResul
 	preview_image.blit_rect(image, Rect2i(Vector2i.ZERO, image.get_size()),
 		Vector2i((SIZE - target_width) / 2, (SIZE - target_height) / 2))
 	_images[key] = preview_image
+	if linked:
+		_linked_keys[key] = true
 	_order.append(key)
 	if _order.size() > CAPACITY:
-		_images.erase(_order.pop_front())
+		var oldest: String = _order.pop_front()
+		_images.erase(oldest)
+		_linked_keys.erase(oldest)
 	renders += 1
 	return DrawingResult.success(preview_image)
 

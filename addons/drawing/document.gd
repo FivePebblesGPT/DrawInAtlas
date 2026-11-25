@@ -5,6 +5,12 @@ extends RefCounted
 
 const TILES: Script = preload("res://addons/drawing/signed_tiles.gd")
 const ROOT_ID: String = "root"
+const LINK_KIND: String = "drawing-linked-object-v1"
+const MAX_LINKS: int = 64
+## Explicit browser authorization supplies detached *published* sources only.
+## Never serialized, never inferred from a path in a Drawing file.
+var linked_sources: Dictionary = {}
+var linked_source_error: String = ""
 ## Native store cap; three full spans per touched tile cover source and replay buffers.
 const MAX_NATIVE_HISTORY_TRANSFER_BYTES: int = 256 * 1024 * 1024
 ## Also bound direct external tile publication before lazy source resolution.
@@ -1967,7 +1973,81 @@ func redo() -> DrawingResult:
 	return result
 
 
+## Standalone links live in ordinary generic semantic layers; the Atlas
+## registry is deliberately not involved. Runtime source bytes are not stored.
+static func valid_link(record: Dictionary) -> bool:
+	return record.get("kind") == LINK_KIND and record.get("source_id") is String \
+		and valid_identifier(record["source_id"]) and record["source_id"] != ROOT_ID \
+		and record.get("position") is Vector2i \
+		and absi(record["position"].x) <= 1000000000 \
+		and absi(record["position"].y) <= 1000000000 \
+		and record.size() == 3
+
+
+func layer_links(layer_id: String) -> Array[Dictionary]:
+	var links: Array[Dictionary] = []
+	if not _nodes.has(layer_id) or _nodes[layer_id].kind != DrawingLayerNode.OBJECTS:
+		return links
+	for record: Dictionary in _nodes[layer_id].objects.values():
+		if record.get("kind") == LINK_KIND:
+			links.append(record.duplicate(true))
+	return links
+
+
+func linked_records() -> Array[Dictionary]:
+	var links: Array[Dictionary] = []
+	for layer_id: String in _nodes:
+		links.append_array(layer_links(layer_id))
+	return links
+
+
+func set_linked_sources(sources: Dictionary, error: String = "") -> void:
+	linked_sources = sources.duplicate()
+	linked_source_error = error
+	display_source_epoch += 1
+
+
+## A complete detached semantic layer is installed by ONE checked metadata
+## revision and ONE structural event, rather than create + untracked add.
+func commit_linked_object(token: Dictionary, catalog: DrawingAssetBrowserIndex, position: Vector2i,
+		parent_id: String, insertion_index: int, expected_revision: int) -> DrawingResult:
+	var entry: Dictionary = DrawingLinkedObjects.entry_for_token(catalog, token)
+	if entry.is_empty():
+		return DrawingResult.failure("LINK_SOURCE", "Source is not authorized by the standalone catalog")
+	var source_id: String = entry["id"]
+	var label: String = entry["name"]
+	var record: Dictionary = {"kind": LINK_KIND, "source_id": source_id, "position": position}
+	if revision != expected_revision or has_unpublished_edit() or external_history:
+		return DrawingResult.failure("LINK_REVISION", "Destination changed or is not locally editable")
+	if not valid_link(record) or source_id == id or linked_records().size() >= MAX_LINKS:
+		return DrawingResult.failure("LINK_SOURCE", "Invalid, self-referential or over-budget Object link")
+	if not _nodes.has(parent_id) or _nodes[parent_id].kind != DrawingLayerNode.GROUP or not _editable(parent_id):
+		return DrawingResult.failure("LINK_TARGET", "Destination group is hidden or locked")
+	var authorized: DrawingResult = DrawingLinkedObjects.resolve(self, catalog, record)
+	if not authorized.ok:
+		return authorized
+	var layer: String = new_id()
+	if _nodes.has(layer) or (_native_raster_store != null and bool(_native_raster_store.call("is_layer_parked", layer))):
+		return DrawingResult.failure("LINK_ID", "Object layer identity already exists")
+	var node: DrawingLayerNode = DrawingLayerNode.new(layer, DrawingLayerNode.OBJECTS, "Object: " + label, parent_id)
+	node.objects[new_id()] = record
+	var advanced: DrawingResult = _advance_checked_layer_metadata()
+	if not advanced.ok:
+		return advanced
+	var siblings: Array[String] = _nodes[parent_id].children
+	var index: int = clampi(insertion_index, 0, siblings.size())
+	_nodes[layer] = node
+	siblings.insert(index, layer)
+	_content_committed = true
+	_finish_structure(true, {"kind": "structure", "op": "create", "id": layer,
+		"parent": parent_id, "index": index, "node": node.detached_copy()})
+	set_linked_sources(authorized.value)
+	return DrawingResult.success(layer, revision)
+
+
 func add_object(layer_id: String, data: Dictionary, requested_id: String = "") -> DrawingResult:
+	if data.get("kind") == LINK_KIND:
+		return DrawingResult.failure("LINK_RECORD", "Use the checked linked placement transaction")
 	if not _nodes.has(layer_id) or _nodes[layer_id].kind != DrawingLayerNode.OBJECTS or not _editable(layer_id):
 		return DrawingResult.failure("LAYER", "Unavailable semantic-object layer")
 	var object_id: String = requested_id if not requested_id.is_empty() else new_id()
@@ -1989,6 +2069,8 @@ func move_object(layer_id: String, object_id: String, position: Vector2) -> Draw
 	if not _nodes[layer_id].objects.has(object_id) or not position.is_finite():
 		return DrawingResult.failure("OBJECT", "Missing object or invalid position")
 	var updated: Dictionary = _nodes[layer_id].objects[object_id].duplicate(true)
+	if updated.get("kind") == LINK_KIND:
+		return DrawingResult.failure("LINK_RECORD", "Linked Object transforms require a checked placement transaction")
 	updated["position"] = position
 	var advanced: DrawingResult = _advance_checked_layer_metadata()
 	if not advanced.ok:
@@ -2342,6 +2424,9 @@ func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool 
 		var source: DrawingLayerNode = nodes[old_id]
 		if source.id != old_id:
 			return DrawingResult.failure("SNAPSHOT", "Inconsistent detached node ID")
+		for record: Dictionary in source.objects.values():
+			if record.get("kind") == LINK_KIND:
+				return DrawingResult.failure("NESTED_TRANSFER", "Transferring a linked subtree requires explicit source authorization and link/copy policy")
 		for child: String in source.children:
 			if not nodes.has(child) or nodes[child].parent_id != old_id:
 				return DrawingResult.failure("SNAPSHOT", "Broken nested group reference")
@@ -2612,12 +2697,18 @@ static func open_manifest(manifest: Dictionary, loader: Callable) -> DrawingResu
 		for object_id: Variant in objects:
 			if not object_id is String or not objects[object_id] is Dictionary:
 				return DrawingResult.failure("MANIFEST", "Invalid generic object record")
+			var object_record: Dictionary = objects[object_id]
+			if object_record.get("kind") == LINK_KIND and (kind != DrawingLayerNode.OBJECTS or \
+					not valid_identifier(object_id) or not valid_link(object_record)):
+				return DrawingResult.failure("LINK_RECORD", "Malformed standalone Object link")
 			node.objects[object_id] = (objects[object_id] as Dictionary).duplicate(true)
 		var chunks: Variant = record.get("chunks", [])
 		if not chunks is Array or (not chunks.is_empty() and kind != DrawingLayerNode.RASTER):
 			return DrawingResult.failure("MANIFEST", "Invalid raster chunk placement")
 		chunk_descriptors[node_id] = chunks
 		document._nodes[node_id] = node
+	if document.linked_records().size() > MAX_LINKS:
+		return DrawingResult.failure("LINK_LIMIT", "Too many standalone Object links")
 	if not document._nodes.has(ROOT_ID) or document._nodes[ROOT_ID].kind != DrawingLayerNode.GROUP:
 		return DrawingResult.failure("MANIFEST", "Missing generic root group")
 	if document._nodes[ROOT_ID].parent_id != "":

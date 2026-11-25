@@ -38,6 +38,7 @@ var initial_extra_panels: Dictionary = {} # Stable id -> Control
 ## Host-provided portable root is registered before dock settings recovery.
 var initial_asset_browser_root: String = ""
 var asset_browser: DrawingAssetBrowserPanel
+var _link_drag: Dictionary = {}
 var asset_browser_directory_dialog: FileDialog
 var recent_objects_root_settings_path: String = "user://drawing-recent-objects-root-v1.json"
 var _recent_objects_root: String = ""
@@ -468,6 +469,8 @@ func _build_interface() -> void:
 	canvas.resized.connect(_maybe_fit_image_frame)
 	canvas.resized.connect(_layout_dock_flyout)
 	canvas.text_requested.connect(_edit_text_at)
+	canvas.object_drop_check = _check_object_drop
+	canvas.object_drop_commit = _commit_object_drop
 	canvas.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventMouseMotion:
 			_update_status())
@@ -1459,6 +1462,11 @@ func _input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		if get_viewport().gui_is_dragging() and not _link_drag.is_empty():
+			get_viewport().gui_cancel_drag()
+			_link_drag.clear()
+			get_viewport().set_input_as_handled()
+			return
 		if dock_drag.is_dragging() or not _drag_candidate_id.is_empty():
 			_suppress_drag_release = not _drag_candidate_id.is_empty()
 			_cancel_cross_drop(true)
@@ -1533,10 +1541,15 @@ func _reset_dock_pointer_gesture() -> void:
 
 
 func _notification(what: int) -> void:
+	if what == NOTIFICATION_DRAG_END:
+		_link_drag.clear()
 	if what == NOTIFICATION_WM_CLOSE_REQUEST and _window_quit_guard_enabled:
 		_request_window_quit()
 		return
 	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		if not _link_drag.is_empty() and get_viewport().gui_is_dragging():
+			get_viewport().gui_cancel_drag()
+			_link_drag.clear()
 		if _color_edit_pending:
 			if _color_edit_pointer_down:
 				_cancel_interrupted_color_pointer()
@@ -2758,6 +2771,7 @@ func _ensure_asset_browser() -> bool:
 	asset_browser.open_requested.connect(_open_object_file)
 	asset_browser.choose_root_requested.connect(_choose_objects_root)
 	asset_browser.recent_root_requested.connect(_use_recent_objects_root)
+	asset_browser.source_index_changed.connect(_refresh_link_sources)
 	if not dock_layout.register_panel("asset_browser") or \
 			not dock_layout.attach_panel("asset_browser", "right", "asset_browser"):
 		asset_browser.queue_free()
@@ -2821,6 +2835,103 @@ func show_asset_browser(objects_root: String) -> bool:
 	return result.ok
 
 
+## Files never infer a catalog from their own path. Reopening without an
+## explicit catalog preserves the stable record and displays NULL.
+func _link_index() -> DrawingAssetBrowserIndex:
+	return asset_browser.index if asset_browser != null and not asset_browser.atlas_host_mode else null
+
+
+func _refresh_document_links(document: DrawingDocument) -> void:
+	if document.linked_records().is_empty() and document.linked_sources.is_empty() and document.linked_source_error.is_empty():
+		return
+	var resolved: DrawingResult = DrawingLinkedObjects.resolve(document, _link_index())
+	document.set_linked_sources(resolved.value if resolved.ok else {}, "" if resolved.ok else resolved.message)
+	if canvas.document == document:
+		canvas.queue_redraw()
+
+
+func _refresh_link_sources() -> void:
+	_link_drag.clear()
+	for tab: Dictionary in tabs:
+		_refresh_document_links(tab["document"])
+	_update_status()
+
+
+func _drop_target_available() -> bool:
+	if active_tab < 0 or current_document() == null or current_document().external_history or \
+			canvas.has_pending_stroke() or canvas.has_floating_move() or canvas.dragging or canvas.panning or \
+			current_document().has_unpublished_edit() or _authoring_dialog_targets.has("text"):
+		return false
+	if current_object() != null:
+		# Hosted source publication belongs to the Atlas registry. A local tab
+		# opened from an immutable revision is not a portable parent either.
+		if not bool(tabs[active_tab].get("local_object", false)):
+			return false
+		var path: String = tabs[active_tab].get("path", "")
+		if not path.is_empty() and (_link_index() == null or path.get_base_dir() != _link_index().root_path):
+			return false
+	var selected: String = selected_layer_node()
+	return (selected.is_empty() or (current_document().has_node(selected) and current_document()._editable(selected))) \
+		and current_document()._editable(_insertion_target()["parent"])
+
+
+func _check_object_drop(token: Dictionary, anchor: Vector2i) -> Rect2i:
+	if not _drop_target_available():
+		return Rect2i()
+	var index: DrawingAssetBrowserIndex = _link_index()
+	var document: DrawingDocument = current_document()
+	var record: Dictionary = {"kind": DrawingDocument.LINK_KIND, "source_id": token.get("id", ""), "position": anchor}
+	if not DrawingDocument.valid_link(record) or document.linked_records().size() >= DrawingDocument.MAX_LINKS:
+		return Rect2i()
+	# Authorize once per drag/target revision, not every mouse motion. Release
+	# independently resolves the exact token and entire dependency graph.
+	if _link_drag.get("document") != document or _link_drag.get("revision") != document.revision \
+			or _link_drag.get("token") != token or _link_drag.get("selected") != selected_layer_node():
+		if not _link_drag.is_empty() or DrawingLinkedObjects.entry_for_token(index, token).is_empty():
+			return Rect2i()
+		var authorized: DrawingResult = DrawingLinkedObjects.resolve(document, index, record)
+		_link_drag = {"document": document, "revision": document.revision, "token": token.duplicate(true),
+			"selected": selected_layer_node(), "result": authorized}
+	var authorized: DrawingResult = _link_drag["result"]
+	if not authorized.ok:
+		return Rect2i()
+	var translated: DrawingResult = DrawingLinkedObjects._translated(record, authorized.value[token["id"]])
+	if not translated.ok:
+		return Rect2i()
+	var area: Rect2i = translated.value
+	var source: Dictionary = authorized.value[token["id"]]
+	var frame: Rect2i = source["bounds"]
+	if frame.has_area():
+		var frame_record: Dictionary = source.duplicate()
+		frame_record["coverage"] = frame
+		var frame_area: DrawingResult = DrawingLinkedObjects._translated(record, frame_record)
+		if frame_area.ok:
+			area = frame_area.value
+	return area if area.has_area() else Rect2i(anchor - Vector2i(4, 4), Vector2i(8, 8))
+
+
+func _commit_object_drop(token: Dictionary, anchor: Vector2i) -> void:
+	var document: DrawingDocument = current_document()
+	if not _drop_target_available() or _link_drag.get("document") != document or \
+			_link_drag.get("revision") != document.revision or _link_drag.get("selected") != selected_layer_node() or \
+			DrawingLinkedObjects.entry_for_token(_link_index(), token).is_empty():
+		_show_error("Object drop rejected: finish the edit and refresh the authorized source")
+		return
+	var before: DrawingHistoryContext = _capture_context()
+	var target: Dictionary = _insertion_target()
+	var added: DrawingResult = document.commit_linked_object(token, _link_index(), anchor,
+		target["parent"], target["index"], document.revision)
+	if not added.ok:
+		_show_error(added.message)
+		return
+	_select_layer_node(String(added.value), false)
+	document.annotate_latest_gesture(before, _capture_context())
+	_reveal_selected_layer()
+	_after_edit()
+	status.text = "Placed linked Object: %s @ %d,%d" % [token["name"], anchor.x, anchor.y]
+	_link_drag.clear()
+
+
 func _ask_open_object() -> void:
 	if _can_persist_or_close("Open Object"):
 		object_open_dialog.popup_centered()
@@ -2853,6 +2964,23 @@ func _local_publish(session: DrawingObjectEditorSession, as_variant: bool) -> Dr
 	if path.is_empty() or (as_variant and path == tabs[index].get("path", "")):
 		return DrawingResult.failure("PATH", "Choose a different target path for Save As")
 	var source: DrawingDocument = session.document
+	if not source.linked_records().is_empty():
+		if as_variant:
+			return DrawingResult.failure("NESTED_SAVE_AS", "Nested Object Save As requires an explicit link/copy policy")
+		var catalog: DrawingAssetBrowserIndex = _link_index()
+		if catalog == null or path.get_base_dir() != catalog.root_path or not DrawingAssetBrowserIndex.path_has_no_links(path):
+			return DrawingResult.failure("LINK_ROOT", "Save a linked Object directly inside its authorized standalone Objects/ folder")
+		if FileAccess.file_exists(path):
+			var existing: Dictionary = {}
+			for entry: Dictionary in catalog.entries:
+				if entry["path"] == path and entry["id"] == source.id and entry["revision"] == session.source_revision:
+					existing = entry
+					break
+			if existing.is_empty() or not catalog.safe_to_open(existing):
+				return DrawingResult.failure("LINK_STALE", "Cannot overwrite a different or changed Object source")
+		var checked: DrawingResult = DrawingLinkedObjects.resolve(source, catalog)
+		if not checked.ok:
+			return checked
 	if as_variant:
 		var copied: DrawingDocument = DrawingDocument.new(DrawingDocument.new_id(),
 			source.tile_stride, source.density_numerator, source.density_denominator)
@@ -3096,6 +3224,7 @@ func _sync_object_tab() -> void:
 		tabs[active_tab]["layer"] = _first_editable(session.document, DrawingDocument.ROOT_ID)
 		tabs[active_tab]["selected_node"] = current_layer()
 	canvas.document = session.document
+	_refresh_document_links(session.document)
 	canvas.layer_id = current_layer()
 	canvas.asset_origin = session.origin
 	canvas.asset_bounds = session.bounds
@@ -3122,6 +3251,8 @@ func _activate(index: int) -> void:
 	active_tab = index
 	tab_bar.current_tab = index
 	canvas.document = current_document()
+	if not current_document().linked_records().is_empty() and current_document().linked_sources.is_empty():
+		_refresh_document_links(current_document())
 	var chosen: String = selected_layer_node()
 	if not current_document().has_node(chosen):
 		chosen = _first_editable(current_document(), DrawingDocument.ROOT_ID)
@@ -3131,6 +3262,7 @@ func _activate(index: int) -> void:
 	var object_session: DrawingObjectEditorSession = current_object()
 	canvas.asset_origin = object_session.origin if object_session != null else Vector2i.ZERO
 	canvas.asset_bounds = object_session.bounds if object_session != null else Rect2i()
+	canvas.object_backdrop = object_session != null
 	canvas.image_bounds = tabs[index].get("frame", Rect2i()) as Rect2i
 	canvas.show_grid = bool(tabs[index].get("show_grid", false))
 	canvas.snap_to_grid = false
@@ -4225,6 +4357,8 @@ func _update_status() -> void:
 		status.text += " | Floating Move: Enter drop / Esc cancel"
 	if _authoring_dialog_targets.has("text"):
 		status.text += " | Text draft: Ctrl+Enter apply / Esc cancel"
+	if not document.linked_source_error.is_empty():
+		status.text += " | NULL: " + document.linked_source_error
 	status.tooltip_text = status.text
 	_refresh_history()
 
@@ -4329,6 +4463,7 @@ func _undo() -> void:
 		return
 	var result: DrawingResult = current_document().undo()
 	if result.ok:
+		_refresh_document_links(current_document())
 		_restore_context(result.value as DrawingHistoryContext)
 		_after_edit()
 	else:
@@ -4345,6 +4480,7 @@ func _redo() -> void:
 		return
 	var result: DrawingResult = current_document().redo()
 	if result.ok:
+		_refresh_document_links(current_document())
 		_restore_context(result.value as DrawingHistoryContext)
 		_after_edit()
 	else:

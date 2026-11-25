@@ -13,7 +13,7 @@ var _press_position: Vector2 = Vector2.ZERO
 ## ItemList handles its own selection and scrolling, so its drag virtual is not
 ## consistently reached for a held row press. Explicitly start the *native*
 ## Control drag once a valid row passes the pointer threshold. No source is
-## placed here; the Atlas canvas remains the only authorized drop target.
+## placed here; the receiving Drawing or Atlas canvas must authorize it.
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var button: InputEventMouseButton = event as InputEventMouseButton
@@ -34,7 +34,7 @@ func _gui_input(event: InputEvent) -> void:
 		var offered: Variant = drag_entry_provider.call(row) if drag_entry_provider.is_valid() else null
 		if not offered is Dictionary or (offered as Dictionary).is_empty():
 			return
-		force_drag(offered, _make_drag_preview(offered))
+		force_drag(offered, _make_drag_preview(offered, row))
 		accept_event()
 
 
@@ -48,11 +48,28 @@ func _get_drag_data(at_position: Vector2) -> Variant:
 	if not offered is Dictionary or (offered as Dictionary).is_empty():
 		return null
 	if get_viewport().gui_is_dragging():
-		set_drag_preview(_make_drag_preview(offered))
+		set_drag_preview(_make_drag_preview(offered, row))
 	return offered
 
 
-func _make_drag_preview(offered: Dictionary) -> Label:
-	var preview: Label = Label.new()
-	preview.text = "Object source: %s" % String(offered.get("name", offered.get("id", "")))
+func _make_drag_preview(offered: Dictionary, row: int) -> Control:
+	var preview: Control = Control.new()
+	preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var content: HBoxContainer = HBoxContainer.new()
+	content.position = Vector2(12, 48)
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	preview.add_child(content)
+	var thumbnail: Texture2D = get_item_icon(row)
+	if thumbnail != null:
+		var image: TextureRect = TextureRect.new()
+		image.texture = thumbnail
+		image.custom_minimum_size = Vector2(48, 48)
+		image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		content.add_child(image)
+	var caption: Label = Label.new()
+	caption.text = "Link Object: %s" % String(offered.get("name", offered.get("id", "")))
+	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(caption)
 	return preview

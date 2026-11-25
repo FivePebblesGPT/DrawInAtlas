@@ -21,6 +21,8 @@ static func import_file(index: DrawingAssetBrowserIndex, source_path: String) ->
 	var read: DrawingResult = DrawingObjectEditorFile.open(source)
 	if not read.ok:
 		return read
+	if not (read.value["document"] as DrawingDocument).linked_records().is_empty():
+		return DrawingResult.failure("NESTED_IMPORT", "A linked Object requires its authorized source library; single-source import is not supported")
 	if not _safe_source_file(source) or FileAccess.get_sha256(source) != selected_sha256:
 		return DrawingResult.failure("STALE_SOURCE", "Incoming Object source changed during validation")
 	var source_id: String = String(read.value["source_id"])
@@ -77,6 +79,11 @@ static func export_file(index: DrawingAssetBrowserIndex, entry: Dictionary,
 		destination_path: String) -> DrawingResult:
 	if index == null or not index.safe_to_open(entry):
 		return DrawingResult.failure("STALE_SOURCE", "Refresh before exporting a changed Object source")
+	var read: DrawingResult = DrawingObjectEditorFile.open(String(entry["path"]))
+	if not read.ok:
+		return read
+	if not (read.value["document"] as DrawingDocument).linked_records().is_empty():
+		return DrawingResult.failure("NESTED_EXPORT", "Nested single-source export requires an explicit link/copy policy")
 	var destination: String = destination_path.simplify_path()
 	if destination.begins_with(index.root_path + "/"):
 		return DrawingResult.failure("EXPORT_PATH", "Export outside the current Objects/ folder")
