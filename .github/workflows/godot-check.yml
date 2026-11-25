@@ -165,6 +165,9 @@ jobs:
           # T-318: detached text history must acquire native raster ownership before replay.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t318_text_history_source.gd 2>&1 | tee /tmp/godot-t318-text-history-source.log
           python3 tools/check_godot_model_log.py /tmp/godot-t318-text-history-source.log --marker T318_TEXT_HISTORY_SOURCE_PASSED || ci_fail_marker 'T318 detached text native history rejected'
+          # T-319: atomic multi-layer ownership on detached structural replay.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t319_subtree_history_source.gd 2>&1 | tee /tmp/godot-t319-subtree-history-source.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t319-subtree-history-source.log --marker T319_SUBTREE_HISTORY_SOURCE_PASSED || ci_fail_marker 'T319 detached subtree history rejected'
           # T-230: even the first legacy-pixel Undo/Redo in a detached document
           # must bootstrap Rust ownership before advancing the host timeline.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t230_detached_pixel_bootstrap.gd 2>&1 | tee /tmp/godot-t230-pixel-bootstrap.log

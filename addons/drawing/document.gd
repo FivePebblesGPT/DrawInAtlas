@@ -1871,6 +1871,132 @@ func _prepare_late_sparse_removal_sources(event: Dictionary) -> DrawingResult:
 	return DrawingResult.success(promoted, revision)
 
 
+## A detached owner can lose the original parked layer reservation. Do not
+## infer native ownership from the retained history event's old parked flag.
+## The native publication call independently refuses any surviving ownership
+## or token, including references not represented in the projection map.
+func _subtree_history_has_native_references(layers: Array[String]) -> bool:
+	if _native_raster_store == null:
+		return false
+	for layer: String in layers:
+		if bool(_native_raster_store.call("is_layer_parked", layer)):
+			return true
+	for identity: String in _native_source_identities:
+		if layers.has(identity.get_slice(":", 0)):
+			return true
+	return false
+
+
+## Validate the retained subtree hierarchy and exact raster bytes before any
+## native mutation. Newly adopted snapshots must remain fully authorized on
+## subsequent park/unpark; late physical sources have their own digest fence.
+func _validate_retained_subtree_sources(event: Dictionary, layers: Array[String],
+		snapshots: Dictionary, restore: bool, require_owned: bool,
+		promoted: Dictionary = {}) -> DrawingResult:
+	var visited: Dictionary[String, bool] = {}
+	var root: String = event["id"]
+	if not _validate_snapshot_tree(root, snapshots, visited) or visited.size() != snapshots.size() or \
+			snapshots[root].parent_id != event["parent"]:
+		return DrawingResult.failure("HISTORY_TARGET", "Detached subtree history hierarchy diverged")
+	if not restore:
+		for identifier: String in snapshots:
+			var snapshot: DrawingLayerNode = snapshots[identifier]
+			var live: DrawingLayerNode = _nodes.get(identifier)
+			if live == null or live.kind != snapshot.kind or live.parent_id != snapshot.parent_id or \
+					live.children != snapshot.children:
+				return DrawingResult.failure("HISTORY_TARGET", "Live subtree hierarchy diverged")
+	var count: int = 0
+	if layers.size() > 128:
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Detached subtree history exceeds layer budget")
+	for layer: String in layers:
+		var snapshot: DrawingLayerNode = snapshots[layer]
+		if snapshot.id != layer:
+			return DrawingResult.failure("HISTORY_TARGET", "Detached raster snapshot ID diverged")
+		count += snapshot.tiles.size()
+		if count > 8192 or count * tile_stride * tile_stride * 4 > MAX_NATIVE_HISTORY_TRANSFER_BYTES:
+			return DrawingResult.failure("NATIVE_STRUCTURE", "Detached subtree history exceeds tile budget")
+		var live: DrawingLayerNode = _nodes.get(layer) if not restore else null
+		var late_count: int = 0
+		for identity: String in promoted:
+			if identity.begins_with(layer + ":"):
+				late_count += 1
+		if not restore and (live == null or live.kind != DrawingLayerNode.RASTER or
+				live.tiles.size() != snapshot.tiles.size() + late_count):
+			return DrawingResult.failure("STALE_PIXEL", "Detached subtree raster set diverged")
+		for key: String in snapshot.tiles:
+			var tile: DrawingRasterTile = snapshot.tiles[key]
+			var coords: PackedStringArray = key.split(",")
+			if tile == null or tile.stride != tile_stride or not tile.has_canonical_storage() or \
+					coords.size() != 2 or not coords[0].is_valid_int() or not coords[1].is_valid_int():
+				return DrawingResult.failure("STALE_PIXEL", "Invalid detached subtree history tile")
+			var cx: int = int(coords[0])
+			var cy: int = int(coords[1])
+			if key != "%d,%d" % [cx, cy] or not TILES.tile_coordinates_in_projection_range(cx, cy, tile_stride):
+				return DrawingResult.failure("COORD", "Detached subtree history exceeds signed projection")
+			if require_owned and not _native_source_identities.has(layer + ":" + key):
+				return DrawingResult.failure("STALE_PIXEL", "Subtree history tile lacks native authority")
+			if not restore:
+				var current: DrawingRasterTile = live.tiles.get(key)
+				if current == null or current.stride != tile_stride or not current.has_canonical_storage() or \
+						current.to_rgba8() != tile.to_rgba8():
+					return DrawingResult.failure("STALE_PIXEL", "Detached subtree live bytes diverged")
+	return DrawingResult.success(count, revision)
+
+
+## Reacquire an entirely detached removal snapshot in a single checked
+## revision. On Redo, prove the live tile set and bytes before parking it.
+## Pending sparse descriptors remain unresolved; this path never calls I/O.
+func _replay_detached_subtree_source(event: Dictionary, layers: Array[String],
+		snapshots: Dictionary, restore: bool) -> DrawingResult:
+	if has_unpublished_edit():
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Subtree history has an unpublished edit")
+	if _native_raster_store != null and not _attached_native_revision_matches(revision):
+		return DrawingResult.failure("STALE_REVISION", "Raster history native revision diverged")
+	var checked: DrawingResult = _validate_retained_subtree_sources(event, layers, snapshots, restore, false)
+	if not checked.ok:
+		return checked
+	if not restore:
+		# A detached owner cannot vouch for a late source read. Retain pending
+		# descriptors exactly, or refuse replay rather than drop unknown bytes.
+		for identity: String in event["pending"]:
+			if _pending_tiles.get(identity) != event["pending"][identity]:
+				return DrawingResult.failure("STALE_SOURCE", "Detached pending history source diverged")
+		for identity: String in _pending_tiles:
+			if snapshots.has(identity.get_slice(":", 0)) and not event["pending"].has(identity):
+				return DrawingResult.failure("STALE_SOURCE", "Unexpected pending source in detached subtree")
+	var count: int = int(checked.value)
+	# Empty/unresolved removals do not need to allocate an owner or tombstones.
+	var store: Object = _native_raster_store
+	var provisional: bool = store == null
+	if provisional and count == 0:
+		revision += 1
+		return DrawingResult.success(false, revision)
+	if provisional:
+		store = ClassDB.instantiate("DrawingNativeTiles")
+		if store == null or int(store.call("tile_abi_version")) != 1 or not bool(store.call("configure", tile_stride, revision)):
+			return DrawingResult.failure("NATIVE_STRUCTURE", "Detached subtree history bootstrap rejected")
+	var descriptors: Array[Dictionary] = []
+	for layer: String in layers:
+		var raster: DrawingLayerNode = snapshots[layer] if restore else _nodes[layer]
+		for key: String in raster.tiles:
+			var coords: PackedStringArray = key.split(",")
+			descriptors.append({"layer": layer, "tile_x": int(coords[0]), "tile_y": int(coords[1]),
+				"bytes": raster.tiles[key].to_rgba8()})
+	if not bool(store.call("publish_subtree_history_source_revision", revision,
+			PackedStringArray(layers), descriptors, not restore and count > 0)):
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Detached subtree history publication rejected")
+	if provisional:
+		_native_raster_store = store
+		_native_source_identities.clear()
+		_sparse_reloads.clear()
+	for layer: String in layers:
+		var raster: DrawingLayerNode = snapshots[layer] if restore else _nodes[layer]
+		for key: String in raster.tiles:
+			_remember_native_source(layer, key, raster.tiles[key])
+	revision += 1
+	return DrawingResult.success(count > 0, revision)
+
+
 ## Structural replay is failure-atomic: all preconditions are checked before
 ## modifying the tree. Content events are undone first in chronological order.
 func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
@@ -1915,10 +2041,15 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 		if not _nodes.has(parent_id) or _nodes[parent_id].kind != DrawingLayerNode.GROUP:
 			return DrawingResult.failure("HISTORY_TARGET", "Structural parent disappeared")
 		var affected_raster: Array[String] = []
+		var retained_raster_source: bool = false
 		if op == "remove":
-			for snapshot: DrawingLayerNode in (event["nodes"] as Dictionary).values():
+			for identifier: String in event["nodes"]:
+				var snapshot: DrawingLayerNode = event["nodes"][identifier]
+				if snapshot == null or snapshot.id != identifier:
+					return DrawingResult.failure("HISTORY_TARGET", "Structural history node identity diverged")
 				if snapshot.kind == DrawingLayerNode.RASTER:
-					affected_raster.append(snapshot.id)
+					affected_raster.append(identifier)
+					retained_raster_source = retained_raster_source or not snapshot.tiles.is_empty()
 		var restored: Dictionary = event["nodes"] if op == "remove" else {node_id: event["node"]}
 		var raster_layers: Array[String] = affected_raster.duplicate()
 		if op == "create" and (event["node"] as DrawingLayerNode).kind == DrawingLayerNode.RASTER:
@@ -1944,7 +2075,18 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 		# Raster-bearing replay must acquire the exact Rust revision *before*
 		# touching Godot's hierarchy. A failed park/unpark or unreferenced-ID
 		# bridge cannot degrade into an unchecked local-only history step.
-		if not raster_layers.is_empty() and _native_raster_store != null:
+		if op == "remove" and not raster_layers.is_empty() and \
+				(retained_raster_source or bool(event.get("native_parked", false))) and \
+				(_native_raster_store != null or (tile_stride >= 16 and ClassDB.class_exists("DrawingNativeTiles"))) and \
+				not _subtree_history_has_native_references(raster_layers):
+			var detached: DrawingResult = _replay_detached_subtree_source(event, raster_layers, restored, restore)
+			if not detached.ok:
+				return detached
+			parked_replay = bool(detached.value)
+			event["native_parked"] = parked_replay
+			event["native_detached_adopted"] = parked_replay
+			raster_advanced = true
+		elif not raster_layers.is_empty() and _native_raster_store != null:
 			if not _attached_native_revision_matches(revision):
 				return DrawingResult.failure("STALE_REVISION", "Raster history native revision diverged")
 			var promoted: Dictionary = {}
@@ -1953,6 +2095,13 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 				if not prepared.ok:
 					return prepared
 				promoted = prepared.value
+			if bool(event.get("native_detached_adopted", false)):
+				if has_unpublished_edit():
+					return DrawingResult.failure("NATIVE_STRUCTURE", "Subtree history has an unpublished edit")
+				var checked: DrawingResult = _validate_retained_subtree_sources(event,
+					raster_layers, restored, restore, true, promoted)
+				if not checked.ok:
+					return checked
 			if bool(event.get("native_parked", false)) or not promoted.is_empty():
 				if restore and not _native_tree_sources_match(restored, true):
 					return DrawingResult.failure("STALE_PIXEL", "Structural snapshot differs from native source")

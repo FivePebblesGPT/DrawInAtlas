@@ -740,3 +740,33 @@ Unsupported synthetic strides retain their prior model-only path. This does
 not supply a native semantic-text history or authenticate an intentionally
 mutated detached Redo snapshot when the original native source is gone.
 See [T-318 evidence](evidence/T-318-2026-11-25-text-history-source.md).
+
+### Detached subtree removal history source (T-319)
+
+`publish_subtree_history_source_revision(expected_revision, layers, tiles, park)`
+uses the existing bounded subtree descriptor schema (`layer`, `tile_x`,
+`tile_y`, `bytes`) and the same all-ID unreferenced-source/history preflight
+as `publish_subtree_revision`. Unlike ordinary new subtree imports it does
+not discard native Redo. It advances exactly one revision and creates no
+pixel history token. All descriptors are validated before mutation; a late
+failure leaves every layer unchanged. `park=true` requires a nonempty tile
+batch and enough room for all IDs in the parked-layer set (up to 128 total),
+and admits and parks the entire subtree atomically. Empty siblings of a
+raster-bearing parked group are reserved consistently with the existing
+`advance_parked_layers_revision` lifecycle. Completely empty removals do not
+need to allocate an owner or parked IDs.
+
+The local structural replay consumer checks the retained hierarchy and full
+signed RGBA8 tile set before admission. Detached Redo compares the live
+bytes against the removal snapshot and retains unresolved pending descriptors
+without invoking providers. An old event's parked flag alone cannot establish
+ownership in a replacement store. Any surviving native source, parked ID or
+history token is protected by the Rust unreferenced-ID fence. A provisional
+owner is attached only after successful admission; restored identities are
+rebound to the installed Godot projection. Subsequent replay of newly adopted
+subtrees checks completeness, and previously supported physical sparse
+late-source promotion continues to use its digest fence. Logical-only lazy
+fixtures and unsupported synthetic strides retain their existing behavior.
+Mixed already-owned and unowned subtrees within one owner and general host
+history consolidation are not addressed by this additive admission method.
+See [T-319 evidence](evidence/T-319-2026-11-25-subtree-history-source.md).

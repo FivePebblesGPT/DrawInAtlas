@@ -890,8 +890,8 @@ impl TileStore {
     }
 
     /// History restoration is not a new branch: retain unrelated redo tokens.
-    /// An Undo to semantic text can adopt and park the detached glyph bytes
-    /// in the same revision, with no intermediate visible native source.
+    /// A structural removal can adopt and park detached source bytes in the
+    /// same revision, with no intermediate visible native source.
     fn publish_subtree_with_history(
         &mut self,
         expected: u64,
@@ -902,9 +902,8 @@ impl TileStore {
     ) -> Result<(), &'static str> {
         self.can_publish_subtree(expected, layers, entries.len())?;
         if park
-            && (layers.len() != 1
-                || entries.is_empty()
-                || self.parked_layers.len() >= MAX_ACTIVE_TILES)
+            && (entries.is_empty()
+                || self.parked_layers.len().saturating_add(layers.len()) > MAX_ACTIVE_TILES)
         {
             return Err("Invalid detached history parking request");
         }
@@ -935,7 +934,7 @@ impl TileStore {
             self.tiles.insert(id, tile);
         }
         if park {
-            self.parked_layers.insert(layers[0].clone());
+            self.parked_layers.extend(layers.iter().cloned());
         }
         Ok(())
     }
@@ -1621,6 +1620,20 @@ impl DrawingNativeTiles {
         self.publish_subtree_descriptors(expected, layers, tiles, false, park)
     }
 
+    /// Reacquire a detached raster subtree during structural Undo/Redo.
+    /// Every ID must be unreferenced in this owner; existing parked history
+    /// uses the checked unpark path instead. Preserve unrelated redo tokens.
+    #[func]
+    fn publish_subtree_history_source_revision(
+        &mut self,
+        expected: i64,
+        layers: PackedStringArray,
+        tiles: Array<Dictionary<Variant, Variant>>,
+        park: bool,
+    ) -> bool {
+        self.publish_subtree_descriptors(expected, layers, tiles, false, park)
+    }
+
     fn publish_subtree_descriptors(
         &mut self,
         expected: i64,
@@ -1634,9 +1647,8 @@ impl DrawingNativeTiles {
             return false;
         }
         if park
-            && (layers.len() != 1
-                || tiles.is_empty()
-                || self.store.parked_layers.len() >= MAX_ACTIVE_TILES)
+            && (tiles.is_empty()
+                || self.store.parked_layers.len().saturating_add(layers.len()) > MAX_ACTIVE_TILES)
         {
             return false;
         }
@@ -3729,6 +3741,96 @@ mod tests {
         assert_eq!(store.read(&ink, false).unwrap().rgba, bytes);
         assert_eq!(store.read(&glyph, false).unwrap().rgba, bytes);
         assert_eq!(store.revision, 5);
+    }
+
+    #[test]
+    fn detached_subtree_history_adopts_multiple_layers_atomically() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let ink = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let first = TileId {
+            layer: "first".into(),
+            x: -1,
+            y: 2,
+        };
+        let second = TileId {
+            layer: "second".into(),
+            x: 3,
+            y: -4,
+        };
+        let mut bytes = vec![0; 16 * 16 * 4];
+        bytes[..4].copy_from_slice(&[19, 33, 55, 0]);
+        let (token, _) = store
+            .adopt_external("ink", 0, vec![(ink.clone(), vec![], bytes.clone())])
+            .unwrap();
+        store.undo_or_redo(true).unwrap();
+        let ids = ["first".into(), "second".into(), "empty".into()];
+        let baseline = (store.revision, store.bytes_used(), store.bytes_imported);
+        assert!(store.history_matches(token, false));
+        assert!(
+            store
+                .publish_subtree_with_history(
+                    2,
+                    &ids,
+                    vec![(first.clone(), bytes.clone()), (second.clone(), vec![1])],
+                    false,
+                    true,
+                )
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_subtree_with_history(
+                    2,
+                    &ids,
+                    vec![
+                        (first.clone(), bytes.clone()),
+                        (first.clone(), bytes.clone())
+                    ],
+                    false,
+                    true,
+                )
+                .is_err()
+        );
+        assert_eq!(
+            baseline,
+            (store.revision, store.bytes_used(), store.bytes_imported)
+        );
+        assert!(store.parked_layers.is_empty());
+        assert!(!store.authorized.contains(&first));
+        assert!(!store.authorized.contains(&second));
+        store
+            .publish_subtree_with_history(
+                2,
+                &ids,
+                vec![
+                    (first.clone(), bytes.clone()),
+                    (second.clone(), bytes.clone()),
+                ],
+                false,
+                true,
+            )
+            .unwrap();
+        assert_eq!(store.revision, 3);
+        assert!(ids.iter().all(|id| store.parked_layers.contains(id)));
+        assert!(store.history_matches(token, false));
+        assert_eq!(store.read(&first, false).unwrap().rgba, bytes);
+        assert_eq!(store.read(&second, false).unwrap().rgba, bytes);
+        assert!(
+            store
+                .publish_subtree_with_history(3, &ids, vec![], false, false)
+                .is_err()
+        );
+        store.advance_parked_layers(3, &ids, true, false).unwrap();
+        assert!(store.parked_layers.is_empty());
+        assert!(store.history_matches(token, false));
+        store.undo_or_redo(false).unwrap();
+        assert_eq!(store.revision, 5);
+        assert_eq!(store.read(&ink, false).unwrap().rgba, bytes);
     }
 
     #[test]
