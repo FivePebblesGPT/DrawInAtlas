@@ -2068,6 +2068,49 @@ func _replay_detached_subtree_source(event: Dictionary, layers: Array[String],
 	return DrawingResult.success(count > 0, revision)
 
 
+## Undoing the creation of a raster is not the same as removing a never-
+## imported ID. Undoing its strokes leaves native-authorized blank tiles and
+## Redo tokens. Check both projections before parking/restoring the empty node.
+func _replay_empty_raster_creation(node_id: String, parent_id: String,
+		snapshot: DrawingLayerNode, restore: bool) -> DrawingResult:
+	if has_unpublished_edit():
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Raster creation history has an unpublished edit")
+	if snapshot == null or snapshot.id != node_id or snapshot.parent_id != parent_id or \
+			snapshot.kind != DrawingLayerNode.RASTER or not snapshot.children.is_empty() or \
+			not snapshot.tiles.is_empty() or not snapshot.objects.is_empty() or \
+			not snapshot.text_value.is_empty() or snapshot.text_element != null:
+		return DrawingResult.failure("HISTORY_TARGET", "Invalid empty raster creation snapshot")
+	if not restore:
+		var live: DrawingLayerNode = _nodes[node_id]
+		if live.id != node_id or live.kind != snapshot.kind or live.name != snapshot.name or \
+				live.visible != snapshot.visible or live.locked != snapshot.locked or \
+				not live.children.is_empty() or not live.tiles.is_empty() or \
+				not live.objects.is_empty() or not live.text_value.is_empty() or live.text_element != null:
+			return DrawingResult.failure("HISTORY_TARGET", "Created raster is no longer empty or its metadata diverged")
+	for identity: String in _pending_tiles:
+		if identity.begins_with(node_id + ":"):
+			return DrawingResult.failure("STALE_SOURCE", "Created raster has an unresolved source")
+	for identity: String in _known_refs:
+		if identity.begins_with(node_id + ":"):
+			return DrawingResult.failure("STALE_SOURCE", "Created raster has a retained physical source")
+	if _native_raster_store == null:
+		return _advance_checked_layer_metadata(false)
+	if not _attached_native_revision_matches(revision):
+		return DrawingResult.failure("STALE_REVISION", "Raster creation native revision diverged")
+	var sources: int = 0
+	for identity: String in _native_source_identities:
+		if identity.begins_with(node_id + ":"):
+			sources += 1
+	var nodes: Dictionary = {node_id: snapshot if restore else _nodes[node_id]}
+	if not _native_tree_sources_match(nodes, restore):
+		return DrawingResult.failure("STALE_PIXEL", "Created raster native source differs")
+	if not bool(_native_raster_store.call("advance_empty_created_layer_revision",
+			revision, node_id, sources, restore)):
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Native empty raster creation history rejected")
+	revision += 1
+	return DrawingResult.success(null, revision)
+
+
 ## Structural replay is failure-atomic: all preconditions are checked before
 ## modifying the tree. Content events are undone first in chronological order.
 func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
@@ -2121,9 +2164,13 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 				if snapshot.kind == DrawingLayerNode.RASTER:
 					affected_raster.append(identifier)
 					retained_raster_source = retained_raster_source or not snapshot.tiles.is_empty()
-		var restored: Dictionary = event["nodes"] if op == "remove" else {node_id: event["node"]}
+		var created_node: DrawingLayerNode = event.get("node") as DrawingLayerNode
+		if op == "create" and (created_node == null or created_node.id != node_id or
+				created_node.parent_id != parent_id):
+			return DrawingResult.failure("HISTORY_TARGET", "Structural creation snapshot diverged")
+		var restored: Dictionary = event["nodes"] if op == "remove" else {node_id: created_node}
 		var raster_layers: Array[String] = affected_raster.duplicate()
-		if op == "create" and (event["node"] as DrawingLayerNode).kind == DrawingLayerNode.RASTER:
+		if op == "create" and created_node.kind == DrawingLayerNode.RASTER:
 			raster_layers.append(node_id)
 		# All tree preconditions precede the Rust revision update; rejected
 		# structural replays must leave both histories and trees unchanged.
@@ -2134,11 +2181,13 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 		elif not _nodes.has(node_id) or _nodes[node_id].parent_id != parent_id or \
 				_nodes[parent_id].children.find(node_id) != int(event["index"]):
 			return DrawingResult.failure("HISTORY_TARGET", "Removed subtree diverged")
+		if op == "create" and not restore and _nodes[node_id].kind != created_node.kind:
+			return DrawingResult.failure("HISTORY_TARGET", "Created layer kind diverged")
 		# A semantic-only tree replay is another checked Rust revision boundary.
 		# The detached nodes and parent slot are validated above, so a rejected
 		# native transition cannot publish even a partial subtree.
 		if affected_raster.is_empty() and (op != "create" or
-				(event["node"] as DrawingLayerNode).kind != DrawingLayerNode.RASTER):
+				created_node.kind != DrawingLayerNode.RASTER):
 			var metadata: DrawingResult = _advance_checked_layer_metadata(false)
 			if not metadata.ok:
 				return metadata
@@ -2146,7 +2195,14 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 		# Raster-bearing replay must acquire the exact Rust revision *before*
 		# touching Godot's hierarchy. A failed park/unpark or unreferenced-ID
 		# bridge cannot degrade into an unchecked local-only history step.
-		if op == "remove" and not raster_layers.is_empty() and \
+		if op == "create" and not raster_layers.is_empty():
+			var creation: DrawingResult = _replay_empty_raster_creation(node_id, parent_id,
+				created_node, restore)
+			if not creation.ok:
+				return creation
+			raster_advanced = true
+			parked_replay = _native_raster_store != null
+		elif op == "remove" and not raster_layers.is_empty() and \
 				(retained_raster_source or bool(event.get("native_parked", false))) and \
 				(_native_raster_store != null or (tile_stride >= 16 and ClassDB.class_exists("DrawingNativeTiles"))) and \
 				not _subtree_history_has_native_references(raster_layers):
@@ -2250,7 +2306,35 @@ func _mark_untracked_change() -> void:
 	_drop_history_redo()
 
 
+## A local branch can abandon a parked empty creation. Release its native
+## sources and Redo tokens only after the absent node and exact native state
+## are established. Other parked structural events have a separate lifecycle.
+func _release_abandoned_raster_creation(event: Dictionary) -> void:
+	if event.get("kind") != "structure" or event.get("op") != "create" or \
+			_native_raster_store == null or not _attached_native_revision_matches(revision):
+		return
+	var snapshot: DrawingLayerNode = event.get("node") as DrawingLayerNode
+	var node_id: String = event.get("id", "")
+	if snapshot == null or snapshot.id != node_id or snapshot.kind != DrawingLayerNode.RASTER or \
+			not snapshot.tiles.is_empty() or _nodes.has(node_id) or \
+			not bool(_native_raster_store.call("is_layer_parked", node_id)):
+		return
+	var identities: Array[String] = []
+	for identity: String in _native_source_identities:
+		if identity.begins_with(node_id + ":"):
+			identities.append(identity)
+	if not _native_tree_sources_match({node_id: snapshot}, true) or \
+			not bool(_native_raster_store.call("discard_empty_creation_history",
+				revision, node_id, identities.size())):
+		return
+	for identity: String in identities:
+		_native_source_identities.erase(identity)
+		_sparse_reloads.erase(identity)
+
+
 func _drop_history_redo() -> void:
+	for index: int in range(_cursor, _events.size()):
+		_release_abandoned_raster_creation(_events[index])
 	_events.resize(_cursor)
 	_content_states.resize(_cursor + 1)
 

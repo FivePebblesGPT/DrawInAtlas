@@ -861,6 +861,86 @@ impl TileStore {
         self.advance_metadata(expected, discard_redo)
     }
 
+    /// Replay the creation of an empty raster, even after a stroke was
+    /// undone. Its blank canonical tiles and future Redo images are distinct
+    /// from an unreferenced layer; never discard those images just to remove
+    /// the empty node. Applied raster history or hidden RGB is not empty.
+    fn advance_empty_created_layer(
+        &mut self,
+        expected: u64,
+        layer: &str,
+        source_count: usize,
+        restore: bool,
+    ) -> Result<(), &'static str> {
+        if self.active.is_some() || self.revision != expected || expected >= i64::MAX as u64 {
+            return Err("Active edit, stale or overflowing creation revision");
+        }
+        self.check_empty_created_sources(layer, source_count)?;
+        let resident = source_count;
+        let ids = [layer.to_owned()];
+        let referenced = resident > 0
+            || self.parked_layers.contains(layer)
+            || self.redo.iter().any(|entry| entry.layer == layer);
+        if referenced {
+            self.advance_parked_layers(expected, &ids, restore, false)
+        } else {
+            self.advance_unreferenced_layers(expected, &ids, false)
+        }
+    }
+
+    fn check_empty_created_sources(
+        &self,
+        layer: &str,
+        source_count: usize,
+    ) -> Result<(), &'static str> {
+        if layer.is_empty() || self.undo.iter().any(|entry| entry.layer == layer) {
+            return Err("Created raster still has applied native history");
+        }
+        let mut resident = 0;
+        for (id, tile) in self.tiles.iter().filter(|(id, _)| id.layer == layer) {
+            if !self.authorized.contains(id) || tile.rgba.iter().any(|byte| *byte != 0) {
+                return Err("Created raster is not canonically empty");
+            }
+            resident += 1;
+        }
+        if resident != source_count
+            || self
+                .authorized
+                .iter()
+                .filter(|id| id.layer == layer)
+                .count()
+                != resident
+        {
+            return Err("Created raster source set differs from projection");
+        }
+        Ok(())
+    }
+
+    /// Once the local command owner discards an undone creation, its absent
+    /// blank source and future raster events can be released. This is history
+    /// reclamation, not a live content revision. An active edit on a different
+    /// layer cannot reference a parked source.
+    fn discard_empty_creation(
+        &mut self,
+        expected: u64,
+        layer: &str,
+        source_count: usize,
+    ) -> Result<(), &'static str> {
+        if self.revision != expected
+            || !self.parked_layers.contains(layer)
+            || self.active.as_ref().is_some_and(|edit| edit.layer == layer)
+        {
+            return Err("Stale or live created raster cannot be discarded");
+        }
+        self.check_empty_created_sources(layer, source_count)?;
+        self.tiles.retain(|id, _| id.layer != layer);
+        self.authorized.retain(|id| id.layer != layer);
+        self.redo.retain(|event| event.layer != layer);
+        self.parked_layers.remove(layer);
+        self.editable_layers.remove(layer);
+        Ok(())
+    }
+
     fn can_publish_subtree(
         &self,
         expected: u64,
@@ -1570,6 +1650,46 @@ impl DrawingNativeTiles {
         let ids: Vec<String> = layers.as_slice().iter().map(|id| id.to_string()).collect();
         self.store
             .advance_unreferenced_layers(expected as u64, &ids, discard_redo)
+            .is_ok()
+    }
+
+    /// Structural creation replay, checked against the complete empty raster
+    /// projection. Retains native Redo while the created layer is absent.
+    #[func]
+    fn advance_empty_created_layer_revision(
+        &mut self,
+        expected: i64,
+        layer: GString,
+        source_count: i64,
+        restore: bool,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        let (Ok(expected), Ok(source_count)) =
+            (u64::try_from(expected), usize::try_from(source_count))
+        else {
+            return false;
+        };
+        self.store
+            .advance_empty_created_layer(expected, &layer.to_string(), source_count, restore)
+            .is_ok()
+    }
+
+    /// Release only the absent blank raster of an abandoned local creation.
+    #[func]
+    fn discard_empty_creation_history(
+        &mut self,
+        expected: i64,
+        layer: GString,
+        source_count: i64,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        let (Ok(expected), Ok(source_count)) =
+            (u64::try_from(expected), usize::try_from(source_count))
+        else {
+            return false;
+        };
+        self.store
+            .discard_empty_creation(expected, &layer.to_string(), source_count)
             .is_ok()
     }
 
@@ -4093,6 +4213,92 @@ mod tests {
         assert_eq!(store.read(&ink, false).unwrap().rgba, zero);
         assert_eq!(store.read(&extra, false).unwrap().rgba, bytes);
         assert!(store.history_matches(token, false));
+    }
+
+    #[test]
+    fn empty_created_layer_replay_and_branch_reclamation_are_checked() {
+        let mut store = initialized(16);
+        let id = TileId {
+            layer: "ink".into(),
+            x: -1,
+            y: 0,
+        };
+        let other = TileId {
+            layer: "other".into(),
+            x: 0,
+            y: 0,
+        };
+        store.editable_layers.insert("other".into(), true);
+        let mut hidden = vec![0; 16 * 16 * 4];
+        hidden[..4].copy_from_slice(&[0x11, 0x22, 0x33, 0]);
+        let (other_token, _) = store
+            .adopt_external("other", 0, vec![(other.clone(), vec![], hidden.clone())])
+            .unwrap();
+        let (token, _) = store
+            .adopt_external("ink", 1, vec![(id.clone(), vec![], hidden.clone())])
+            .unwrap();
+        assert!(
+            store
+                .advance_empty_created_layer(2, "ink", 1, false)
+                .is_err()
+        );
+        assert!(store.history_matches(token, true));
+        store.undo_or_redo(true).unwrap();
+        let generation = store.read(&id, false).unwrap().generation;
+        let resident = store.bytes_used();
+        assert!(
+            store
+                .advance_empty_created_layer(2, "ink", 1, false)
+                .is_err()
+        );
+        assert!(
+            store
+                .advance_empty_created_layer(3, "ink", 0, false)
+                .is_err()
+        );
+        assert!(
+            store
+                .advance_empty_created_layer(3, "ink", 1, true)
+                .is_err()
+        );
+        assert!(store.discard_empty_creation(3, "ink", 1).is_err());
+        let transaction = store.begin("other", 3, false).unwrap();
+        assert!(
+            store
+                .advance_empty_created_layer(3, "ink", 1, false)
+                .is_err()
+        );
+        assert!(store.transaction_matches(transaction, 3, "other"));
+        store.active = None;
+        store
+            .advance_empty_created_layer(3, "ink", 1, false)
+            .unwrap();
+        assert!(store.parked_layers.contains("ink"));
+        assert!(store.retains_history_token(token));
+        assert!(store.history_matches(other_token, true));
+        assert_eq!(store.bytes_used(), resident);
+        assert_eq!(store.read(&id, false).unwrap().generation, generation);
+        assert!(store.undo_or_redo(false).is_err());
+        store
+            .advance_empty_created_layer(4, "ink", 1, true)
+            .unwrap();
+        assert!(store.history_matches(token, false));
+        store.undo_or_redo(false).unwrap();
+        assert_eq!(store.read(&id, false).unwrap().rgba, hidden);
+        store.undo_or_redo(true).unwrap();
+        store
+            .advance_empty_created_layer(7, "ink", 1, false)
+            .unwrap();
+        assert!(store.discard_empty_creation(8, "ink", 0).is_err());
+        let active = store.begin("other", 8, false).unwrap();
+        store.discard_empty_creation(8, "ink", 1).unwrap();
+        assert!(store.transaction_matches(active, 8, "other"));
+        assert_eq!(store.revision, 8);
+        assert!(!store.retains_history_token(token));
+        assert!(store.retains_history_token(other_token));
+        assert!(!store.authorized.contains(&id));
+        assert!(!store.parked_layers.contains("ink"));
+        assert_eq!(store.read(&other, false).unwrap().rgba, hidden);
     }
 
     #[test]

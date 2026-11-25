@@ -793,3 +793,29 @@ can acquire missing bytes; already fully adopted events continue to fail
 closed on partial ownership loss. Entirely detached recovery remains T-319.
 This is not a new host timeline or a replacement for T-148 integration.
 See [T-320 evidence](evidence/T-320-2026-11-25-mixed-subtree-source.md).
+
+
+### Empty raster creation history and branch reclamation (T-321)
+
+`advance_empty_created_layer_revision(expected_revision, layer, source_count, restore)`
+advances exactly one revision and preserves both native history stacks. The
+host first verifies a structurally empty creation snapshot and, on Undo,
+matching empty live metadata, no pending/known source or unpublished edit,
+and all retained source identity/byte parity. Rust independently checks
+current revision, quiescence, absence of applied history for this layer,
+complete authorized/resident source count and zero **all-channel** RGBA8.
+Referenced blank layers are parked on Undo and unparked on Redo; never-owned
+IDs use the unreferenced bridge. Paint Redo is unavailable while parked.
+No new native pixel token is created. Detached empty layers need no source
+publication until detached paint replay.
+
+`discard_empty_creation_history(expected_revision, layer, source_count)` is
+reserved for the local command owner's abandoned creation branch. The layer
+must be absent from the host tree and parked, and its complete native source
+must remain blank with no applied history. It releases the layer's canonical
+sources, authorization, reservation, editability and layer-specific Redo
+entries at the unchanged content revision. An active edit on another layer
+is unaffected. Rejected reclamation does not change canonical data; the host
+must not erase its source identities unless the native call succeeds. This
+is not general history eviction or an external host timeline protocol.
+See [T-321 evidence](evidence/T-321-2026-11-25-raster-creation-history.md).

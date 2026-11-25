@@ -223,17 +223,21 @@ func exercise_corrupt_parked() -> void:
 		"restored parked snapshot retries without clearing native history")
 
 
-func exercise_owned_create_refusal() -> void:
+func exercise_owned_create_replay() -> void:
 	var doc: DrawingDocument = make_doc("owned-create", false)
 	var store: Object = doc._native_raster_store
 	check(record(doc, "create").ok and paint(doc, "newraster").ok,
 		"recorded new raster receives real Hokusai source")
 	check(doc.undo().ok, "created raster Brush Undo succeeds")
-	var before: Dictionary = snapshot(doc, store)
-	var refused: DrawingResult = doc.undo()
-	check(not refused.ok and refused.code == "NATIVE_STRUCTURE" and
-		doc._native_raster_store == store and snapshot(doc, store) == before,
-		"previously authorized raster create cannot be undone via unreferenced bridge")
+	var prior_revision: int = doc.revision
+	var token: int = (doc._events[doc._cursor]["delta"] as DrawingDelta).native_history_token
+	var undone: DrawingResult = doc.undo()
+	check(undone.ok and not doc.has_node("newraster") and
+		bool(store.call("is_layer_parked", "newraster")) and
+		doc.revision == prior_revision + 1 and doc.redo().ok and
+		bool(store.call("has_history_token", token, doc.revision, false)) and doc.redo().ok and
+		doc._native_raster_store == store and doc._native_save_projection_matches(),
+		"created raster Undo/Redo retains the original Hokusai token")
 
 
 func run() -> void:
@@ -243,7 +247,7 @@ func run() -> void:
 		exercise(operation)
 		exercise_ahead(operation)
 	exercise_corrupt_parked()
-	exercise_owned_create_refusal()
+	exercise_owned_create_replay()
 	var plain: DrawingDocument = DrawingDocument.new("t177-plain", STRIDE)
 	check(plain.create_layer(DrawingLayerNode.RASTER, "Plain", "root",
 		"plain", -1, true).ok and plain.undo().ok and
