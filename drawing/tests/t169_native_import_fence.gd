@@ -137,13 +137,15 @@ func run() -> void:
 		native_bytes(bounded_store, bounded_ink) == bounded_bytes,
 		"over-limit rejection leaves both documents' sources unchanged")
 
-	# Native-absent documents keep their former structural import semantics.
+	# A first import bootstraps native authority without a pixel history token.
 	var ordinary: DrawingDocument = DrawingDocument.new("ordinary", STRIDE)
 	check(ordinary._native_raster_store == null, "plain document has no native store")
 	var plain: DrawingResult = ordinary.import_subtree(source.value, "root", true)
 	check(plain.ok and ordinary.has_node(child) and
 		ordinary._nodes[child].tiles["0,0"].to_rgba8() == image.to_rgba8(),
 		"native-absent import retains source bytes")
+	check(ordinary._native_raster_store != null and native_bytes(ordinary._native_raster_store, child) == image.to_rgba8(),
+		"native-absent recipient immediately owns imported bytes")
 
 	print("T169_IMPORT_RESULT checks=%d failures=%d" % [checks, failures])
 	if failures == 0:

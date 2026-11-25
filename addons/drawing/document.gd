@@ -2448,6 +2448,31 @@ func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool 
 		for child: String in source.children:
 			if not nodes.has(child) or nodes[child].parent_id != old_id:
 				return DrawingResult.failure("SNAPSHOT", "Broken nested group reference")
+	# Validate source tiles before copying any projection or materializing buffers.
+	var raster_count: int = 0
+	var tile_count: int = 0
+	var native_required: bool = _native_raster_store != null or (tile_stride >= 16 and ClassDB.class_exists("DrawingNativeTiles"))
+	for old_id: Variant in nodes:
+		var source: DrawingLayerNode = nodes[old_id]
+		if source.kind != DrawingLayerNode.RASTER:
+			if not source.tiles.is_empty():
+				return DrawingResult.failure("SNAPSHOT", "Non-raster node contains tiles")
+			continue
+		raster_count += 1
+		tile_count += source.tiles.size()
+		if native_required and (raster_count > 128 or tile_count > 8192 or tile_count * tile_stride * tile_stride * 4 > MAX_NATIVE_HISTORY_TRANSFER_BYTES):
+			return DrawingResult.failure("NATIVE_STRUCTURE", "Detached subtree exceeds native source budget")
+		for key: String in source.tiles:
+			var tile: DrawingRasterTile = source.tiles[key]
+			var coords: PackedStringArray = key.split(",")
+			if tile == null or tile.stride != tile_stride or not tile.has_canonical_storage() or coords.size() != 2 or not coords[0].is_valid_int() or not coords[1].is_valid_int():
+				return DrawingResult.failure("SNAPSHOT", "Invalid detached raster tile or stride")
+			var cx: int = int(coords[0])
+			var cy: int = int(coords[1])
+			if key != "%d,%d" % [cx, cy] or not TILES.tile_coordinates_in_projection_range(cx, cy, tile_stride):
+				return DrawingResult.failure("COORD", "Invalid detached tile coordinate")
+	if raster_count > 0 and has_unpublished_edit():
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Cannot import raster during an unpublished edit")
 	# Prepare the entire detached projection before publishing. A failed copy
 	# must not install a partial group, advance either revision or leave a
 	# half-populated dirty map. Native parked IDs are reserved even while the
@@ -2474,9 +2499,8 @@ func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool 
 		if imported.kind == DrawingLayerNode.RASTER:
 			imported_rasters.append(imported.id)
 	# Prepare the full tree before a checked, single-step native revision.
-	# The previous raster import used a bare increment and forced a rebase even when
-	# every imported raster layer was new to Rust. The checked bridge keeps
-	# unrelated native Brush history and source authorizations alive.
+	# Adopt every imported raster tile before exposing the tree; the untracked
+	# structural event keeps unrelated native Brush history and authorizations.
 	if imported_rasters.is_empty():
 		# Semantic-only detached imports must obey the same fail-closed native
 		# revision boundary as public object/text edits. The old post-mutation
@@ -2485,16 +2509,28 @@ func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool 
 		if not metadata.ok:
 			return metadata
 	else:
-		# A rejected native bridge is not permission to publish a Godot-only
-		# subtree. Keep the detached projection uninstalled and allow retry.
-		# Every imported ID is new to this document, so Rust may advance only
-		# after proving that none is resident, parked or referenced in history.
-		if _native_raster_store != null:
-			if not _attached_native_revision_matches(revision):
-				return DrawingResult.failure("STALE_REVISION", "Native raster revision diverged before import")
-			if not bool(_native_raster_store.call("advance_unreferenced_layers_revision",
-					revision, PackedStringArray(imported_rasters), true)):
+		var store: Object = _native_raster_store
+		var provisional: bool = store == null
+		if store != null and not _attached_native_revision_matches(revision):
+			return DrawingResult.failure("STALE_REVISION", "Native raster revision diverged before import")
+		if provisional and native_required:
+			store = ClassDB.instantiate("DrawingNativeTiles")
+			if store == null or int(store.call("tile_abi_version")) != 1 or not store.call("configure", tile_stride, revision):
+				return DrawingResult.failure("NATIVE_STRUCTURE", "Detached subtree native bootstrap rejected")
+		if store != null:
+			var descriptors: Array[Dictionary] = []
+			for layer: String in imported_rasters:
+				for key: String in prepared[layer].tiles:
+					var coords: PackedStringArray = key.split(",")
+					descriptors.append({"layer": layer, "tile_x": int(coords[0]), "tile_y": int(coords[1]), "bytes": prepared[layer].tiles[key].to_rgba8()})
+			if not bool(store.call("publish_subtree_revision", revision, PackedStringArray(imported_rasters), descriptors)):
 				return DrawingResult.failure("NATIVE_STRUCTURE", "Native raster import was rejected")
+			if provisional:
+				_native_raster_store = store
+				_native_source_identities.clear()
+			for layer: String in imported_rasters:
+				for key: String in prepared[layer].tiles:
+					_remember_native_source(layer, key, prepared[layer].tiles[key])
 		revision += 1
 	for identifier: String in prepared:
 		var imported: DrawingLayerNode = prepared[identifier]

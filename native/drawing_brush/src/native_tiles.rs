@@ -782,11 +782,10 @@ impl TileStore {
     /// removed/restored as a structural edit: no canonical tile or reversible
     /// history event belongs to it. Unlike an unconditional metadata advance,
     /// this fails closed for even an authorized *blank* tile and for redo.
-    fn advance_unreferenced_layers(
-        &mut self,
+    fn can_advance_unreferenced_layers(
+        &self,
         expected: u64,
         layers: &[String],
-        discard_redo: bool,
     ) -> Result<(), &'static str> {
         if self.active.is_some() || self.revision != expected || expected >= i64::MAX as u64 {
             return Err("Active edit, stale or overflowing structural revision");
@@ -824,7 +823,72 @@ impl TileStore {
         {
             return Err("Raster layer has native tile ownership or history");
         }
+        Ok(())
+    }
+
+    fn advance_unreferenced_layers(
+        &mut self,
+        expected: u64,
+        layers: &[String],
+        discard_redo: bool,
+    ) -> Result<(), &'static str> {
+        self.can_advance_unreferenced_layers(expected, layers)?;
         self.advance_metadata(expected, discard_redo)
+    }
+
+    fn can_publish_subtree(
+        &self,
+        expected: u64,
+        layers: &[String],
+        count: usize,
+    ) -> Result<(), &'static str> {
+        self.can_advance_unreferenced_layers(expected, layers)?;
+        if count > MAX_STRUCTURAL_TILES
+            || self.bytes_used().saturating_add(
+                self.stride_bytes()?
+                    .checked_mul(count)
+                    .ok_or("Subtree byte count overflow")?,
+            ) > MAX_STORED_BYTES
+        {
+            return Err("Structural subtree memory budget exceeded");
+        }
+        Ok(())
+    }
+
+    fn publish_subtree(
+        &mut self,
+        expected: u64,
+        layers: &[String],
+        entries: Vec<(TileId, Vec<u8>)>,
+    ) -> Result<(), &'static str> {
+        self.can_publish_subtree(expected, layers, entries.len())?;
+        let names: HashSet<&str> = layers.iter().map(String::as_str).collect();
+        let len = self.stride_bytes()?;
+        let mut prepared = HashMap::with_capacity(entries.len());
+        for (id, rgba) in entries {
+            if !names.contains(id.layer.as_str())
+                || id.x.unsigned_abs() > SAFE_COORD as u64
+                || id.y.unsigned_abs() > SAFE_COORD as u64
+                || rgba.len() != len
+                || prepared.contains_key(&id)
+            {
+                return Err("Invalid or repeated subtree tile");
+            }
+            prepared.insert(
+                id,
+                Tile {
+                    rgba,
+                    generation: 0,
+                },
+            );
+        }
+        self.advance_metadata(expected, true)?;
+        for (id, tile) in prepared {
+            self.bytes_imported += tile.rgba.len() as u64;
+            self.authorized.insert(id.clone());
+            self.tiles.insert(id, tile);
+        }
+        Ok(())
     }
 
     /// An unrecorded structural removal has no future tree Undo to restore its
@@ -1479,6 +1543,66 @@ impl DrawingNativeTiles {
             .collect();
         self.store
             .publish_structural_source(&layer, expected as u64, entries)
+            .is_ok()
+    }
+
+    /// Adopt all raster layers of a new detached subtree in one revision.
+    #[func]
+    fn publish_subtree_revision(
+        &mut self,
+        expected: i64,
+        layers: PackedStringArray,
+        tiles: Array<Dictionary<Variant, Variant>>,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        if expected < 0 || layers.is_empty() || layers.len() > MAX_ACTIVE_TILES {
+            return false;
+        }
+        let ids: Vec<String> = layers.as_slice().iter().map(|id| id.to_string()).collect();
+        if self
+            .store
+            .can_publish_subtree(expected as u64, &ids, tiles.len())
+            .is_err()
+        {
+            return false;
+        }
+        let names: HashSet<&str> = ids.iter().map(String::as_str).collect();
+        let Ok(len) = self.store.stride_bytes() else {
+            return false;
+        };
+        let mut descriptors = Vec::with_capacity(tiles.len());
+        let mut seen = HashSet::with_capacity(tiles.len());
+        for entry in tiles.iter_shared() {
+            let (Some(layer), Some(x), Some(y), Some(rgba)) = (
+                entry.get("layer").and_then(|v| v.try_to::<GString>().ok()),
+                entry.get("tile_x").and_then(|v| v.try_to::<i64>().ok()),
+                entry.get("tile_y").and_then(|v| v.try_to::<i64>().ok()),
+                entry
+                    .get("bytes")
+                    .and_then(|v| v.try_to::<PackedByteArray>().ok()),
+            ) else {
+                return false;
+            };
+            let layer = layer.to_string();
+            if !names.contains(layer.as_str())
+                || x.unsigned_abs() > SAFE_COORD as u64
+                || y.unsigned_abs() > SAFE_COORD as u64
+                || rgba.len() != len
+            {
+                return false;
+            }
+            let id = TileId { layer, x, y };
+            if !seen.insert(id.clone()) {
+                return false;
+            }
+            descriptors.push((id, rgba));
+        }
+        let entries = descriptors
+            .into_iter()
+            .map(|(id, bytes)| (id, bytes.as_slice().to_vec()))
+            .collect();
+        self.store
+            .publish_subtree(expected as u64, &ids, entries)
             .is_ok()
     }
 
@@ -3274,6 +3398,112 @@ mod tests {
         assert!(
             store
                 .can_publish_structural_source("large", 4, MAX_STRUCTURAL_TILES + 1)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn subtree_publication_checks_complete_batch_before_any_mutation() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let ink = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let mut bytes = vec![0; 16 * 16 * 4];
+        bytes[..4].copy_from_slice(&[19, 33, 55, 0]);
+        let (token, _) = store
+            .adopt_external("ink", 0, vec![(ink.clone(), vec![], bytes.clone())])
+            .unwrap();
+        let a = TileId {
+            layer: "a".into(),
+            x: -1,
+            y: 2,
+        };
+        let b = TileId {
+            layer: "b".into(),
+            x: -1,
+            y: 2,
+        };
+        let ids = ["a".into(), "b".into(), "empty".into()];
+        let memory = store.bytes_used();
+        let imported = store.bytes_imported;
+        assert!(
+            store
+                .publish_subtree(
+                    1,
+                    &ids,
+                    vec![(a.clone(), bytes.clone()), (b.clone(), vec![0])]
+                )
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_subtree(
+                    1,
+                    &ids,
+                    vec![(a.clone(), bytes.clone()), (a.clone(), bytes.clone())]
+                )
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_subtree(
+                    1,
+                    &["a".into()],
+                    vec![(a.clone(), bytes.clone()), (b.clone(), bytes.clone())]
+                )
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_subtree(
+                    1,
+                    &["ink".into(), "a".into()],
+                    vec![(a.clone(), bytes.clone())]
+                )
+                .is_err()
+        );
+        assert!(store.publish_subtree(0, &ids, vec![]).is_err());
+        let active = store.begin("ink", 1, false).unwrap();
+        assert!(
+            store
+                .publish_subtree(1, &ids, vec![(a.clone(), bytes.clone())])
+                .is_err()
+        );
+        assert!(store.transaction_matches(active, 1, "ink"));
+        store.active = None;
+        assert_eq!(
+            (store.revision, store.bytes_used(), store.bytes_imported),
+            (1, memory, imported)
+        );
+        assert!(!store.authorized.contains(&a));
+        assert!(store.history_matches(token, true));
+        store
+            .publish_subtree(
+                1,
+                &ids,
+                vec![(a.clone(), bytes.clone()), (b.clone(), bytes.clone())],
+            )
+            .unwrap();
+        assert_eq!(store.revision, 2);
+        assert_eq!(store.read(&a, false).unwrap().rgba, bytes);
+        assert_eq!(store.read(&b, false).unwrap().rgba, bytes);
+        assert!(store.history_matches(token, true));
+        assert!(!store.parked_layers.contains("empty"));
+        assert_eq!(store.undo.len(), 1);
+        store
+            .advance_parked_layers(2, &["a".into()], false, false)
+            .unwrap();
+        assert!(store.publish_subtree(3, &ids, vec![]).is_err());
+        assert_eq!(store.revision, 3);
+        let wide = initialized(2048);
+        assert!(wide.can_publish_subtree(0, &ids, 16).is_ok());
+        assert!(wide.can_publish_subtree(0, &ids, 17).is_err());
+        assert!(
+            store
+                .can_publish_subtree(3, &["new".into()], MAX_STRUCTURAL_TILES + 1)
                 .is_err()
         );
     }

@@ -52,6 +52,10 @@ application shell is implemented under T-053; see `drawing/README.md` for the in
 - `export_subtree` / `import_subtree` / `transfer_subtree` validate IDs and
   trees, deep-detach tiles and preserve IDs on moves but mint fresh IDs on
   copies. An inaccessible lazy tile blocks transfer instead of being dropped.
+  Native-supported imports publish all raster tiles atomically into Rust at
+  the new structural revision, without introducing a pixel-history entry.
+  Invalid tile storage, incompatible strides, pending edits and native budget
+  or revision rejection leave the destination unchanged.
 
 ## T-088 independent selection and clipboard layer
 

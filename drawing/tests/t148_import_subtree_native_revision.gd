@@ -86,9 +86,9 @@ func run() -> void:
 		int(store.call("stats").get("revision", -1)) == dest.revision and
 		int(store.call("stats").get("undo", -1)) == history,
 		"unreferenced raster import retains Rust source and native history")
-	check(int(store.call("stats").get("bytes_imported", -1)) == imported_bytes and
+	check(int(store.call("stats").get("bytes_imported", -1)) == imported_bytes + lazy_bytes.size() and
 		packed(dest, ink, "0,0") == original,
-		"import does not reimport or mutate existing brush RGBA8")
+		"only the new subtree bytes are imported; existing brush RGBA8 unchanged")
 	check(packed(dest, copied_raster, "-1,1") == lazy_bytes and
 		packed(source, raster, "-1,1") == lazy_bytes,
 		"copied signed source is detached and byte-identical")
@@ -97,7 +97,7 @@ func run() -> void:
 		"nested semantic objects copied with remapped identity")
 	check(stroke(dest, ink, Vector2(32, 34)).ok and
 		dest._native_raster_store == store and
-		int(store.call("stats").get("bytes_imported", -1)) == imported_bytes and
+		int(store.call("stats").get("bytes_imported", -1)) == imported_bytes + lazy_bytes.size() and
 		int(store.call("stats").get("undo", -1)) == history + 1,
 		"subsequent brush keeps canonical Rust store across import")
 	check(dest.undo().ok and packed(dest, ink, "0,0") == original,
@@ -110,9 +110,9 @@ func run() -> void:
 		"Redo both native strokes restores one synchronized timeline")
 	check(stroke(dest, copied_raster, Vector2(-53, 78)).ok and
 		dest._native_raster_store == store,
-		"first native edit of imported raster authorizes only its new source")
-	check(int(store.call("stats").get("bytes_imported", -1)) > imported_bytes,
-		"new imported raster lazily enters Rust when first painted")
+		"first native edit of imported raster uses the existing source")
+	check(int(store.call("stats").get("bytes_imported", -1)) == imported_bytes + lazy_bytes.size(),
+		"first paint does not reimport already-owned raster source")
 	check(packed(dest, copied_raster, "-1,1") != lazy_bytes and
 		int(dest.read_pixel(copied_raster, -61, 65).value) == 0x00112233,
 		"editing copied raster preserves untouched signed hidden-RGB pixel")
@@ -233,4 +233,6 @@ func run() -> void:
 		"post-rejection gesture preserves earlier native history without rebase")
 
 	print("T148_IMPORT_RESULT checks=%d failures=%d" % [checks, failures])
+	if failures == 0:
+		print("T148_IMPORT_PASSED")
 	quit(0 if failures == 0 else 1)

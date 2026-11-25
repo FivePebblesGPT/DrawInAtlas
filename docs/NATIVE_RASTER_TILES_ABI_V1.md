@@ -123,8 +123,31 @@ Signed Godot projection bounds are checked by the caller. Stale stores and
 pending edits reject. Native-owned glyphs park/unpark without reimport on
 structural replay; a parked raster at a semantic text ID is excluded from the
 live Save/Copy projection. Godot continues shaping glyphs and owns the
-structural timeline, and detached subtrees remain a separate integration seam.
+structural timeline; detached subtree source publication is addressed separately below.
 The model-only sub-native stride path is retained. See [T-313 evidence](evidence/T-313-2026-11-25-native-text-source.md).
+
+## Detached subtree source publication (T-314, 2026-11-25)
+
+`publish_subtree_revision(expected_revision, layers, tiles)` adopts new raster
+layers together, with `layers: PackedStringArray` and descriptors
+`{layer: String, tile_x: int, tile_y: int, bytes: PackedByteArray}`. It admits
+1–128 distinct previously unreferenced raster layer IDs, up to 8,192 distinct
+(layer, x, y) keys and 256 MiB resident-plus-incoming RGBA8/history bytes.
+Before buffer cloning, Rust checks the expected revision, transaction state,
+all identities, membership, signed coordinates and exact byte spans. A single
+revision publishes the entire batch, preserving unrelated Undo and clearing
+branched Redo. It creates no additional pixel-history token. Empty layers
+may be listed without creating source tiles or parked IDs at import.
+
+`DrawingDocument.import_subtree` additionally validates canonical storage and
+projection coordinates, matching strides and pending detached edit sessions
+before preparing detached copies. When the native class is available and the
+stride is supported, first use configures a provisional owner; neither it
+nor the tree is installed on rejection. A model-only/sub-native-stride path
+remains available. Native-owned imported bytes participate in the existing
+save/export guards and park/restore/retire paths without first paint. Existing
+untracked local import and Atlas Move/Copy command ownership are unchanged;
+this is not a two-document Rust transaction or a universal host-history bridge.
 
 ## Ownership, byte format and source identity
 
