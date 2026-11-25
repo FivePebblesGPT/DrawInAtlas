@@ -160,6 +160,11 @@ var _color_write_suspended: bool = false
 var preferences_dialog: AcceptDialog
 var open_dialog: FileDialog
 var save_dialog: FileDialog
+var export_dialog: DrawingExportDialog
+var export_file_dialog: FileDialog
+var _export_target: Dictionary = {}
+var _export_bytes: PackedByteArray = PackedByteArray()
+var _export_format: String = ""
 var new_counter: int = 0
 ## Application preference; existing selection entries survive toggling it off.
 var record_selection_history: bool = false
@@ -240,10 +245,10 @@ func _build_interface() -> void:
 	root.add_child(top_bar)
 	# Ordinary documents and portable Object sources have independent commands.
 	# The same canonical workspace is embedded by standalone Drawing and Atlas.
-	top_bar.add_menu_spec("File", ["New", "Open…", "Save", "Save As…", "Close Tab"],
+	top_bar.add_menu_spec("File", ["New", "Open…", "Save", "Save As…", "Close Tab", "Export…"],
 		[Callable(self, "new_drawing"), Callable(self, "_ask_open"),
 		Callable(self, "_save"), Callable(self, "_ask_save"),
-		Callable(self, "_request_close_current")],
+		Callable(self, "_request_close_current"), Callable(self, "_ask_export")],
 		{0: KEY_MASK_CTRL | KEY_N, 1: KEY_MASK_CTRL | KEY_O, 2: KEY_MASK_CTRL | KEY_S,
 		3: KEY_MASK_CTRL | KEY_MASK_SHIFT | KEY_S, 4: KEY_MASK_CTRL | KEY_W})
 	top_bar.add_menu_spec("Object", ["New Source", "Open Source…", "Rename Source…",
@@ -619,6 +624,14 @@ func _build_interface() -> void:
 	save_dialog = _make_dialog(FileDialog.FILE_MODE_SAVE_FILE)
 	save_dialog.file_selected.connect(_save_dialog_selected)
 	save_dialog.canceled.connect(_save_dialog_cancelled)
+	export_dialog = DrawingExportDialog.new()
+	add_child(export_dialog)
+	export_dialog.confirmed.connect(_choose_export_file)
+	export_dialog.canceled.connect(_cancel_export)
+	export_file_dialog = _make_dialog(FileDialog.FILE_MODE_SAVE_FILE)
+	export_file_dialog.title = "Export raster image (not Save Drawing)"
+	export_file_dialog.file_selected.connect(_export_file_selected)
+	export_file_dialog.canceled.connect(_cancel_export)
 	object_open_dialog = _make_dialog(FileDialog.FILE_MODE_OPEN_FILE)
 	object_open_dialog.title = "Open portable Object source in its own editor tab"
 	object_open_dialog.file_selected.connect(_open_object_file)
@@ -4164,6 +4177,103 @@ func _open_raster_file(path: String) -> void:
 		"saved_frame": image_bounds, "frame_dirty": false, "fit_pending": true})
 	tab_bar.add_tab("Imported: " + path.get_file())
 	_activate(tabs.size() - 1)
+
+
+## Export never commits pending gestures, floating pixels or a native savepoint.
+func _export_bounds() -> Rect2i:
+	var object: DrawingObjectEditorSession = current_object()
+	return object.bounds if object != null else canvas.image_bounds
+
+
+func _export_edit_pending() -> bool:
+	return canvas.has_pending_stroke() or canvas.has_floating_move() or canvas.dragging \
+		or current_document().has_unpublished_edit()
+
+
+func _export_target_current() -> bool:
+	return _save_target_is_current(_export_target) and current_document().revision == int(_export_target["revision"]) \
+		and current_document().display_source_epoch == int(_export_target["epoch"]) \
+		and _export_bounds() == _export_target["bounds"] and not _export_edit_pending()
+
+
+func _ask_export() -> void:
+	_cancel_export()
+	if active_tab < 0:
+		return
+	if _export_edit_pending():
+		_show_error("Finish or cancel the pending edit before exporting")
+		return
+	var bounds: Rect2i = _export_bounds()
+	_export_target = _capture_save_target()
+	_export_target["revision"] = current_document().revision
+	_export_target["epoch"] = current_document().display_source_epoch
+	_export_target["bounds"] = bounds
+	var result: DrawingResult = DrawingRasterExport.render(current_document(), bounds)
+	if not result.ok or not _export_target_current():
+		_show_error(result.message if not result.ok else "Document changed during export; reopen Export")
+		_cancel_export()
+		return
+	_update_status()
+	export_dialog.prepare(result.value as Image, bounds, result.message)
+	if DisplayServer.get_name() == "headless":
+		export_dialog.show()
+	else:
+		var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+		export_dialog.set_compact_preview(viewport_size.y < 480.0)
+		var dialog_size: Vector2i = Vector2i(maxi(1, mini(420, floori(viewport_size.x) - 24)), maxi(1, mini(395, floori(viewport_size.y) - 56)))
+		export_dialog.popup_centered(dialog_size)
+
+
+func _choose_export_file() -> void:
+	if not _export_target_current():
+		_show_error("Export source changed; reopen Export")
+		_cancel_export()
+		return
+	var result: DrawingResult = export_dialog.encode_current()
+	if not result.ok:
+		return
+	_export_bytes = result.value as PackedByteArray
+	_export_format = export_dialog.selected_format()
+	var extensions: PackedStringArray = DrawingRasterExport.extensions(_export_format)
+	var filters: PackedStringArray = PackedStringArray()
+	for extension: String in extensions:
+		filters.append("*." + extension)
+	export_file_dialog.filters = PackedStringArray([", ".join(filters) + " ; " + _export_format.to_upper() + " image"])
+	var filename: String = String(tabs[active_tab].get("path", "")).get_file().get_basename()
+	if filename.is_empty():
+		filename = "Drawing"
+	export_file_dialog.current_file = filename + "." + extensions[0]
+	export_dialog.hide()
+	export_dialog.clear_snapshot()
+	if DisplayServer.get_name() == "headless":
+		export_file_dialog.show()
+	else:
+		export_file_dialog.popup_centered_ratio(0.85)
+
+
+func _export_file_selected(path: String) -> void:
+	if not _export_target_current() or _export_bytes.is_empty():
+		_show_error("Export source changed or was cancelled; reopen Export")
+		_cancel_export()
+		return
+	# FileDialog's save mode confirms existing destinations before emitting.
+	var result: DrawingResult = DrawingRasterExport.publish(path, _export_format, _export_bytes, true)
+	_cancel_export()
+	if result.ok:
+		status.text = "Exported: " + path.get_file()
+	else:
+		_show_error(result.message)
+
+
+func _cancel_export() -> void:
+	_export_target.clear()
+	_export_bytes = PackedByteArray()
+	_export_format = ""
+	if export_dialog != null:
+		export_dialog.hide()
+		export_dialog.clear_snapshot()
+	if export_file_dialog != null:
+		export_file_dialog.hide()
 
 
 func _ask_open() -> void:

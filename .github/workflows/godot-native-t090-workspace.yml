@@ -50,6 +50,10 @@ jobs:
         run: |
           set -euo pipefail
           T304_SCREENSHOTS=/tmp/t090-screenshots make test-selection-menu TOOLCHAIN=system 2>&1 | tee /tmp/t304-native.log
+      - name: Verify native raster export and hosted Object frames (T-305)
+        run: |
+          set -euo pipefail
+          T305_SCREENSHOTS=/tmp/t090-screenshots make test-raster-export TOOLCHAIN=system 2>&1 | tee /tmp/t305-native.log
       - name: Upload software-only screenshots and diagnostic log
         if: always()
         uses: actions/upload-artifact@v4
@@ -60,5 +64,6 @@ jobs:
             /tmp/t302-native.log
             /tmp/t303-native.log
             /tmp/t304-native.log
+            /tmp/t305-native.log
             /tmp/t090-screenshots/
           if-no-files-found: warn

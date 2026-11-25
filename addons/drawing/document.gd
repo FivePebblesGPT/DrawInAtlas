@@ -1573,6 +1573,12 @@ func _has_pending_edit_sessions() -> bool:
 	return not live.is_empty()
 
 
+## Read-only persistence/export guard: a native-only draft is also unpublished.
+func has_unpublished_edit() -> bool:
+	return _has_pending_edit_sessions() or (_native_raster_store != null and (
+		not _native_raster_store.has_method("has_active_edit") or bool(_native_raster_store.call("has_active_edit"))))
+
+
 ## A host must select external ownership *before* it begins committing edits.
 ## Switching a document with existing local entries would silently split history.
 func set_external_history(enabled: bool) -> DrawingResult:

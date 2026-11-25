@@ -1,7 +1,7 @@
 class_name DrawingImageFrame
 extends RefCounted
 ## Standalone image extent is an authoring guide, NOT sparse-document storage.
-## Frame metadata never changes pixels, edits, image export, or Atlas regions.
+## Frame metadata does not change stored pixels or Atlas regions; raster export crops to this frame.
 
 const DEFAULT_BOUNDS: Rect2i = Rect2i(-256, -256, 512, 512)
 const MAX_COORD: int = 1000000000

@@ -86,8 +86,8 @@ func run() -> void:
 	top._refresh_layout()
 	check(top._menus.size() == 9 and top._menus[0].visible and top._menus[1].visible,
 		"normal desktop shows File and Object as independent menu buttons")
-	check(top._menus[0].get_popup().item_count == 5 and top._menus[1].get_popup().item_count == 5,
-		"File and Object each have five distinct commands")
+	check(top._menus[0].get_popup().item_count == 6 and top._menus[1].get_popup().item_count == 5,
+		"File has six and Object has five distinct commands")
 	await click(top._menus[1])
 	check(top._menus[1].get_popup().visible, "real pointer opens top-level Object popup")
 	await screenshot("object-menu-wide")

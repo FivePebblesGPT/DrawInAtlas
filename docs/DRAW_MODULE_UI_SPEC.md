@@ -134,8 +134,11 @@ Suggested commands and shortcuts:
 | File | Open | Ctrl+O |
 | File | Save | Ctrl+S |
 | File | Save As | Ctrl+Shift+S |
+| File | Export… | — |
 | Edit | Undo | Ctrl+Z |
 | Edit | Redo | Ctrl+Y or Ctrl+Shift+Z (choose one default) |
+
+**Raster export (T-305):** File > Export… is independent of Save and exports the visible composite clipped to the current signed image frame (Object frame for a hosted editor). A finite frame is required; maximum side 4096, total 4,194,304 pixels, encoded size 32 MiB. PNG preserves alpha losslessly; WebP offers lossless or quality-controlled lossy encoding; JPEG offers quality and an explicit opaque matte. Update encoded preview shows the actual encoded byte count and decoded preview, with bounded display size and scrollable compact options. Confirm a matching output extension in the export chooser; existing files require overwrite confirmation. Cancellation, pending edits, stale sources and write errors never implicitly commit or save the document.
 
 Keep a visible modified-document indicator (`*`), preserve unsaved-change prompts, and show shortcuts in menu items.
 

@@ -31,7 +31,11 @@ On narrow windows, use the option-row chevrons, Shift+wheel or keyboard focus
 to reach controls that overflow. `make test-graphical` runs the moving-stroke
 tile-retention regression under Xvfb; this requires `xvfb-run` on the test host.
 
-Standalone Linux export (requires the matching official Godot export templates
+## Export artwork
+
+Use **File > Export…** for PNG, WebP or JPEG. Choose the finite image frame first; the exporter composites visible layers within that frame, including signed coordinates. PNG and lossless WebP retain composite RGBA8; lossy WebP exposes quality and JPEG adds an opaque matte. Update encoded preview to see the decoded preview and actual byte size. Choose a destination independently of native Save; pending edits must be finished or cancelled first. The bounded exporter accepts up to 4096 pixels per side, 4,194,304 pixels total and 32 MiB encoded. `make test-raster-export` exercises codecs, native standalone and hosted export.
+
+Standalone Linux application export (requires the matching official Godot export templates
 and a built native extension; **not** a native-absent release):
 
 ```sh

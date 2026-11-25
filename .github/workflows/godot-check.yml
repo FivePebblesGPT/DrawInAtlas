@@ -476,6 +476,9 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t120_unified_open_smoke.gd 2>&1 | tee /tmp/godot-t120-open-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t120-open-model.log --marker T120_MODEL_PASSED || ci_fail_marker 'T120 unified Open model log rejected'
           python3 -m unittest discover -s tests -p 'test_t120_unified_open.py' -v
+          # T-305 keeps raster export separate from native Save (same required check ID).
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t305_export_model.gd 2>&1 | tee /tmp/godot-t305-export-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t305-export-model.log --marker T305_MODEL_PASSED || ci_fail_marker 'T305 raster export model log rejected'
           # T-121 rejects path/decoder TOCTOU by asserting one bounded source snapshot.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t121_raster_snapshot_smoke.gd 2>&1 | tee /tmp/godot-t121-snapshot-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t121-snapshot-model.log --marker T121_MODEL_PASSED || ci_fail_marker 'T121 single-snapshot raster Open rejected'

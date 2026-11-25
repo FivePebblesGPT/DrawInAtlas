@@ -80,7 +80,7 @@ func run() -> void:
 	check(app.asset_browser == null, "no guessed or automatic Objects root despite a remembered path")
 	var file_menu: PopupMenu = app.top_bar._menus[0].get_popup()
 	var object_menu: PopupMenu = app.top_bar._menus[1].get_popup()
-	check(file_menu.item_count == 5 and file_menu.get_item_text(1).contains("Open…") and
+	check(file_menu.item_count == 6 and file_menu.get_item_text(1).contains("Open…") and
 		object_menu.item_count == 5 and object_menu.get_item_text(1).contains("Open Source") and
 		object_menu.get_item_text(4).contains("Browse Sources"),
 		"File Open unifies documents and images; Object sources use a separate menu")
