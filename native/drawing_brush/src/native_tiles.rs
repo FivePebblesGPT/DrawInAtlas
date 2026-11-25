@@ -939,6 +939,112 @@ impl TileStore {
         Ok(())
     }
 
+    /// Reconcile a complete mixed source set without overwriting an existing
+    /// native tile or resurrecting a missing history-owned coordinate.
+    fn adopt_mixed_subtree(
+        &mut self,
+        expected: u64,
+        layers: &[String],
+        entries: Vec<(TileId, Vec<u8>, bool)>,
+        restore: bool,
+        discard_redo: bool,
+    ) -> Result<(), &'static str> {
+        if self.active.is_some() || self.revision != expected || expected >= i64::MAX as u64 {
+            return Err("Active edit, stale or overflowing mixed subtree revision");
+        }
+        let names: HashSet<&str> = layers.iter().map(String::as_str).collect();
+        let len = self.stride_bytes()?;
+        if layers.is_empty()
+            || layers.len() > MAX_ACTIVE_TILES
+            || names.len() != layers.len()
+            || names.contains("")
+            || entries.is_empty()
+            || entries.len() > MAX_STRUCTURAL_TILES
+            || self
+                .bytes_used()
+                .saturating_add(entries.len().saturating_mul(len))
+                > MAX_STORED_BYTES
+            || (!restore
+                && self.parked_layers.len().saturating_add(layers.len()) > MAX_ACTIVE_TILES)
+        {
+            return Err("Mixed subtree identity or memory budget rejected");
+        }
+        let referenced: HashSet<&str> = self
+            .authorized
+            .iter()
+            .chain(self.tiles.keys())
+            .map(|id| id.layer.as_str())
+            .chain(
+                self.undo
+                    .iter()
+                    .chain(self.redo.iter())
+                    .map(|entry| entry.layer.as_str()),
+            )
+            .collect();
+        for layer in layers {
+            let parked = self.parked_layers.contains(layer);
+            if (!restore && parked) || (restore && referenced.contains(layer.as_str()) && !parked) {
+                return Err("Wrong mixed subtree parked lifecycle");
+            }
+        }
+        let mut seen = HashSet::with_capacity(entries.len());
+        let mut prepared = Vec::new();
+        for (id, rgba, owned) in entries {
+            if !names.contains(id.layer.as_str())
+                || id.x.unsigned_abs() > SAFE_COORD as u64
+                || id.y.unsigned_abs() > SAFE_COORD as u64
+                || rgba.len() != len
+                || !seen.insert(id.clone())
+                || self.authorized.contains(&id) != owned
+            {
+                return Err("Invalid or repeated mixed subtree descriptor");
+            }
+            if owned {
+                if !self.tiles.get(&id).is_some_and(|tile| tile.rgba == rgba) {
+                    return Err("Mixed subtree native source differs");
+                }
+            } else {
+                if self.tiles.contains_key(&id)
+                    || self.undo.iter().chain(self.redo.iter()).any(|entry| {
+                        entry.before.contains_key(&id) || entry.after.contains_key(&id)
+                    })
+                {
+                    return Err("Mixed subtree source has surviving native ownership or history");
+                }
+                prepared.push((
+                    id,
+                    Tile {
+                        rgba,
+                        generation: 0,
+                    },
+                ));
+            }
+        }
+        if self
+            .authorized
+            .iter()
+            .chain(self.tiles.keys())
+            .any(|id| names.contains(id.layer.as_str()) && !seen.contains(id))
+        {
+            return Err("Mixed subtree omitted a native source");
+        }
+        // Everything has been validated; retain existing tiles and generations.
+        self.advance_metadata(expected, discard_redo)?;
+        for (id, tile) in prepared {
+            self.bytes_imported += tile.rgba.len() as u64;
+            self.authorized.insert(id.clone());
+            self.tiles.insert(id, tile);
+        }
+        for layer in layers {
+            if restore {
+                self.parked_layers.remove(layer);
+            } else {
+                self.parked_layers.insert(layer.clone());
+            }
+        }
+        Ok(())
+    }
+
     /// An unrecorded structural removal has no future tree Undo to restore its
     /// pixels. Retire only the specified layer IDs, including their native
     /// source authorization and tile history; unrelated layer tokens survive.
@@ -1632,6 +1738,70 @@ impl DrawingNativeTiles {
         park: bool,
     ) -> bool {
         self.publish_subtree_descriptors(expected, layers, tiles, false, park)
+    }
+
+    /// Adopt missing mixed subtree coordinates and park/unpark the entire
+    /// checked source set. Existing ownership is never overwritten.
+    #[func]
+    fn adopt_mixed_subtree_revision(
+        &mut self,
+        expected: i64,
+        layers: PackedStringArray,
+        tiles: Array<Dictionary<Variant, Variant>>,
+        restore: bool,
+        discard_redo: bool,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        let Ok(len) = self.store.stride_bytes() else {
+            return false;
+        };
+        if expected < 0
+            || layers.is_empty()
+            || layers.len() > MAX_ACTIVE_TILES
+            || tiles.is_empty()
+            || tiles.len() > MAX_STRUCTURAL_TILES
+            || self
+                .store
+                .bytes_used()
+                .saturating_add(tiles.len().saturating_mul(len))
+                > MAX_STORED_BYTES
+        {
+            return false;
+        }
+        let ids: Vec<String> = layers.as_slice().iter().map(|id| id.to_string()).collect();
+        let mut descriptors = Vec::with_capacity(tiles.len());
+        for entry in tiles.iter_shared() {
+            let (Some(layer), Some(x), Some(y), Some(rgba), Some(owned)) = (
+                entry.get("layer").and_then(|v| v.try_to::<GString>().ok()),
+                entry.get("tile_x").and_then(|v| v.try_to::<i64>().ok()),
+                entry.get("tile_y").and_then(|v| v.try_to::<i64>().ok()),
+                entry
+                    .get("bytes")
+                    .and_then(|v| v.try_to::<PackedByteArray>().ok()),
+                entry.get("owned").and_then(|v| v.try_to::<bool>().ok()),
+            ) else {
+                return false;
+            };
+            if rgba.len() != len {
+                return false;
+            }
+            descriptors.push((
+                TileId {
+                    layer: layer.to_string(),
+                    x,
+                    y,
+                },
+                rgba,
+                owned,
+            ));
+        }
+        let entries = descriptors
+            .into_iter()
+            .map(|(id, bytes, owned)| (id, bytes.as_slice().to_vec(), owned))
+            .collect();
+        self.store
+            .adopt_mixed_subtree(expected as u64, &ids, entries, restore, discard_redo)
+            .is_ok()
     }
 
     fn publish_subtree_descriptors(
@@ -3831,6 +4001,98 @@ mod tests {
         store.undo_or_redo(false).unwrap();
         assert_eq!(store.revision, 5);
         assert_eq!(store.read(&ink, false).unwrap().rgba, bytes);
+    }
+
+    #[test]
+    fn mixed_subtree_preserves_existing_generation_and_history() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let ink = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let extra = TileId {
+            layer: "ink".into(),
+            x: -2,
+            y: 3,
+        };
+        let second = TileId {
+            layer: "second".into(),
+            x: 4,
+            y: -5,
+        };
+        let blank_id = TileId {
+            layer: "second".into(),
+            x: 1,
+            y: 2,
+        };
+        let bytes = vec![19; 16 * 16 * 4];
+        let zero = vec![0; bytes.len()];
+        let (token, _) = store
+            .adopt_external("ink", 0, vec![(ink.clone(), Vec::new(), bytes.clone())])
+            .unwrap();
+        store.import(blank_id.clone(), 1, &[]).unwrap();
+        let original_generation = store.read(&ink, false).unwrap().generation;
+        let ids = ["ink".into(), "second".into(), "empty".into()];
+        let complete = vec![
+            (ink.clone(), bytes.clone(), true),
+            (extra.clone(), bytes.clone(), false),
+            (second.clone(), bytes.clone(), false),
+            (blank_id.clone(), zero.clone(), true),
+        ];
+        let baseline = (store.revision, store.bytes_used(), store.bytes_imported);
+        for invalid in [
+            vec![(extra.clone(), bytes.clone(), false)],
+            vec![(ink.clone(), bytes.clone(), false)],
+            vec![
+                (ink.clone(), zero.clone(), true),
+                (extra.clone(), bytes.clone(), false),
+                (blank_id.clone(), zero.clone(), true),
+            ],
+            vec![
+                (ink.clone(), bytes.clone(), true),
+                (extra.clone(), bytes.clone(), false),
+                (blank_id.clone(), zero.clone(), true),
+                (second.clone(), vec![1], false),
+            ],
+        ] {
+            assert!(
+                store
+                    .adopt_mixed_subtree(1, &ids, invalid, false, false)
+                    .is_err()
+            );
+            assert_eq!(
+                baseline,
+                (store.revision, store.bytes_used(), store.bytes_imported)
+            );
+            assert!(!store.authorized.contains(&extra));
+            assert!(store.parked_layers.is_empty());
+            assert!(store.history_matches(token, true));
+        }
+        assert!(
+            store
+                .adopt_mixed_subtree(1, &ids, complete.clone(), true, false)
+                .is_err()
+        );
+        store
+            .adopt_mixed_subtree(1, &ids, complete, false, true)
+            .unwrap();
+        assert_eq!(store.revision, 2);
+        assert!(ids.iter().all(|id| store.parked_layers.contains(id)));
+        assert_eq!(
+            store.read(&ink, false).unwrap().generation,
+            original_generation
+        );
+        assert_eq!(store.read(&extra, false).unwrap().rgba, bytes);
+        assert_eq!(store.read(&second, false).unwrap().rgba, bytes);
+        assert_eq!(store.read(&blank_id, false).unwrap().rgba, zero);
+        store.advance_parked_layers(2, &ids, true, false).unwrap();
+        assert!(store.history_matches(token, true));
+        store.undo_or_redo(true).unwrap();
+        assert_eq!(store.read(&ink, false).unwrap().rgba, zero);
+        assert_eq!(store.read(&extra, false).unwrap().rgba, bytes);
+        assert!(store.history_matches(token, false));
     }
 
     #[test]

@@ -770,3 +770,26 @@ fixtures and unsupported synthetic strides retain their existing behavior.
 Mixed already-owned and unowned subtrees within one owner and general host
 history consolidation are not addressed by this additive admission method.
 See [T-319 evidence](evidence/T-319-2026-11-25-subtree-history-source.md).
+
+### Mixed retained raster subtree source admission (T-320)
+
+`adopt_mixed_subtree_revision(expected_revision, layers, tiles, restore, discard_redo)`
+accepts a complete bounded raster source set for the affected IDs. Each
+`layer`, `tile_x`, `tile_y`, `bytes` descriptor adds a required Boolean `owned`.
+An owned coordinate must already be authorized with exactly the supplied
+RGBA8; an unowned coordinate must have no canonical source or retained native
+history image. Every existing native source for the affected IDs must appear,
+including explicitly authorized blank tiles. Existing generations are kept.
+All descriptors are checked before any native state changes. `restore=false`
+parks all affected IDs, requiring that none is already parked; `restore=true`
+restores existing parked references and admits missing coordinates together,
+rejecting an already-live referenced layer. The operation advances exactly
+one revision without creating a pixel token. `discard_redo` is true for new
+recorded removal and false for structural replay. Maximum 128 layer IDs,
+8192 descriptors and a conservative 256 MiB resident-plus-batch peak apply.
+The host checks exact retained hierarchy, live bytes and pending sparse
+descriptors, and retains verified late-source promotion. Older mixed events
+can acquire missing bytes; already fully adopted events continue to fail
+closed on partial ownership loss. Entirely detached recovery remains T-319.
+This is not a new host timeline or a replacement for T-148 integration.
+See [T-320 evidence](evidence/T-320-2026-11-25-mixed-subtree-source.md).

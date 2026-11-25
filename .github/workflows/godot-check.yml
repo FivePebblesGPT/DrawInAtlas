@@ -168,6 +168,9 @@ jobs:
           # T-319: atomic multi-layer ownership on detached structural replay.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t319_subtree_history_source.gd 2>&1 | tee /tmp/godot-t319-subtree-history-source.log
           python3 tools/check_godot_model_log.py /tmp/godot-t319-subtree-history-source.log --marker T319_SUBTREE_HISTORY_SOURCE_PASSED || ci_fail_marker 'T319 detached subtree history rejected'
+          # T-320: admit mixed retained sources without replacing native ownership.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t320_mixed_subtree_source.gd 2>&1 | tee /tmp/godot-t320-mixed-subtree-source.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t320-mixed-subtree-source.log --marker T320_MIXED_SUBTREE_SOURCE_PASSED || ci_fail_marker 'T320 mixed subtree source rejected'
           # T-230: even the first legacy-pixel Undo/Redo in a detached document
           # must bootstrap Rust ownership before advancing the host timeline.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t230_detached_pixel_bootstrap.gd 2>&1 | tee /tmp/godot-t230-pixel-bootstrap.log
