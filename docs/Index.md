@@ -1,5 +1,11 @@
 **2026-11-25 owner review — next Drawing sprint:** [review and ordered queue](DRAWING_UX_REVIEW_2026-11-25.md), T-302–T-312 engineering Done. T-250 is Manual Review pending explicit owner acceptance of the corrected build. T-148–T-152 native consolidation remains open; hosted beta4 CI on PR #23 head `da308376` passed (see review). Do not infer full approval.
 
+**[T-326](Tickets/T-326.md) P0 implementation Done (2026-11-26):**
+[Transferred raster history](evidence/T-326-2026-11-26-transfer-source-history.md)
+retains affected native tokens between document visits, releases departing
+live tiles, restores blank history authorizations and preserves chronological
+Move/Copy, branching and reset. T-148 stays In Progress; T-250 Manual Review.
+
 **[T-325](Tickets/T-325.md) P0 implementation Done (2026-11-26):**
 [External transfer Redo ownership](evidence/T-325-2026-11-26-transfer-redo-ownership.md)
 keeps unrelated native tokens through raster/semantic Move/Copy replay,
@@ -653,6 +659,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | [T-323 · Reclaim abandoned parked text raster sources](Tickets/T-323.md) | Done | P0 T-148 integration: [checked parked glyph lifetime](evidence/T-323-2026-11-26-parked-text-reclamation.md). | [T-318](Tickets/T-318.md), [T-322](Tickets/T-322.md) |
 | [T-324 · Reclaim applied orphaned subtree sources on permanent ancestor removal](Tickets/T-324.md) | Done | P0 T-148 integration: [atomic orphaned source retirement](evidence/T-324-2026-11-26-orphaned-subtree-reclamation.md). | [T-320](Tickets/T-320.md), [T-323](Tickets/T-323.md) |
 | [T-325 · Preserve unrelated native Redo during external subtree transfer replay](Tickets/T-325.md) | Done | P0 T-148 integration: [host transfer replay and branch ownership](evidence/T-325-2026-11-26-transfer-redo-ownership.md). | [T-172](Tickets/T-172.md), [T-314](Tickets/T-314.md), [T-322](Tickets/T-322.md) |
+| [T-326 · Preserve transferred raster layers' own native history between visits](Tickets/T-326.md) | Done | P0 T-148 integration: [native source release/re-admission and host token lifetime](evidence/T-326-2026-11-26-transfer-source-history.md). | [T-325](Tickets/T-325.md) |
 | [T-273 · Align whole right-dock toggle with outer edge](Tickets/T-273.md) | Done | **P0 engineering:** [real X11 screenshots and behavioral input proof](evidence/T-273-2026-11-23-dock-edge.md); T-250 owner review unapproved | [T-251](Tickets/T-251.md) |
 | [T-274 · Compact native ColorPicker width and duplicate chrome](Tickets/T-274.md) | Done | **P0 engineering:** [native full-width picker, optional exact RGBA8, real X11 screenshots and Drawing/Atlas regression](evidence/T-274-2026-11-23-native-picker-composition.md); owner approval remains T-250 | [T-226](Tickets/T-226.md), [T-252](Tickets/T-252.md) |
 | [T-275 · Repair stale workspace CI/owner-gate test contracts](Tickets/T-275.md) | Done | **P1 CI engineering:** [T-063/T-072 canonical status dependencies and 73-check native workspace regression](evidence/T-275-2026-11-23-workspace-ci-gates.md); T-250 approval and other hosted CI gates remain open | [T-063](Tickets/T-063.md), [T-072](Tickets/T-072.md) |

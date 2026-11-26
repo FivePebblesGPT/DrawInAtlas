@@ -277,19 +277,19 @@ func _advance_parked_structure_revision(layers: Array[String], restore: bool,
 	return true
 
 
-## A direct, unrecorded removal has no structural Undo to restore its raster
-## children. Preflight their resident source identity/bytes before Rust drops
-## only those layers; unrelated canonical tiles and tokens remain live.
-## Rejecting retirement leaves both stores untouched and uses the ordinary
-## later checked rebase. This is deliberately not the recorded park path.
+## A direct removal retires the affected native sources and history. A
+## reversible host transfer releases only the sources and preserves tokens;
+## the command's next visit re-admits them. Both check exact source bytes.
 func _retire_unrecorded_raster_layers(layers: Array[String], nodes: Dictionary,
-		discard_redo: bool = true) -> bool:
+		discard_redo: bool = true, reversible_transfer: bool = false) -> bool:
 	if _native_raster_store == null or layers.is_empty() \
 			or not _native_tree_sources_match(nodes, false):
 		return false
 	var previous: int = revision
-	if not bool(_native_raster_store.call("retire_layers_revision",
-			previous, PackedStringArray(layers), discard_redo)):
+	var released: bool = bool(_native_raster_store.call("release_transfer_layers_revision",
+		previous, PackedStringArray(layers))) if reversible_transfer else bool(_native_raster_store.call(
+		"retire_layers_revision", previous, PackedStringArray(layers), discard_redo))
+	if not released:
 		return false
 	for layer_id: String in layers:
 		for identity: String in _native_source_identities.keys():
@@ -475,8 +475,10 @@ func create_layer(kind: String, name: String, parent_id: String = ROOT_ID,
 		return DrawingResult.failure("LAYER_ID", "Layer IDs contain only ASCII letters, digits, _ and -")
 	if new_identifier == ROOT_ID or _nodes.has(new_identifier):
 		return DrawingResult.failure("DUPLICATE_ID", "Layer/group identity already exists")
-	if _native_raster_store != null and bool(_native_raster_store.call("is_layer_parked", new_identifier)):
-		return DrawingResult.failure("LAYER_ID", "Raster ID is reserved by native structural history")
+	if _native_raster_store != null:
+		var retained_keys: PackedStringArray = _native_raster_store.call("transfer_history_source_keys", new_identifier)
+		if bool(_native_raster_store.call("is_layer_parked", new_identifier)) or not retained_keys.is_empty():
+			return DrawingResult.failure("LAYER_ID", "Raster ID is reserved by native structural history")
 	var advanced: DrawingResult = _advance_checked_layer_metadata()
 	if not advanced.ok:
 		return advanced
@@ -724,12 +726,12 @@ func remove_subtree(node_id: String, record_history: bool = false,
 		retired = true
 		retained_history = orphan_plan["history"]
 	elif not parked and not raster_layers.is_empty() and (not record_history or external_history):
-		# External/transfer callers do not create a reversible tree event.
-		# Verify canonical source before permanently retiring these IDs.
+		# Local permanent removal retires IDs. Reversible external transfer
+		# has its own chronological event and retains native paint tokens.
 		_gather_ids(node_id, removed_ids)
 		if _native_raster_store != null:
 			retained_history = _prepare_retired_local_history(removed_ids)
-		retired = _retire_unrecorded_raster_layers(raster_layers, resident_nodes, not preserve_host_redo)
+		retired = _retire_unrecorded_raster_layers(raster_layers, resident_nodes, not preserve_host_redo, preserve_host_redo)
 	# Semantic-only subtree deletion must acquire Rust metadata authority
 	# before erasing even one Godot node. The old post-mutation bridge could
 	# detach a busy/stale native store while leaving the local tree deleted.
@@ -3173,6 +3175,11 @@ func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool 
 		var next_id: String = String(old_id) if preserve_ids else new_id()
 		if _nodes.has(next_id):
 			return DrawingResult.failure("DUPLICATE_ID", "Imported layer ID already exists")
+		if _native_raster_store != null:
+			var retained_keys: PackedStringArray = _native_raster_store.call("transfer_history_source_keys", next_id)
+			if bool(_native_raster_store.call("is_layer_parked", next_id)) or \
+					(not retained_keys.is_empty() and (not preserve_host_redo or nodes[old_id].kind != DrawingLayerNode.RASTER)):
+				return DrawingResult.failure("LAYER_ID", "Imported ID is reserved by native structural history")
 		mapping[String(old_id)] = next_id
 	for old_id: Variant in nodes:
 		var source: DrawingLayerNode = nodes[old_id]
@@ -3256,11 +3263,27 @@ func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool 
 		if store != null:
 			var descriptors: Array[Dictionary] = []
 			for layer: String in imported_rasters:
+				var keys: Dictionary[String, bool] = {}
 				for key: String in prepared[layer].tiles:
+					keys[key] = true
+				if preserve_host_redo:
+					# Retained history may reference blank coordinates omitted
+					# from the detached source snapshot at this visit.
+					var history_keys: PackedStringArray = store.call("transfer_history_source_keys", layer)
+					for key: String in history_keys:
+						keys[key] = true
+				if descriptors.size() + keys.size() > 8192 or \
+						(descriptors.size() + keys.size()) * tile_stride * tile_stride * 4 > MAX_NATIVE_HISTORY_TRANSFER_BYTES:
+					return DrawingResult.failure("NATIVE_STRUCTURE", "Transferred history source budget exceeded")
+				for key: String in keys:
 					var coords: PackedStringArray = key.split(",")
-					descriptors.append({"layer": layer, "tile_x": int(coords[0]), "tile_y": int(coords[1]), "bytes": prepared[layer].tiles[key].to_rgba8()})
-			var published: bool = bool(store.call("publish_subtree_history_source_revision",
-				revision, PackedStringArray(imported_rasters), descriptors, false)) if preserve_host_redo else \
+					var tile: DrawingRasterTile = prepared[layer].tiles.get(key)
+					var bytes: PackedByteArray = tile.to_rgba8() if tile != null else PackedByteArray()
+					if tile == null:
+						bytes.resize(tile_stride * tile_stride * 4)
+					descriptors.append({"layer": layer, "tile_x": int(coords[0]), "tile_y": int(coords[1]), "bytes": bytes})
+			var published: bool = bool(store.call("publish_transfer_subtree_revision",
+				revision, PackedStringArray(imported_rasters), descriptors)) if preserve_host_redo else \
 				bool(store.call("publish_subtree_revision", revision, PackedStringArray(imported_rasters), descriptors))
 			if not published:
 				return DrawingResult.failure("NATIVE_STRUCTURE", "Native raster import was rejected")
@@ -3268,9 +3291,10 @@ func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool 
 				_native_raster_store = store
 				_native_source_identities.clear()
 				_sparse_reloads.clear()
-			for layer: String in imported_rasters:
-				for key: String in prepared[layer].tiles:
-					_remember_native_source(layer, key, prepared[layer].tiles[key])
+			for descriptor: Dictionary in descriptors:
+				var layer: String = descriptor["layer"]
+				var key: String = "%d,%d" % [descriptor["tile_x"], descriptor["tile_y"]]
+				_remember_native_source(layer, key, prepared[layer].tiles.get(key))
 		revision += 1
 	for identifier: String in prepared:
 		var imported: DrawingLayerNode = prepared[identifier]

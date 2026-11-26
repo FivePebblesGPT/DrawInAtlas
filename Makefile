@@ -23,7 +23,7 @@ TY_VERSION = $(shell "$(PYTHON)" tools/toolchain.py pin ty)
 PYTHON_CHECKS = tools/toolchain.py tools/prepare_native_project.py tools/check_offline_toolchain.py tools/run_t185_profile.py tools/package_linux_export.py tests/test_t201_linux_native_package.py tests/test_t185_profile.py tests/test_t198_matched_callbacks.py tests/test_t199_canvas_draw_cadence.py tests/test_t217_pck_index.py tests/test_t218_pck_payload_integrity.py tests/test_t219_pck_resource_names.py tests/test_t220_pck_project_identity.py tests/t217_pck_fixture.py
 
 .PHONY: help doctor native stage-drawing import-drawing import-atlas drawing atlas build \
-        test test-graphical test-bucket test-shapes test-selection-menu test-raster-export test-srgb test-text-options test-object-drop test-window-panels test-panel-icons test-binary-drawing verify-binary-drawing test-native-text-source verify-native-text-source test-native-subtree-source verify-native-subtree-source test-native-file-sources verify-native-file-sources test-native-sparse-sources verify-native-sparse-sources test-native-sparse-eviction verify-native-sparse-eviction test-native-text-history-source verify-native-text-history-source test-native-subtree-history-source verify-native-subtree-history-source test-native-mixed-subtree-source verify-native-mixed-subtree-source test-raster-creation-history verify-raster-creation-history test-history-reclamation verify-history-reclamation test-parked-text-reclamation verify-parked-text-reclamation test-orphaned-subtree-reclamation verify-orphaned-subtree-reclamation test-transfer-redo-ownership verify-transfer-redo-ownership test-dock-toggle test-dock-flyout test-floating-tabs test-floating-context test-floating-cancel test-floating-focus test-floating-release test-dock-release test-document-tabs test-color-interruption test-live-stroke test-viewport-cache test-selection-native test-large-move test-layer-hierarchy verify-layer-disclosure test-floating-dock test-object-sources check lint format clean bundle bundle-check bundle-verify python-test
+        test test-graphical test-bucket test-shapes test-selection-menu test-raster-export test-srgb test-text-options test-object-drop test-window-panels test-panel-icons test-binary-drawing verify-binary-drawing test-native-text-source verify-native-text-source test-native-subtree-source verify-native-subtree-source test-native-file-sources verify-native-file-sources test-native-sparse-sources verify-native-sparse-sources test-native-sparse-eviction verify-native-sparse-eviction test-native-text-history-source verify-native-text-history-source test-native-subtree-history-source verify-native-subtree-history-source test-native-mixed-subtree-source verify-native-mixed-subtree-source test-raster-creation-history verify-raster-creation-history test-history-reclamation verify-history-reclamation test-parked-text-reclamation verify-parked-text-reclamation test-orphaned-subtree-reclamation verify-orphaned-subtree-reclamation test-transfer-redo-ownership verify-transfer-redo-ownership test-transfer-source-history verify-transfer-source-history test-dock-toggle test-dock-flyout test-floating-tabs test-floating-context test-floating-cancel test-floating-focus test-floating-release test-dock-release test-document-tabs test-color-interruption test-live-stroke test-viewport-cache test-selection-native test-large-move test-layer-hierarchy verify-layer-disclosure test-floating-dock test-object-sources check lint format clean bundle bundle-check bundle-verify python-test
 
 help:
 	@printf '%s\n' 'make drawing [GODOT=/path] [TOOLCHAIN=system|bundle] [BUNDLE=/path/to.tar.zst]' \
@@ -71,6 +71,7 @@ test: build
 	@$(MAKE) verify-parked-text-reclamation
 	@$(MAKE) verify-orphaned-subtree-reclamation
 	@$(MAKE) verify-transfer-redo-ownership
+	@$(MAKE) verify-transfer-source-history
 	@$(WITH_TOOL) bash tools/build_native_brush.sh --test
 	@$(WITH_TOOL) godot --headless --path drawing --script res://tests/native_brush_integration.gd
 	@$(WITH_TOOL) godot --headless --path drawing --script res://tests/t148_native_tiles_contract.gd
@@ -442,6 +443,17 @@ verify-transfer-redo-ownership:
 	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path . \
 	    --script res://tests/t325_transfer_redo_ownership.gd 2>&1 | tee "$$log"; \
 	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T325_TRANSFER_REDO_OWNERSHIP_PASSED
+
+# T-326: retain the transferred raster's own native history between visits.
+test-transfer-source-history: import-drawing import-atlas
+	@$(MAKE) verify-transfer-source-history
+	@$(WITH_TOOL) bash tools/build_native_brush.sh --test
+
+verify-transfer-source-history:
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path . \
+	    --script res://tests/t326_transfer_source_history.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T326_TRANSFER_SOURCE_HISTORY_PASSED
 
 # T-262: reproducible T-085 held-preview native CI witness after both imports.
 # Retain complete process logs during validation, then remove temporary files.

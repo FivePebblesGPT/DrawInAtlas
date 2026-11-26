@@ -897,3 +897,31 @@ command tokens (T-322). Direct local structural edits retain the ordinary
 branching policy. Retirement still drops tokens for the named layer(s);
 affected transfer replay uses detached source snapshots. No ABI addition or
 cross-document transaction guarantee. See [T-325 evidence](evidence/T-325-2026-11-26-transfer-redo-ownership.md).
+
+
+### T-326: transferred-layer native history between visits
+
+`release_transfer_layers_revision(expected_revision, layer_ids)` validates
+current revision, quiescence, 1–128 distinct nonempty IDs and no parked IDs,
+then releases their resident raster tiles, authorizations and editability,
+advancing one revision without removing native Undo/Redo tokens.
+`transfer_history_source_keys(layer_id)` returns retained token coordinates
+as canonical signed `x,y` strings (up to 8192 plus one overflow sentinel).
+`publish_transfer_subtree_revision(expected_revision, layer_ids, tiles)`
+accepts the usual complete `{layer, tile_x, tile_y, bytes}` descriptors,
+including explicit zero RGBA8 for absent snapshot coordinates referenced by
+retained tokens. It permits history-referenced absent IDs, but rejects live
+or parked sources, missing required history coordinates, malformed or
+repeated descriptors, stale/busy owners and admission over the native
+memory/descriptor limits. Publication neither consumes nor creates a raster
+history token. The ordinary subtree APIs retain their stricter unreferenced
+ID rules. Native history probes and replay refuse absent canonical sources.
+
+Drawing's existing opt-in host structural policy now uses these operations
+instead of irreversible native retirement and unreferenced history-source
+publication for reversible transfers. The host supplies the detached source
+snapshot at its chronological boundary and owns command reclamation (T-322).
+Normal creation/import may not reuse a history-reserved ID. Repeated moves
+back into a previously visited owner are supported; no live source is parked
+solely to retain a transferred token. Cross-document coordination and source
+snapshots are still host-owned. See [T-326 evidence](evidence/T-326-2026-11-26-transfer-source-history.md).

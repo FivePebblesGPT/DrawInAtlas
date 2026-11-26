@@ -601,6 +601,9 @@ jobs:
         shell: bash
         run: |
           source tools/ci_fail_late.sh
+          # T-326: moved/copied layer's own native history survives transfer replay.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t326_transfer_source_history.gd 2>&1 | tee /tmp/godot-t326-transfer-source-history.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t326-transfer-source-history.log --marker T326_TRANSFER_SOURCE_HISTORY_PASSED || ci_fail_marker 'T326 transfer source history rejected'
           # T-325: structural host replay preserves unrelated raster Redo.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t325_transfer_redo_ownership.gd 2>&1 | tee /tmp/godot-t325-transfer-redo-ownership.log
           python3 tools/check_godot_model_log.py /tmp/godot-t325-transfer-redo-ownership.log --marker T325_TRANSFER_REDO_OWNERSHIP_PASSED || ci_fail_marker 'T325 transfer Redo ownership rejected'

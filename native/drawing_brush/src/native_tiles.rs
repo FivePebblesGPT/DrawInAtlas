@@ -983,7 +983,33 @@ impl TileStore {
         layers: &[String],
         count: usize,
     ) -> Result<(), &'static str> {
-        self.can_advance_unreferenced_layers(expected, layers)?;
+        self.can_publish_subtree_sources(expected, layers, count, false)
+    }
+
+    fn can_publish_subtree_sources(
+        &self,
+        expected: u64,
+        layers: &[String],
+        count: usize,
+        transfer: bool,
+    ) -> Result<(), &'static str> {
+        if transfer {
+            self.can_retire_layers(expected, layers)?;
+            let names: HashSet<&str> = layers.iter().map(String::as_str).collect();
+            if self
+                .tiles
+                .keys()
+                .any(|id| names.contains(id.layer.as_str()))
+                || self
+                    .authorized
+                    .iter()
+                    .any(|id| names.contains(id.layer.as_str()))
+            {
+                return Err("Transfer destination already owns raster sources");
+            }
+        } else {
+            self.can_advance_unreferenced_layers(expected, layers)?;
+        }
         if count > MAX_STRUCTURAL_TILES
             || self.bytes_used().saturating_add(
                 self.stride_bytes()?
@@ -1016,7 +1042,23 @@ impl TileStore {
         discard_redo: bool,
         park: bool,
     ) -> Result<(), &'static str> {
-        self.can_publish_subtree(expected, layers, entries.len())?;
+        self.publish_subtree_sources(expected, layers, entries, discard_redo, park, false)
+    }
+
+    fn publish_subtree_sources(
+        &mut self,
+        expected: u64,
+        layers: &[String],
+        entries: Vec<(TileId, Vec<u8>)>,
+        discard_redo: bool,
+        park: bool,
+        transfer: bool,
+    ) -> Result<(), &'static str> {
+        if transfer {
+            self.can_publish_subtree_sources(expected, layers, entries.len(), true)?;
+        } else {
+            self.can_publish_subtree(expected, layers, entries.len())?;
+        }
         if park
             && (entries.is_empty()
                 || self.parked_layers.len().saturating_add(layers.len()) > MAX_ACTIVE_TILES)
@@ -1042,6 +1084,20 @@ impl TileStore {
                     generation: 0,
                 },
             );
+        }
+        // Every retained token needs an authorized coordinate, including
+        // blank tiles omitted from the portable subtree snapshot.
+        if transfer
+            && self.undo.iter().chain(self.redo.iter()).any(|event| {
+                names.contains(event.layer.as_str())
+                    && event
+                        .before
+                        .keys()
+                        .chain(event.after.keys())
+                        .any(|id| !prepared.contains_key(id))
+            })
+        {
+            return Err("Transfer omits a retained history source");
         }
         self.advance_metadata(expected, discard_redo)?;
         for (id, tile) in prepared {
@@ -1243,8 +1299,21 @@ impl TileStore {
         Ok(())
     }
 
-    fn retire_checked_layers(&mut self, expected: u64, layers: &[String], discard_redo: bool) {
+    // Release live sources without deleting the command owner's native tokens.
+    // A later visit explicitly re-admits the complete source set.
+    fn release_transfer_layers(
+        &mut self,
+        expected: u64,
+        layers: &[String],
+    ) -> Result<(), &'static str> {
+        self.can_retire_layers(expected, layers)?;
         let ids: HashSet<&str> = layers.iter().map(String::as_str).collect();
+        self.release_layer_sources(&ids);
+        self.revision = expected + 1;
+        Ok(())
+    }
+
+    fn release_layer_sources(&mut self, ids: &HashSet<&str>) {
         self.parked_layers.retain(|id| !ids.contains(id.as_str()));
         self.tiles
             .retain(|tile, _| !ids.contains(tile.layer.as_str()));
@@ -1252,6 +1321,11 @@ impl TileStore {
             .retain(|tile| !ids.contains(tile.layer.as_str()));
         self.editable_layers
             .retain(|id, _| !ids.contains(id.as_str()));
+    }
+
+    fn retire_checked_layers(&mut self, expected: u64, layers: &[String], discard_redo: bool) {
+        let ids: HashSet<&str> = layers.iter().map(String::as_str).collect();
+        self.release_layer_sources(&ids);
         self.undo.retain(|event| {
             !ids.contains(event.layer.as_str())
                 && !event
@@ -1504,9 +1578,14 @@ impl TileStore {
             return false;
         }
         let stack = if undo { &self.undo } else { &self.redo };
-        stack
-            .last()
-            .is_some_and(|event| event.token == token && !self.parked_layers.contains(&event.layer))
+        stack.last().is_some_and(|event| {
+            event.token == token
+                && !self.parked_layers.contains(&event.layer)
+                && event
+                    .before
+                    .keys()
+                    .all(|id| self.authorized.contains(id) && self.tiles.contains_key(id))
+        })
     }
 
     /// Validate the detached document history payload against the live Rust
@@ -1589,6 +1668,13 @@ impl TileStore {
                 .unwrap_or(false)
         {
             return Err("History layer is locked/hidden");
+        }
+        if entry
+            .before
+            .keys()
+            .any(|id| !self.authorized.contains(id) || !self.tiles.contains_key(id))
+        {
+            return Err("History layer source is absent");
         }
         let entry = from.pop().expect("checked above");
         let (replacements, count) = if undo {
@@ -1853,6 +1939,23 @@ impl DrawingNativeTiles {
             .is_ok()
     }
 
+    /// Reversible host transfer: release live sources, retain all tokens.
+    #[func]
+    fn release_transfer_layers_revision(
+        &mut self,
+        expected: i64,
+        layers: PackedStringArray,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        if expected < 0 || layers.is_empty() || layers.len() > MAX_ACTIVE_TILES {
+            return false;
+        }
+        let ids: Vec<String> = layers.as_slice().iter().map(|id| id.to_string()).collect();
+        self.store
+            .release_transfer_layers(expected as u64, &ids)
+            .is_ok()
+    }
+
     /// Permanently retire live layers and explicitly orphaned parked sources.
     #[func]
     fn retire_orphaned_layers_revision(
@@ -1994,7 +2097,7 @@ impl DrawingNativeTiles {
         layers: PackedStringArray,
         tiles: Array<Dictionary<Variant, Variant>>,
     ) -> bool {
-        self.publish_subtree_descriptors(expected, layers, tiles, true, false)
+        self.publish_subtree_descriptors(expected, layers, tiles, true, false, false)
     }
 
     /// Restore a previously unreferenced text raster without creating a new
@@ -2009,7 +2112,7 @@ impl DrawingNativeTiles {
     ) -> bool {
         let mut layers = PackedStringArray::new();
         layers.push(&layer);
-        self.publish_subtree_descriptors(expected, layers, tiles, false, park)
+        self.publish_subtree_descriptors(expected, layers, tiles, false, park, false)
     }
 
     /// Reacquire a detached raster subtree during structural Undo/Redo.
@@ -2023,7 +2126,44 @@ impl DrawingNativeTiles {
         tiles: Array<Dictionary<Variant, Variant>>,
         park: bool,
     ) -> bool {
-        self.publish_subtree_descriptors(expected, layers, tiles, false, park)
+        self.publish_subtree_descriptors(expected, layers, tiles, false, park, false)
+    }
+
+    /// Source coordinates referenced by retained native tokens. The extra
+    /// entry beyond the structural limit signals an oversized transfer.
+    #[func]
+    fn transfer_history_source_keys(&self, layer: GString) -> PackedStringArray {
+        let layer = layer.to_string();
+        let mut keys = HashSet::new();
+        for event in self.store.undo.iter().chain(self.store.redo.iter()) {
+            if event.layer == layer {
+                for id in event.before.keys().chain(event.after.keys()) {
+                    keys.insert((id.x, id.y));
+                    if keys.len() > MAX_STRUCTURAL_TILES {
+                        break;
+                    }
+                }
+            }
+            if keys.len() > MAX_STRUCTURAL_TILES {
+                break;
+            }
+        }
+        let mut result = PackedStringArray::new();
+        for (x, y) in keys {
+            result.push(&GString::from(&format!("{x},{y}")));
+        }
+        result
+    }
+
+    /// Re-admit a transferred subtree without replacing or replaying its tokens.
+    #[func]
+    fn publish_transfer_subtree_revision(
+        &mut self,
+        expected: i64,
+        layers: PackedStringArray,
+        tiles: Array<Dictionary<Variant, Variant>>,
+    ) -> bool {
+        self.publish_subtree_descriptors(expected, layers, tiles, false, false, true)
     }
 
     /// Adopt missing mixed subtree coordinates and park/unpark the entire
@@ -2097,6 +2237,7 @@ impl DrawingNativeTiles {
         tiles: Array<Dictionary<Variant, Variant>>,
         discard_redo: bool,
         park: bool,
+        transfer: bool,
     ) -> bool {
         self.store.ffi_calls += 1;
         if expected < 0 || layers.is_empty() || layers.len() > MAX_ACTIVE_TILES {
@@ -2111,7 +2252,7 @@ impl DrawingNativeTiles {
         let ids: Vec<String> = layers.as_slice().iter().map(|id| id.to_string()).collect();
         if self
             .store
-            .can_publish_subtree(expected as u64, &ids, tiles.len())
+            .can_publish_subtree_sources(expected as u64, &ids, tiles.len(), transfer)
             .is_err()
         {
             return false;
@@ -2151,7 +2292,11 @@ impl DrawingNativeTiles {
             .into_iter()
             .map(|(id, bytes)| (id, bytes.as_slice().to_vec()))
             .collect();
-        if discard_redo && !park {
+        if transfer {
+            self.store
+                .publish_subtree_sources(expected as u64, &ids, entries, false, false, true)
+                .is_ok()
+        } else if discard_redo && !park {
             self.store
                 .publish_subtree(expected as u64, &ids, entries)
                 .is_ok()
@@ -4185,6 +4330,133 @@ mod tests {
                 .can_publish_structural_source("large", 4, MAX_STRUCTURAL_TILES + 1)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn transferred_sources_release_and_readmit_retained_history() {
+        let mut store = initialized(16);
+        blank(&mut store, -1, 0);
+        let key = TileId {
+            layer: "ink".into(),
+            x: -1,
+            y: 0,
+        };
+        let ids = ["ink".into()];
+        let mut bytes = vec![0; 16 * 16 * 4];
+        bytes[..4].copy_from_slice(&[23, 34, 56, 0]);
+        let (token, _) = store
+            .adopt_external("ink", 0, vec![(key.clone(), vec![], bytes.clone())])
+            .unwrap();
+        let before = store.bytes_used();
+        assert!(store.release_transfer_layers(0, &ids).is_err());
+        let active = store.begin("ink", 1, false).unwrap();
+        assert!(store.release_transfer_layers(1, &ids).is_err());
+        assert!(store.transaction_matches(active, 1, "ink"));
+        store.active = None;
+        store.release_transfer_layers(1, &ids).unwrap();
+        assert_eq!(store.revision, 2);
+        assert!(store.retains_history_token(token));
+        assert!(!store.history_matches(token, true));
+        assert!(!store.authorized.contains(&key));
+        assert!(store.read(&key, false).is_none());
+        assert_eq!(store.bytes_used(), before - bytes.len());
+        store.editable_layers.insert("ink".into(), true);
+        assert!(store.undo_or_redo(true).is_err());
+        assert!(
+            store
+                .publish_subtree(2, &ids, vec![(key.clone(), bytes.clone())])
+                .is_err()
+        );
+        let remaining = store.bytes_used();
+        assert!(
+            store
+                .publish_subtree_sources(2, &ids, vec![], false, false, true)
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_subtree_sources(2, &ids, vec![(key.clone(), vec![0])], false, false, true)
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_subtree_sources(
+                    2,
+                    &ids,
+                    vec![(key.clone(), bytes.clone()), (key.clone(), bytes.clone())],
+                    false,
+                    false,
+                    true
+                )
+                .is_err()
+        );
+        assert_eq!((store.revision, store.bytes_used()), (2, remaining));
+        assert!(store.retains_history_token(token));
+        store
+            .publish_subtree_sources(
+                2,
+                &ids,
+                vec![(key.clone(), bytes.clone())],
+                false,
+                false,
+                true,
+            )
+            .unwrap();
+        assert!(store.history_matches(token, true));
+        assert!(
+            store
+                .publish_subtree_sources(
+                    3,
+                    &ids,
+                    vec![(key.clone(), bytes.clone())],
+                    false,
+                    false,
+                    true
+                )
+                .is_err()
+        );
+        store.undo_or_redo(true).unwrap();
+        assert!(
+            store
+                .read(&key, false)
+                .unwrap()
+                .rgba
+                .iter()
+                .all(|byte| *byte == 0)
+        );
+        store.release_transfer_layers(4, &ids).unwrap();
+        assert!(!store.history_matches(token, false));
+        assert!(store.retains_history_token(token));
+        store
+            .publish_subtree_sources(
+                5,
+                &ids,
+                vec![(key.clone(), vec![0; bytes.len()])],
+                false,
+                false,
+                true,
+            )
+            .unwrap();
+        store.editable_layers.insert("ink".into(), true);
+        assert!(store.history_matches(token, false));
+        store.undo_or_redo(false).unwrap();
+        assert_eq!(store.read(&key, false).unwrap().rgba, bytes);
+        assert_eq!(store.revision, 7);
+        store.advance_parked_layers(7, &ids, false, false).unwrap();
+        assert!(store.release_transfer_layers(8, &ids).is_err());
+        assert!(
+            store
+                .publish_subtree_sources(
+                    8,
+                    &ids,
+                    vec![(key.clone(), bytes.clone())],
+                    false,
+                    false,
+                    true
+                )
+                .is_err()
+        );
+        assert!(store.retains_history_token(token));
     }
 
     #[test]
