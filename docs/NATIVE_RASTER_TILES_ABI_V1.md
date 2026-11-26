@@ -925,3 +925,24 @@ Normal creation/import may not reuse a history-reserved ID. Repeated moves
 back into a previously visited owner are supported; no live source is parked
 solely to retain a transferred token. Cross-document coordination and source
 snapshots are still host-owned. See [T-326 evidence](evidence/T-326-2026-11-26-transfer-source-history.md).
+
+
+### T-327: checked host structural transfer publication
+
+No new Rust ABI method. The host captures source and destination revisions
+before lazy export (and checks destination source epoch afterward). Before
+publishing the opposite document, it checks the outgoing materialized
+hierarchy, complete tile set, exact RGBA8, native authority and revision
+headroom without calling providers. A changed or unresolved source refuses
+the transfer; reconstruct the command after resolving it. Copy's first
+import optionally captures its remapped detached tree before native
+publication, and Move uses its one logical snapshot with the expected root
+parent adjusted per document. Ordered restoration inserts into the original
+sibling position as part of the single checked import revision, rather than
+a subsequent metadata revision. Copy Undo may remove a protected imported
+root only via the host path with exact retained-source and editable-parent
+checks; ordinary removal rules are unchanged. All T-326 token lifetime and
+admission bounds still apply. This is synchronous host coordination, not a
+single transaction spanning independent native stores; the defensive
+compensation branch remains for unexpected divergence. See
+[T-327 evidence](evidence/T-327-2026-11-26-transfer-publication-boundary.md).

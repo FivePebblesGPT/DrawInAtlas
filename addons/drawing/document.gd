@@ -7,6 +7,7 @@ const TILES: Script = preload("res://addons/drawing/signed_tiles.gd")
 const ROOT_ID: String = "root"
 const LINK_KIND: String = "drawing-linked-object-v1"
 const MAX_LINKS: int = 64
+const MAX_STRUCTURAL_REVISION: int = 9223372036854775807
 ## Explicit browser authorization supplies detached *published* sources only.
 ## Never serialized, never inferred from a path in a Drawing file.
 var linked_sources: Dictionary = {}
@@ -177,6 +178,8 @@ func _advance_nonraster_revision(discard_redo: bool = true) -> void:
 ## failure must never detach canonical Rust source. No callbacks occur
 ## between the checked native step and the deterministic live-state write.
 func _advance_checked_layer_metadata(discard_redo: bool = true) -> DrawingResult:
+	if revision < 0 or revision >= MAX_STRUCTURAL_REVISION:
+		return DrawingResult.failure("STALE_REVISION", "Metadata revision cannot advance")
 	if _native_raster_store != null:
 		if not _attached_native_revision_matches(revision):
 			return DrawingResult.failure("STALE_REVISION", "Native metadata revision diverged")
@@ -548,7 +551,9 @@ func _editable(node_id: String) -> bool:
 
 ## External structural commands are part of the existing host timeline.
 ## Their caller owns branch disposal; local commands keep the default policy.
-func _preflight_host_structure() -> DrawingResult:
+func _preflight_host_structure(needs_revision: bool = true) -> DrawingResult:
+	if revision < 0 or (needs_revision and revision >= MAX_STRUCTURAL_REVISION):
+		return DrawingResult.failure("STALE_REVISION", "Host structural revision cannot advance")
 	if not external_history:
 		return DrawingResult.failure("HISTORY_OWNED", "Only an external command owner may preserve host Redo")
 	if has_unpublished_edit():
@@ -603,7 +608,18 @@ func can_remove_subtree(node_id: String) -> bool:
 ## raster ownership can be retired. No lazy provider is called by this gate.
 ## Keep this paired with remove_subtree's unrecorded retirement checks.
 func preflight_unrecorded_subtree_removal(node_id: String) -> DrawingResult:
-	if not can_remove_subtree(node_id):
+	return _preflight_unrecorded_subtree_removal(node_id, false)
+
+
+func _can_remove_transfer_root(node_id: String, allow_protected_root: bool) -> bool:
+	return can_remove_subtree(node_id) or (allow_protected_root and node_id != ROOT_ID and
+		_nodes.has(node_id) and _nodes.has(_nodes[node_id].parent_id) and _editable(_nodes[node_id].parent_id))
+
+
+func _preflight_unrecorded_subtree_removal(node_id: String, allow_protected_root: bool) -> DrawingResult:
+	if revision < 0 or revision >= MAX_STRUCTURAL_REVISION:
+		return DrawingResult.failure("STALE_REVISION", "Subtree removal revision cannot advance")
+	if not _can_remove_transfer_root(node_id, allow_protected_root):
 		return DrawingResult.failure("LAYER", "Missing, root or inaccessible layer")
 	if has_unpublished_edit():
 		return DrawingResult.failure("NATIVE_STRUCTURE", "Unpublished edit prevents subtree transfer")
@@ -628,11 +644,25 @@ func preflight_unrecorded_subtree_removal(node_id: String) -> DrawingResult:
 
 func remove_subtree(node_id: String, record_history: bool = false,
 		preserve_host_redo: bool = false) -> DrawingResult:
+	return _remove_subtree(node_id, record_history, preserve_host_redo, false)
+
+
+## Undo of a Copy may remove a locked/hidden imported root, but only the
+## exact subtree that the external command published, in an editable parent.
+func remove_host_copied_subtree(snapshot: Dictionary) -> DrawingResult:
+	var checked: DrawingResult = preflight_host_transfer_source(snapshot, true, true)
+	if not checked.ok:
+		return checked
+	return _remove_subtree(String(snapshot["root"]), false, true, true)
+
+
+func _remove_subtree(node_id: String, record_history: bool, preserve_host_redo: bool,
+		allow_protected_root: bool) -> DrawingResult:
 	if preserve_host_redo:
 		var owner: DrawingResult = _preflight_host_structure()
 		if not owner.ok:
 			return owner
-	if not can_remove_subtree(node_id):
+	if not _can_remove_transfer_root(node_id, allow_protected_root):
 		return DrawingResult.failure("LAYER", "Missing, root or inaccessible layer")
 	# The local editor cannot delete locked/hidden descendants indirectly via
 	# an editable ancestor. Legacy API callers keep their historical semantics.
@@ -3150,8 +3180,61 @@ func _validate_snapshot_tree(node_id: String, nodes: Dictionary,
 	return true
 
 
+## Host publication consumes a detached snapshot, not a newly fetched source.
+## Check the actual outgoing tree (including untracked lazy descriptors) before
+## the other document changes. This never calls a source provider.
+func preflight_host_transfer_source(snapshot: Dictionary, removing: bool,
+		allow_protected_root: bool = false, root_parent_override: String = "") -> DrawingResult:
+	var owner: DrawingResult = _preflight_host_structure(removing)
+	if not owner.ok:
+		return owner
+	var root: Variant = snapshot.get("root")
+	var nodes: Variant = snapshot.get("nodes")
+	if not root is String or root == ROOT_ID or not nodes is Dictionary or not _nodes.has(root):
+		return DrawingResult.failure("SNAPSHOT", "Missing transfer source")
+	var visited: Dictionary[String, bool] = {}
+	if not _validate_snapshot_tree(root, nodes, visited) or visited.size() != nodes.size():
+		return DrawingResult.failure("SNAPSHOT", "Invalid transfer source tree")
+	var ids: Array[String] = []
+	_gather_ids(root, ids)
+	if ids.size() != nodes.size():
+		return DrawingResult.failure("STALE_SOURCE", "Transfer source hierarchy changed")
+	for identifier: String in ids:
+		var live: DrawingLayerNode = _nodes[identifier]
+		var expected: DrawingLayerNode = nodes.get(identifier) as DrawingLayerNode
+		if expected == null:
+			return DrawingResult.failure("STALE_SOURCE", "Transfer source layer missing")
+		var expected_parent: String = root_parent_override if identifier == root and not root_parent_override.is_empty() else expected.parent_id
+		if live.parent_id != expected_parent or live.kind != expected.kind or \
+				live.name != expected.name or live.visible != expected.visible or live.locked != expected.locked or \
+				live.children != expected.children or live.objects != expected.objects or \
+				live.text_value != expected.text_value or \
+				(live.text_element.to_record() if live.text_element != null else null) != \
+				(expected.text_element.to_record() if expected.text_element != null else null):
+			return DrawingResult.failure("STALE_SOURCE", "Transfer source metadata changed")
+		if tile_keys(identifier).size() != expected.tiles.size() or live.tiles.size() != expected.tiles.size():
+			return DrawingResult.failure("STALE_SOURCE", "Transfer source tile set changed or is unresolved")
+		for key: String in expected.tiles:
+			var tile: DrawingRasterTile = live.tiles.get(key)
+			var retained: DrawingRasterTile = expected.tiles[key]
+			if tile == null or retained == null or tile.stride != retained.stride or \
+					not tile.has_canonical_storage() or not retained.has_canonical_storage() or \
+					tile.to_rgba8() != retained.to_rgba8():
+				return DrawingResult.failure("STALE_SOURCE", "Transfer source raster changed")
+	if removing:
+		return _preflight_unrecorded_subtree_removal(root, allow_protected_root)
+	return _preflight_native_subtree_export(ids)
+
+
+## An external transfer may restore its original sibling position in the same
+## publication. On first import it may also capture the fully remapped detached
+## tree before publication, avoiding a second fallible live export afterward.
+## Ordinary callers receive the root ID; capture returns {id, snapshot}.
 func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool = false,
-		preserve_host_redo: bool = false) -> DrawingResult:
+		preserve_host_redo: bool = false, insertion_index: int = -1,
+		capture_snapshot: bool = false) -> DrawingResult:
+	if (capture_snapshot or insertion_index != -1) and not preserve_host_redo:
+		return DrawingResult.failure("HISTORY_OWNED", "Ordered transfer capture requires a host command")
 	if preserve_host_redo:
 		var owner: DrawingResult = _preflight_host_structure()
 		if not owner.ok:
@@ -3241,6 +3324,13 @@ func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool 
 		prepared[imported.id] = imported
 		if imported.kind == DrawingLayerNode.RASTER:
 			imported_rasters.append(imported.id)
+	var inserted_id: String = mapping[original_root]
+	var captured: Dictionary = {}
+	if capture_snapshot:
+		var detached: Dictionary[String, DrawingLayerNode] = {}
+		for identifier: String in prepared:
+			detached[identifier] = prepared[identifier].detached_copy()
+		captured = {"id": inserted_id, "snapshot": {"root": inserted_id, "nodes": detached}}
 	# Prepare the full tree before a checked, single-step native revision.
 	# Adopt every imported raster tile before exposing the tree; the untracked
 	# structural event keeps unrelated native Brush history and authorizations.
@@ -3301,9 +3391,11 @@ func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool 
 		_nodes[identifier] = imported
 		for tile_key: String in imported.tiles:
 			_dirty_tiles[identifier + ":" + tile_key] = true
-	_nodes[parent_id].children.append(mapping[original_root])
+	var siblings: Array[String] = _nodes[parent_id].children
+	var index: int = siblings.size() if insertion_index < 0 else mini(insertion_index, siblings.size())
+	siblings.insert(index, inserted_id)
 	_mark_untracked_change()
-	return DrawingResult.success(mapping[original_root], revision)
+	return DrawingResult.success(captured if capture_snapshot else inserted_id, revision)
 
 
 static func transfer_subtree(source: DrawingDocument, target: DrawingDocument,
