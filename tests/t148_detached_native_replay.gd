@@ -76,7 +76,8 @@ func run() -> void:
 	# Simulate eviction of the older event's Rust token without changing
 	# canonical bytes; the host still owns its complete detached snapshots.
 	var old: DrawingDelta = document._events[0]["delta"]
-	old.native_history_token = 9223372036854000000 # token no longer resident
+	check(bool(store.call("forget_history_token", document.revision, layer,
+		old.native_history_token, true)), "simulate actual eviction of first token")
 	var base_revision: int = document.revision
 	var bad: Array[Dictionary] = [
 		{"tile_x": -1, "tile_y": 0, "expected": PackedByteArray([1, 2]),
@@ -91,8 +92,9 @@ func run() -> void:
 		int(store.call("stats").get("revision", -1)) == document.revision,
 		"detached Undo retains the same canonical native store and revision")
 	check(int(store.call("stats").get("undo", -1)) == 0 and
-		int(store.call("stats").get("redo", -1)) == 0,
-		"unpaired native tokens retired rather than silently retained")
+		int(store.call("stats").get("redo", -1)) == 1 and
+		bool(store.call("has_retained_history_token", second.delta.native_history_token)),
+		"newer chronological native Redo retained")
 	check(source(document, layer, "-1,0") == seed and
 		source(document, layer, "0,0").is_empty(),
 		"detached Undo restored initial hidden RGB and blank positive tile")
@@ -105,7 +107,7 @@ func run() -> void:
 		source(document, layer, "0,0") == after_first_positive,
 		"first Redo restores exact pixels")
 	check(document.redo().ok and document._native_raster_store == store,
-		"newer invalidated token safely replays as detached bytes")
+		"newer original token safely replays through Rust")
 	check(source(document, layer, "-1,0") == after_second_negative and
 		source(document, layer, "0,0") == after_second_positive,
 		"final Redo restores second native stroke source")
@@ -115,8 +117,8 @@ func run() -> void:
 	check(third.ok and third.delta != null and third.delta.native_history_token > 0,
 		"new real native stroke follows detached history without source reimport")
 	check(document._native_raster_store == store and
-		int(store.call("stats").get("undo", -1)) == 1,
-		"fresh stroke owns a new native history token")
+		int(store.call("stats").get("undo", -1)) == 2,
+		"fresh stroke owns a new token alongside the retained second stroke")
 	check(document.undo().ok and document.redo().ok,
 		"new native history Undo/Redo is exact")
 	if failures == 0:

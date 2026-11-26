@@ -61,6 +61,13 @@ struct Edit {
     batches: u64,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ExternalHistoryPolicy {
+    Record,
+    Invalidate,
+    Preserve,
+}
+
 struct History {
     token: i64,
     layer: String,
@@ -657,6 +664,43 @@ impl TileStore {
         changes: Vec<(TileId, Vec<u8>, Vec<u8>)>,
         record_history: bool,
     ) -> Result<(i64, usize), &'static str> {
+        let policy = if record_history {
+            ExternalHistoryPolicy::Record
+        } else {
+            ExternalHistoryPolicy::Invalidate
+        };
+        self.apply_external_tiles_with_history(layer, revision, changes, policy)
+    }
+
+    /// Only the chronological command owner may request this variant. A
+    /// retained token must use ordinary token replay, never a snapshot bypass.
+    fn replay_ordered_detached(
+        &mut self,
+        layer: &str,
+        revision: u64,
+        token: i64,
+        changes: Vec<(TileId, Vec<u8>, Vec<u8>)>,
+    ) -> Result<usize, &'static str> {
+        if token < 0 || self.retains_history_token(token) {
+            return Err("Retained or invalid ordered detached history token");
+        }
+        self.apply_external_tiles_with_history(
+            layer,
+            revision,
+            changes,
+            ExternalHistoryPolicy::Preserve,
+        )
+        .map(|(_, count)| count)
+    }
+
+    fn apply_external_tiles_with_history(
+        &mut self,
+        layer: &str,
+        revision: u64,
+        changes: Vec<(TileId, Vec<u8>, Vec<u8>)>,
+        policy: ExternalHistoryPolicy,
+    ) -> Result<(i64, usize), &'static str> {
+        let record_history = policy == ExternalHistoryPolicy::Record;
         let len = self.stride_bytes()?;
         if self.revision != revision
             || self.active.is_some()
@@ -760,7 +804,7 @@ impl TileStore {
             if self.undo.len() > MAX_HISTORY {
                 self.undo.remove(0);
             }
-        } else {
+        } else if policy == ExternalHistoryPolicy::Invalidate {
             self.undo.clear();
             self.redo.clear();
         }
@@ -1562,8 +1606,8 @@ impl TileStore {
         true
     }
 
-    // Do not treat a retained but out-of-order token as detached. Detached
-    // replay discards the native history timeline, even for disjoint tiles.
+    // A retained but out-of-order token must never use either detached
+    // replay policy, even for disjoint tiles.
     fn retains_history_token(&self, token: i64) -> bool {
         token > 0
             && self
@@ -2441,7 +2485,34 @@ impl DrawingNativeTiles {
         expected_revision: i64,
         tiles: Array<Dictionary<Variant, Variant>>,
     ) -> Dictionary<Variant, Variant> {
+        self.replay_detached_tiles(layer, expected_revision, tiles, None)
+    }
+
+    /// Chronological host/local replay of a bounded-out token (or old tokenless
+    /// event). The command owner checks chronology; Rust checks that the token
+    /// is absent and preserves both existing stacks without adding a new entry.
+    #[func]
+    fn replay_ordered_detached_history(
+        &mut self,
+        layer: GString,
+        expected_revision: i64,
+        token: i64,
+        tiles: Array<Dictionary<Variant, Variant>>,
+    ) -> Dictionary<Variant, Variant> {
+        self.replay_detached_tiles(layer, expected_revision, tiles, Some(token))
+    }
+
+    fn replay_detached_tiles(
+        &mut self,
+        layer: GString,
+        expected_revision: i64,
+        tiles: Array<Dictionary<Variant, Variant>>,
+        ordered_token: Option<i64>,
+    ) -> Dictionary<Variant, Variant> {
         self.store.ffi_calls += 1;
+        if ordered_token.is_some_and(|token| token < 0 || self.store.retains_history_token(token)) {
+            return err("Retained or invalid ordered detached history token");
+        }
         if expected_revision < 0 || tiles.is_empty() || tiles.len() > MAX_ACTIVE_TILES {
             return err("Invalid detached history revision or tile count");
         }
@@ -2462,10 +2533,16 @@ impl DrawingNativeTiles {
                 .saturating_add(before.len().saturating_add(after.len()) as u64);
             changes.push((id, before.as_slice().to_vec(), after.as_slice().to_vec()));
         }
-        match self
-            .store
-            .replay_detached(&layer, expected_revision as u64, changes)
-        {
+        let result = match ordered_token {
+            Some(token) => {
+                self.store
+                    .replay_ordered_detached(&layer, expected_revision as u64, token, changes)
+            }
+            None => self
+                .store
+                .replay_detached(&layer, expected_revision as u64, changes),
+        };
+        match result {
             Ok(count) => {
                 let mut result = Dictionary::new();
                 result.set("ok", true);
@@ -3096,6 +3173,101 @@ mod tests {
         assert!(store.history_matches(tokens[1], true));
         store.undo_or_redo(true).unwrap();
         assert_eq!(store.read(&key, false).unwrap().rgba, bytes);
+    }
+
+    #[test]
+    fn ordered_detached_replay_keeps_both_native_stacks() {
+        let mut store = initialized(16);
+        blank(&mut store, -1, 0);
+        let key = TileId {
+            layer: "ink".into(),
+            x: -1,
+            y: 0,
+        };
+        let mut images = vec![vec![0; 16 * 16 * 4]];
+        let mut tokens = Vec::new();
+        for value in 1..=3_u8 {
+            let mut next = images.last().unwrap().clone();
+            next[0] = value;
+            let (token, _) = store
+                .adopt_external(
+                    "ink",
+                    store.revision,
+                    vec![(key.clone(), images.last().unwrap().clone(), next.clone())],
+                )
+                .unwrap();
+            images.push(next);
+            tokens.push(token);
+        }
+        store.undo_or_redo(true).unwrap();
+        let rev = store.revision;
+        assert!(store.forget_history_token(rev, "ink", tokens[1], true));
+        let undo_middle = vec![(key.clone(), images[2].clone(), images[1].clone())];
+        let used = store.bytes_used();
+        for (revision, token, payload) in [
+            (rev, tokens[0], undo_middle.clone()),
+            (rev, tokens[2], undo_middle.clone()),
+            (rev - 1, tokens[1], undo_middle.clone()),
+            (rev, -1, undo_middle.clone()),
+            (
+                rev,
+                tokens[1],
+                vec![(key.clone(), images[3].clone(), images[1].clone())],
+            ),
+        ] {
+            assert!(
+                store
+                    .replay_ordered_detached("ink", revision, token, payload)
+                    .is_err()
+            );
+            assert_eq!(store.revision, rev);
+            assert_eq!(store.tiles[&key].rgba, images[2]);
+            assert_eq!(store.bytes_used(), used);
+            assert!(store.history_matches(tokens[0], true));
+            assert!(store.history_matches(tokens[2], false));
+        }
+        let active = store.begin("ink", rev, false).unwrap();
+        assert!(
+            store
+                .replay_ordered_detached("ink", rev, tokens[1], undo_middle.clone())
+                .is_err()
+        );
+        assert!(store.transaction_matches(active, rev as i64, "ink"));
+        store.active = None;
+        assert_eq!(
+            store
+                .replay_ordered_detached("ink", rev, tokens[1], undo_middle)
+                .unwrap(),
+            1
+        );
+        assert_eq!(store.tiles[&key].rgba, images[1]);
+        assert_eq!(store.bytes_used(), used);
+        assert!(store.history_matches(tokens[0], true));
+        assert!(store.history_matches(tokens[2], false));
+        store.undo_or_redo(true).unwrap();
+        assert_eq!(store.tiles[&key].rgba, images[0]);
+        store.undo_or_redo(false).unwrap();
+        assert_eq!(store.tiles[&key].rgba, images[1]);
+        store
+            .replay_ordered_detached(
+                "ink",
+                store.revision,
+                tokens[1],
+                vec![(key.clone(), images[1].clone(), images[2].clone())],
+            )
+            .unwrap();
+        assert!(store.history_matches(tokens[2], false));
+        store.undo_or_redo(false).unwrap();
+        assert_eq!(store.tiles[&key].rgba, images[3]);
+        assert_eq!(
+            store
+                .undo
+                .iter()
+                .map(|entry| entry.token)
+                .collect::<Vec<_>>(),
+            vec![tokens[0], tokens[2]]
+        );
+        assert!(store.redo.is_empty());
     }
 
     #[test]

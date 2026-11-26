@@ -601,6 +601,9 @@ jobs:
         shell: bash
         run: |
           source tools/ci_fail_late.sh
+          # T-328: real history eviction with retained chronological Redo.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t328_ordered_detached_history.gd 2>&1 | tee /tmp/godot-t328-ordered-detached-history.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t328-ordered-detached-history.log --marker T328_ORDERED_DETACHED_HISTORY_PASSED || ci_fail_marker 'T328 ordered detached history rejected'
           # T-327: checked structural transfer publication and ordered replay.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t327_transfer_publication_boundary.gd 2>&1 | tee /tmp/godot-t327-transfer-publication-boundary.log
           python3 tools/check_godot_model_log.py /tmp/godot-t327-transfer-publication-boundary.log --marker T327_TRANSFER_PUBLICATION_BOUNDARY_PASSED || ci_fail_marker 'T327 transfer publication boundary rejected'

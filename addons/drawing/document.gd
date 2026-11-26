@@ -1457,7 +1457,8 @@ func _install_prepared_native_tile_edit(layer_id: String, expected: int,
 
 ## Replay a native tile delta as one atomic history operation. No sparse
 ## pixel maps are materialized; each source is verified before replacement.
-func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> DrawingResult:
+func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool,
+		ordered_history: bool = false) -> DrawingResult:
 	if delta.tile_stride != tile_stride or not _nodes.has(delta.layer_id) \
 			or not _editable(delta.layer_id):
 		return DrawingResult.failure("HISTORY_TARGET", "Native history target unavailable")
@@ -1604,9 +1605,8 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 	var live_token: bool = current_store and source_token > 0 and \
 		replay_store.call("has_history_token", source_token,
 			base_revision, undo_action)
-	# Detached replay invalidates Rust Undo/Redo. A retained token that is not
-	# the next event belongs to the live timeline and must fail without a
-	# fallback, even when the requested tiles are disjoint from newer edits.
+	# A retained token that is not the next event belongs to the live timeline
+	# and must fail without either detached replay policy, even for disjoint tiles.
 	if current_store and source_token > 0 and not live_token \
 			and replay_store.call("has_retained_history_token", source_token):
 		return DrawingResult.failure("HISTORY_ORDER", "Native history token is retained out of order")
@@ -1615,6 +1615,11 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 		native_replay = replay_store.call("replay_history_token",
 			delta.native_history_token, base_revision, undo_action,
 			delta.layer_id, native_tiles)
+	elif ordered_history:
+		# The local cursor or Atlas ledger established chronology. Older bounded-
+		# out events must not invalidate the newer retained Undo/Redo entries.
+		native_replay = replay_store.call("replay_ordered_detached_history",
+			delta.layer_id, base_revision, source_token, native_tiles)
 	else:
 		native_replay = replay_store.call("replay_detached_history",
 			delta.layer_id, base_revision, native_tiles)
@@ -2567,7 +2572,8 @@ func record_selection_change(before: DrawingHistoryContext,
 ## native Brush attached its tile store. Convert those cold history entries
 ## into checked whole-tile replay once Rust owns the document revision;
 ## publishing only the Godot pixels would silently leave Rust one step behind.
-func _replay_pixel_delta_native(delta: DrawingDelta, undo_action: bool) -> DrawingResult:
+func _replay_pixel_delta_native(delta: DrawingDelta, undo_action: bool,
+		ordered_history: bool = false) -> DrawingResult:
 	if not _nodes.has(delta.layer_id) or not _editable(delta.layer_id):
 		return DrawingResult.failure("HISTORY_TARGET", "Legacy history layer unavailable")
 	var expected: Dictionary[String, int] = (delta.after if undo_action else delta.before).duplicate()
@@ -2632,24 +2638,28 @@ func _replay_pixel_delta_native(delta: DrawingDelta, undo_action: bool) -> Drawi
 	# bytes after every lazy callback and inside the atomic Rust transaction.
 	var native_delta: DrawingDelta = DrawingDelta.from_owned_tile_bytes(
 		source_layer, tile_stride, originals, changed)
-	return _replay_native_tile_delta(native_delta, false)
+	return _replay_native_tile_delta(native_delta, false, ordered_history)
 
 
 ## Replays a detached delta without creating a second history entry.
 ## The caller must validate the stable document identity before invoking it.
-func replay_delta(delta: DrawingDelta, undo_action: bool) -> DrawingResult:
+## Only the chronological command owner may assert ordered_history after
+## validating its cursor and revision ledger. Unordered recovery invalidates
+## native tokens conservatively; it cannot establish their chronological order.
+func replay_delta(delta: DrawingDelta, undo_action: bool,
+		ordered_history: bool = false) -> DrawingResult:
 	if delta == null:
 		return DrawingResult.failure("DELTA", "Missing drawing delta")
 	var result: DrawingResult
 	if delta.tile_stride > 0:
-		result = _replay_native_tile_delta(delta, undo_action)
+		result = _replay_native_tile_delta(delta, undo_action, ordered_history)
 	elif _native_raster_store != null or (tile_stride >= 16 and tile_stride <= 2048
 			and ClassDB.class_exists("DrawingNativeTiles")):
 		# Even a detached legacy/Atlas pixel event must acquire Rust ownership
 		# when its storage stride is supported by the native tile ABI.
 		# Otherwise it advances Godot alone and the next native gesture has to
 		# invalidate the host timeline at a checked rebase boundary.
-		result = _replay_pixel_delta_native(delta, undo_action)
+		result = _replay_pixel_delta_native(delta, undo_action, ordered_history)
 	else:
 		result = _publish_edit(delta.layer_id, revision,
 			delta.after if undo_action else delta.before,
@@ -2665,7 +2675,7 @@ func undo() -> DrawingResult:
 	var event: Dictionary = _events[_cursor - 1]
 	var result: DrawingResult
 	if event["kind"] == "content":
-		result = replay_delta(event["delta"] as DrawingDelta, true)
+		result = replay_delta(event["delta"] as DrawingDelta, true, true)
 	elif event["kind"] == "text_tree":
 		result = _replay_text_tree(event, true)
 	elif event["kind"] == "structure":
@@ -2685,7 +2695,7 @@ func redo() -> DrawingResult:
 	var event: Dictionary = _events[_cursor]
 	var result: DrawingResult
 	if event["kind"] == "content":
-		result = replay_delta(event["delta"] as DrawingDelta, false)
+		result = replay_delta(event["delta"] as DrawingDelta, false, true)
 	elif event["kind"] == "text_tree":
 		result = _replay_text_tree(event, false)
 	elif event["kind"] == "structure":

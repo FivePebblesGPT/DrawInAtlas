@@ -395,6 +395,22 @@ absent historical behavior remains until T-150. See
 
 `DrawingNativeTiles.replay_detached_history(layer_id, expected_revision, tiles)` accepts 1–128 descriptors of `{tile_x: int64, tile_y: int64, expected: PackedByteArray, replacement: PackedByteArray}`; empty packed bytes represent an all-zero tile. Rust checks the active transaction, layer editability, parked status, signed coordinate range, duplicate IDs, source RGBA8 equality (including transparent hidden RGB), exact stride/length, changed bytes, memory budget, and the shared revision **before** installing any replacement. A previously unimported tile is explicitly authorized by its expected image. Successful replay updates native canonical tiles and generations and advances the common revision by one; any unrelated resident tiles remain untouched. It invalidates native Undo/Redo stacks rather than synthesizing an opaque Rust token outside the host history timeline. Failure changes neither canonical source nor revision/history.
 
+**T-328 chronological detached replay:** `replay_ordered_detached_history(layer_id,
+expected_revision, token, tiles)` accepts the same bounded descriptors and
+applies the same canonical-source, editability, revision and transaction checks.
+The local cursor or Atlas command owner must first establish chronology. Rust
+rejects a negative token or any token still present on either native stack;
+zero denotes an older tokenless event. A successful ordered replay advances
+source bytes/generations and revision exactly once, preserves both native
+history stacks unchanged, and does not invent a replacement history token.
+In particular, undoing a bounded-out older command after unwinding the newer
+64 entries leaves those newer entries available for native Redo. The ordinary
+`replay_detached_history` recovery method retains its invalidating behavior
+when the caller cannot establish chronology. The owner remains responsible for
+discarding real branches; ordered replay is not an independent Rust global
+command timeline or a substitute for retained snapshots of evicted events.
+
+
 `DrawingDocument._replay_native_tile_delta` uses this operation only when the previous token is unavailable **and** the attached native store's revision equals the document's. It preflights all lazy providers and immutable snapshot bytes, calls Rust once, then installs only detached display/save projections. A valid live token still uses `replay_history_token`'s stronger exact-native-event parity check. When the native store is absent or stale, existing detached snapshot replay remains a deliberately incomplete fallback until universal native authority is implemented. This operation does not serialize Rust's history stack, make GDScript snapshots disappear, or close T-148. See [detached replay evidence](evidence/T-148-2026-11-16-detached-native-replay.md).
 
 ## Atlas global history handoff (2026-11-15 checkpoint)
