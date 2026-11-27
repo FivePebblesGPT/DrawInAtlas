@@ -42,3 +42,7 @@ The owner selected **one internal DrawingDocument per floor/detail** and restore
 
 ## Round 9 — larger chunk geometry must be measured
 The owner wants chunks larger than the current 256×256 to reduce overhead and potentially improve compression. [[T-067]] has measured the size/latency/working-set trade-off and independent packing options: [512 future-default / immutable segmented-pack recommendation](../DRAWING_CHUNK_GEOMETRY_BENCHMARK.md). T-066 already deployed a versioned per-document stride and one-file-per-blob v1; the measured changes are not applied until separately implemented/tested. The new multi-file manifest must record/validate its versioned chunk stride. Never infer current 256-chunk test success means a future larger-chunk format is crash-safe, byte-exact or memory bounded.
+
+## Owner direction — 2026-11-27: binary-only application persistence
+
+The owner confirmed that JSON persistence is deprecated, including standalone/registry Drawing files, sparse campaign generation metadata, transitional Object indexes and preferences. No historical save migration is required. T-329–T-333 implement and verify the replacement before PR #24 finalization; preserve T-066's sparse generation/recovery guarantees, not its JSON physical encoding. T-334 plans later repository-wide legacy/unused-code cleanup after T-150 and persistence verification. Historical reports remain historical; owner UX and native consolidation gates are unchanged.

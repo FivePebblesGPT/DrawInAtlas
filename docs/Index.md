@@ -1,3 +1,5 @@
+**2026-11-27 owner direction — binary-only persistence:** [T-329](Tickets/T-329.md) through [T-333](Tickets/T-333.md) supersede legacy JSON save compatibility and are prioritized before PR #24 finalization. [T-334](Tickets/T-334.md) plans later legacy/unused-code cleanup after persistence and T-150. T-329 and T-332 are Ready; the dependent tickets are Blocked. T-250 remains Manual Review, not approved. On `320eeba`, hosted T-180 passed and fast desktop passed 45/46; T-110 remains red (2/20 failures). No new implementation or migration claimed.
+
 **2026-11-27 PR #24 CI checkpoint:** [Regression fixture reconciliation](Tickets/T-106.md#2026-11-27--pr-24-regression-fixture-reconciliation) addresses the hosted T-120/T-110/T-148 failures on `7c53e17`; T-180 stopped at the same T-148 assertion. Fresh hosted validation is pending; T-106/T-148/T-180 remain In Progress and T-250 remains Manual Review.
 
 **2026-11-25 owner review — next Drawing sprint:** [review and ordered queue](DRAWING_UX_REVIEW_2026-11-25.md), T-302–T-312 engineering Done. T-250 is Manual Review pending explicit owner acceptance of the corrected build. T-148–T-152 native consolidation remains open; hosted beta4 CI on PR #23 head `da308376` passed (see review). Do not infer full approval.
@@ -648,6 +650,8 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 
 | Ticket | Status | Scope / next gate | Hard dependencies |
 | --- | --- | --- | --- |
+| [T-329 · Make standalone and registry-owned Drawing files binary-only](Tickets/T-329.md) | Ready | Retire JSON Drawing codec; replace failing T-110 with binary authorization tests. | [T-310](Tickets/T-310.md), [T-315](Tickets/T-315.md) |
+| [T-332 · Replace application preference JSON files with native configuration](Tickets/T-332.md) | Ready | Native dock/preferences/recent colors/Object root persistence. | [T-078](Tickets/T-078.md) |
 | [T-302 · Expose standalone Bucket tool](Tickets/T-302.md) | Done | Shared Bucket toolbar and bounded fill; standalone/Atlas native pointer witnesses and visual inspection passed. | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-303 · Add raster Shapes tool and contextual options](Tickets/T-303.md) | Done | Shared Rectangle/Ellipse/Polygon, fill/stroke, FG/BG and width; native pointer, history and visual witnesses passed. | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-304 · Simplify Selection menu, shortcut captions and snapping chrome](Tickets/T-304.md) | Done | Native synchronized Selection mode submenu; duplicate tool commands and Snap chrome removed; distinct accelerator captions, overflow click fix; 59 standalone + 15 hosted checks and actual menu inspection passed. | [T-063](Tickets/T-063.md), [T-090](Tickets/T-090.md) |
@@ -749,6 +753,10 @@ T-096 is blocked on T-149 because the pending native source/preview path would i
 
 | Ticket | Status | Scope / next gate | Hard dependencies |
 | --- | --- | --- | --- |
+| [T-330 · Replace sparse Drawing manifests and Atlas generation records with binary](Tickets/T-330.md) | Blocked | Binary root/backup, generations, indexes and sparse manifests; preserve atomic recovery. | [T-066](Tickets/T-066.md), [T-329](Tickets/T-329.md) |
+| [T-331 · Eliminate transitional Object-index JSON persistence](Tickets/T-331.md) | Blocked | Remove or replace transitional sidecar; keep a single authority and portable copies. | [T-329](Tickets/T-329.md), [T-330](Tickets/T-330.md) |
+| [T-333 · Audit and verify binary-only application persistence](Tickets/T-333.md) | Blocked | No-JSON persistence audit and exact-head native/offline/hosted validation before PR finalization. | [T-329](Tickets/T-329.md), [T-330](Tickets/T-330.md), [T-331](Tickets/T-331.md), [T-332](Tickets/T-332.md) |
+| [T-334 · Plan repository-wide legacy and unused code removal](Tickets/T-334.md) | Blocked | Deferred reachability audit and bounded cleanup plan; no deletions yet. | [T-333](Tickets/T-333.md), [T-150](Tickets/T-150.md) |
 
 
 | [T-013 · Projector framing object](Tickets/T-013.md) | Blocked | Completed scope; see ticket evidence | [T-039](Tickets/T-039.md), [T-022](Tickets/T-022.md), [T-250](Tickets/T-250.md) |
