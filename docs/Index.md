@@ -1,3 +1,5 @@
+**2026-11-27 PR #24 CI checkpoint:** [Regression fixture reconciliation](Tickets/T-106.md#2026-11-27--pr-24-regression-fixture-reconciliation) addresses the hosted T-120/T-110/T-148 failures on `7c53e17`; T-180 stopped at the same T-148 assertion. Fresh hosted validation is pending; T-106/T-148/T-180 remain In Progress and T-250 remains Manual Review.
+
 **2026-11-25 owner review — next Drawing sprint:** [review and ordered queue](DRAWING_UX_REVIEW_2026-11-25.md), T-302–T-312 engineering Done. T-250 is Manual Review pending explicit owner acceptance of the corrected build. T-148–T-152 native consolidation remains open; hosted beta4 CI on PR #23 head `da308376` passed (see review). Do not infer full approval.
 
 **[T-328](Tickets/T-328.md) P0 implementation Done (2026-11-26):**
