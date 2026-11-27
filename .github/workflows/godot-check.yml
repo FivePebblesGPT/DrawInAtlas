@@ -153,6 +153,27 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t159_signed_replay_publication_bounds.gd 2>&1 | tee /tmp/godot-t159-signed-replay.log
           python3 tools/check_godot_model_log.py /tmp/godot-t159-signed-replay.log --marker T159_SIGNED_REPLAY_PASSED || ci_fail_marker 'T159 native signed replay rejected'
           grep -Fqx 'T159_SIGNED_REPLAY_PASSED checks=39 failures=0' /tmp/godot-t159-signed-replay.log || ci_fail_marker 'T159 signed replay assertion count changed'
+          # T-315: portable Open immediately authorizes every verified tile.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t315_native_file_sources.gd 2>&1 | tee /tmp/godot-t315-file-sources.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t315-file-sources.log --marker T315_NATIVE_FILE_PASSED || ci_fail_marker 'T315 portable native source bootstrap rejected'
+          # T-316: verified sparse physical sources enter native authority on first read.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t316_native_sparse_sources.gd 2>&1 | tee /tmp/godot-t316-sparse-sources.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t316-sparse-sources.log --marker T316_NATIVE_SPARSE_PASSED || ci_fail_marker 'T316 sparse native source admission rejected'
+          # T-317: native pristine-source paging under real aggregate pressure.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t317_sparse_eviction.gd 2>&1 | tee /tmp/godot-t317-sparse-eviction.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t317-sparse-eviction.log --marker T317_SPARSE_EVICTION_PASSED || ci_fail_marker 'T317 sparse native eviction rejected'
+          # T-318: detached text history must acquire native raster ownership before replay.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t318_text_history_source.gd 2>&1 | tee /tmp/godot-t318-text-history-source.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t318-text-history-source.log --marker T318_TEXT_HISTORY_SOURCE_PASSED || ci_fail_marker 'T318 detached text native history rejected'
+          # T-319: atomic multi-layer ownership on detached structural replay.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t319_subtree_history_source.gd 2>&1 | tee /tmp/godot-t319-subtree-history-source.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t319-subtree-history-source.log --marker T319_SUBTREE_HISTORY_SOURCE_PASSED || ci_fail_marker 'T319 detached subtree history rejected'
+          # T-320: admit mixed retained sources without replacing native ownership.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t320_mixed_subtree_source.gd 2>&1 | tee /tmp/godot-t320-mixed-subtree-source.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t320-mixed-subtree-source.log --marker T320_MIXED_SUBTREE_SOURCE_PASSED || ci_fail_marker 'T320 mixed subtree source rejected'
+          # T-321: undoing creation must retain native paint Redo and reclaim abandoned branches.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t321_raster_creation_history.gd 2>&1 | tee /tmp/godot-t321-raster-creation-history.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t321-raster-creation-history.log --marker T321_RASTER_CREATION_HISTORY_PASSED || ci_fail_marker 'T321 native raster creation history rejected'
           # T-230: even the first legacy-pixel Undo/Redo in a detached document
           # must bootstrap Rust ownership before advancing the host timeline.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t230_detached_pixel_bootstrap.gd 2>&1 | tee /tmp/godot-t230-pixel-bootstrap.log
@@ -476,6 +497,12 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t120_unified_open_smoke.gd 2>&1 | tee /tmp/godot-t120-open-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t120-open-model.log --marker T120_MODEL_PASSED || ci_fail_marker 'T120 unified Open model log rejected'
           python3 -m unittest discover -s tests -p 'test_t120_unified_open.py' -v
+          # T-305 keeps raster export separate from native Save (same required check ID).
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t305_export_model.gd 2>&1 | tee /tmp/godot-t305-export-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t305-export-model.log --marker T305_MODEL_PASSED || ci_fail_marker 'T305 raster export model log rejected'
+          # T-306 independent sRGB/native pigment oracles (same required check ID).
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t306_srgb_model.gd 2>&1 | tee /tmp/godot-t306-srgb-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t306-srgb-model.log --marker T306_MODEL_PASSED || ci_fail_marker 'T306 sRGB model log rejected'
           # T-121 rejects path/decoder TOCTOU by asserting one bounded source snapshot.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t121_raster_snapshot_smoke.gd 2>&1 | tee /tmp/godot-t121-snapshot-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t121-snapshot-model.log --marker T121_MODEL_PASSED || ci_fail_marker 'T121 single-snapshot raster Open rejected'
@@ -574,6 +601,27 @@ jobs:
         shell: bash
         run: |
           source tools/ci_fail_late.sh
+          # T-328: real history eviction with retained chronological Redo.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t328_ordered_detached_history.gd 2>&1 | tee /tmp/godot-t328-ordered-detached-history.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t328-ordered-detached-history.log --marker T328_ORDERED_DETACHED_HISTORY_PASSED || ci_fail_marker 'T328 ordered detached history rejected'
+          # T-327: checked structural transfer publication and ordered replay.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t327_transfer_publication_boundary.gd 2>&1 | tee /tmp/godot-t327-transfer-publication-boundary.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t327-transfer-publication-boundary.log --marker T327_TRANSFER_PUBLICATION_BOUNDARY_PASSED || ci_fail_marker 'T327 transfer publication boundary rejected'
+          # T-326: moved/copied layer's own native history survives transfer replay.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t326_transfer_source_history.gd 2>&1 | tee /tmp/godot-t326-transfer-source-history.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t326-transfer-source-history.log --marker T326_TRANSFER_SOURCE_HISTORY_PASSED || ci_fail_marker 'T326 transfer source history rejected'
+          # T-325: structural host replay preserves unrelated raster Redo.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t325_transfer_redo_ownership.gd 2>&1 | tee /tmp/godot-t325-transfer-redo-ownership.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t325-transfer-redo-ownership.log --marker T325_TRANSFER_REDO_OWNERSHIP_PASSED || ci_fail_marker 'T325 transfer Redo ownership rejected'
+          # T-324: permanent ancestor retirement reclaims unreachable applied removal sources.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t324_orphaned_subtree_reclamation.gd 2>&1 | tee /tmp/godot-t324-orphaned-subtree-reclamation.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t324-orphaned-subtree-reclamation.log --marker T324_ORPHANED_SUBTREE_RECLAMATION_PASSED || ci_fail_marker 'T324 orphaned subtree reclamation rejected'
+          # T-323: local abandoned conversion sources must release native glyph residency.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t323_parked_text_reclamation.gd 2>&1 | tee /tmp/godot-t323-parked-text-reclamation.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t323-parked-text-reclamation.log --marker T323_PARKED_TEXT_RECLAMATION_PASSED || ci_fail_marker 'T323 parked text reclamation rejected'
+          # T-322: native event lifetime follows the local and Atlas command owners.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t322_history_reclamation.gd 2>&1 | tee /tmp/godot-t322-history-reclamation.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t322-history-reclamation.log --marker T322_HISTORY_RECLAMATION_PASSED || ci_fail_marker 'T322 native history reclamation rejected'
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_history_smoke.gd 2>&1 | tee /tmp/godot-drawing-history.log
           grep -q 'DRAWING_HISTORY_PASSED' /tmp/godot-drawing-history.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|failed;' /tmp/godot-drawing-history.log; then ci_fail_marker 'Forbidden error marker'; fi

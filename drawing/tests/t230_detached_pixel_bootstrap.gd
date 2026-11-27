@@ -140,11 +140,12 @@ func run() -> void:
 	check(opened.ok and opened.value != null, "saved source reopens")
 	if opened.ok:
 		var reopened: DrawingDocument = opened.value
-		check(reopened._native_raster_store == null, "reloaded document starts detached")
+		var reopened_store: Object = reopened._native_raster_store
+		check(reopened_store != null and canonical_matches(reopened, host_layer, "-1,0"), "reloaded document starts with exact native source")
 		check(reopened.replay_delta(delta, true).ok and
-			reopened._native_raster_store != null and
+			reopened._native_raster_store == reopened_store and
 			canonical_matches(reopened, host_layer, "-1,0"),
-			"host delta replays into fresh Rust store after portable Open")
+			"host delta replays into existing Rust store after portable Open")
 	DirAccess.remove_absolute(path)
 
 	var invalid: Dictionary = fixture("t230-invalid", true)

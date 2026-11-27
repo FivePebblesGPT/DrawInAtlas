@@ -24,25 +24,27 @@ class CompactDrawingWorkspaceContractTests(unittest.TestCase):
 
     def test_menu_order_and_no_duplicate_action_toolbar(self) -> None:
         menu_positions = [WORKSPACE.index(f'top_bar.add_menu_spec("{name}"') for name in
-                          ("File", "Edit", "View", "Image", "Layers", "Select", "Window", "Help")]
+                          ("File", "Edit", "View", "Image", "Layers", "Selection", "Window", "Help")]
         self.assertEqual(menu_positions, sorted(menu_positions))
         self.assertIn('divider.name = "BarDivider"', TOP_BAR)
         self.assertIn('options_scroll.name = "ToolOptionsRegion"', TOP_BAR)
         self.assertNotIn('for action in ["New", "Open", "Save", "Undo"]', WORKSPACE)
 
     def test_commands_and_history_preference_are_real(self) -> None:
-        self.assertIn('"Save As…  Ctrl+Shift+S"', WORKSPACE)
+        self.assertIn('"Save As…"', WORKSPACE)
+        self.assertIn("3: KEY_MASK_CTRL | KEY_MASK_SHIFT | KEY_S", WORKSPACE)
         self.assertIn('KEY_S:', WORKSPACE)
         self.assertIn('if key.shift_pressed:', WORKSPACE)
         self.assertIn('_ask_save()', WORKSPACE)
-        self.assertIn('"Redo  Ctrl+Y"', WORKSPACE)
+        self.assertIn('"Redo"', WORKSPACE)
+        self.assertIn("1: KEY_MASK_CTRL | KEY_Y", WORKSPACE)
         self.assertIn('selection_history_toggle.toggled.connect(_selection_history_preference_changed)', WORKSPACE)
         self.assertIn('"Preferences…"', WORKSPACE)
         self.assertIn('func _load_preferences()', WORKSPACE)
 
     def test_context_options_and_scrolling(self) -> None:
         for term in ('if active_tool in ["Brush", "Eraser"]',
-                     'if active_tool in ["Brush", "Eraser", "Select", "Move", "Text"]',
+                     'if active_tool == "Select"',
                      'top_bar.set_tool_controls(active_tool, controls)'):
             self.assertIn(term, WORKSPACE)
         for term in ('options_scroll.ensure_control_visible', 'options_scroll.scroll_horizontal = 0',
@@ -59,7 +61,7 @@ class CompactDrawingWorkspaceContractTests(unittest.TestCase):
             self.assertIn(term, WORKSPACE)
 
     def test_user_refinements_are_packaged_and_tested(self) -> None:
-        for name in ("brush", "eraser", "select", "move", "text", "pan"):
+        for name in ("brush", "eraser", "bucket", "shapes", "select", "move", "text", "pan"):
             asset = ROOT / f"addons/drawing/icons/{name}.svg"
             self.assertTrue(asset.is_file(), name)
             self.assertIn('<svg xmlns="http://www.w3.org/2000/svg"', asset.read_text())
@@ -73,13 +75,13 @@ class CompactDrawingWorkspaceContractTests(unittest.TestCase):
                       (ROOT / "tools/build_drawing_app.py").read_text())
         self.assertIn('icons = PACKAGE / "icons"',
                       (ROOT / "tools/build_drawing_contract_consumer.py").read_text())
-        for witness in ('six tools share the icon rail', 'Ctrl+Shift+Tab cycles backward',
+        for witness in ('current tools share the icon rail', 'Ctrl+Shift+Tab cycles backward',
                         'keyboard focus brings History events into scroll viewport',
                         'hidden tabs still enforce unsaved document close prompt'):
             self.assertIn(witness, NATIVE)
 
     def test_native_witness_is_live_and_touches_required_behaviors(self) -> None:
-        for term in ('T063_WORKSPACE_PASSED', 'Ctrl+Shift+S', 'get_popup()',
+        for term in ('T063_WORKSPACE_PASSED', 'KEY_MASK_CTRL | KEY_MASK_SHIFT | KEY_S', 'get_popup()',
                      'root.content_scale_factor = 1.5', 'root.size = Vector2i(420, 600)',
                      'top.consume_option_wheel', 'grab_focus()', '_request_close_current()'):
             self.assertIn(term, NATIVE)

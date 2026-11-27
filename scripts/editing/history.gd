@@ -92,8 +92,13 @@ func _emit_changed() -> void:
 func reset(campaign: AtlasCampaign, saved: bool = true) -> void:
 	if _timeline_reserved() or _replaying:
 		return
+	_executing_command = true
+	# Release from the top of each native stack in the common case.
+	_discard_redo()
+	for index: int in range(_cursor - 1, -1, -1):
+		_release_drawing_command(_commands[index], true)
 	_campaign = campaign
-	active_map_id = ""
+	_active_map_id = ""
 	_commands.clear()
 	_contexts_before.clear()
 	_contexts_after.clear()
@@ -108,6 +113,7 @@ func reset(campaign: AtlasCampaign, saved: bool = true) -> void:
 	_external_revision = 0
 	_saved_external_revision = 0
 	_emit_changed()
+	_executing_command = false
 
 
 ## Applying a command is transactional: invalid commands do not mutate history.
@@ -195,7 +201,9 @@ func record_selection_change(before: DrawingHistoryContext,
 			or _campaign.get_map(before.map_id) == null:
 		return false
 	var command: AtlasSelectionEdit = AtlasSelectionEdit.new(before, after)
+	_executing_command = true
 	_append_applied(command, before, after, false)
+	_executing_command = false
 	return true
 
 
@@ -348,12 +356,25 @@ func mark_external_change() -> void:
 	if _timeline_reserved() or _replaying:
 		return
 	# External metadata edits are dirty even when not represented by commands.
+	_executing_command = true
 	_discard_redo()
 	_external_revision += 1
 	_emit_changed()
+	_executing_command = false
+
+
+## Commands can span different documents. Even a non-raster branch must
+## release the precise native events that the global cursor has abandoned.
+func _release_drawing_command(command: AtlasEditCommand, applied: bool) -> void:
+	if command is AtlasDrawingEdit:
+		var edit: AtlasDrawingEdit = command as AtlasDrawingEdit
+		if edit.document != null and edit.document.id == edit.document_id and edit.document.external_history:
+			edit.document._release_discarded_history_delta(edit.delta, applied)
 
 
 func _discard_redo() -> void:
+	for index: int in range(_cursor, _commands.size()):
+		_release_drawing_command(_commands[index], false)
 	_commands.resize(_cursor)
 	_contexts_before.resize(_cursor)
 	_contexts_after.resize(_cursor)

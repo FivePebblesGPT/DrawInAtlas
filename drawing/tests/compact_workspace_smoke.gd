@@ -80,11 +80,11 @@ func run() -> void:
 	var names: Array[String] = []
 	for menu: Control in top._menus:
 		names.append((menu as MenuButton).text)
-	check(names == ["File", "Object", "Edit", "View", "Image", "Layers", "Select", "Window", "Help"],
-		"exact nine fixed menu names in intended order")
-	var tool_names: Array[String] = ["Brush", "Eraser", "Select", "Move", "Text", "Pan"]
-	check(app.tool_buttons.size() == 6 and app.dock_split.get_child_count() == 2,
-		"six tools share the icon rail and resizable workspace")
+	check(names == ["File", "Object", "Edit", "View", "Image", "Layers", "Selection", "Window", "Text", "Help"],
+		"exact ten fixed menu names in intended order")
+	var tool_names: Array[String] = ["Brush", "Eraser", "Bucket", "Shapes", "Select", "Move", "Text", "Pan"]
+	check(app.tool_buttons.size() == tool_names.size() and app.dock_split.get_child_count() == 2,
+		"current tools share the icon rail and resizable workspace")
 	for name: String in tool_names:
 		var button: Button = app.tool_buttons[name]
 		check(button.tooltip_text.contains(name) and button.focus_mode == Control.FOCUS_ALL,
@@ -95,11 +95,11 @@ func run() -> void:
 		and not app.tool_buttons["Brush"].button_pressed,
 		"icon button selects the active tool and updates pressed state")
 	app._change_tool("Brush")
-	check(not top.more_menu.visible and top._menus[8].visible,
-		"full desktop displays all nine application menus")
+	check(not top.more_menu.visible and top._menus[9].visible,
+		"full desktop displays all ten application menus")
 	await snapshot("drawing-1280")
-	check(top.options_region.get_child_count() == 3 and top.active_options == "Brush",
-		"brush options show native preset, width and generic snap")
+	check(top.options_region.get_child_count() == 2 and top.active_options == "Brush",
+		"brush options show native preset and width without a snap toggle")
 	check(not app.record_selection_history and app.selection_history_toggle.get_parent() != app.dock_views["history"]
 		and top._menus[2].get_popup().get_item_text(2).contains("Preferences"),
 		"selection-history preference OFF and moved from History to Edit > Preferences")
@@ -117,10 +117,10 @@ func run() -> void:
 	check(app.status.text.contains("cursor") and app.status.text.contains("zoom"),
 		"status reports pixel coordinates and zoom")
 	var file_popup: PopupMenu = top._menus[0].get_popup()
-	check(file_popup.get_item_text(3).contains("Ctrl+Shift+S"),
+	check(file_popup.get_item_accelerator(3) == (KEY_MASK_CTRL | KEY_MASK_SHIFT | KEY_S),
 		"Save As accelerator discoverable in File menu")
 	var edit_popup: PopupMenu = top._menus[2].get_popup()
-	check(edit_popup.get_item_text(1).contains("Ctrl+Y"),
+	check(edit_popup.get_item_accelerator(1) == (KEY_MASK_CTRL | KEY_Y),
 		"one primary redo shortcut visible")
 	await shortcut(KEY_S, true)
 	check(app.save_dialog.visible and app.tabs[app.active_tab]["path"] == "",
@@ -233,10 +233,13 @@ func run() -> void:
 		top._more_selected(about_index)
 		check(app.get_node("WorkspaceAbout").visible, "More invokes the original Help action")
 		app.get_node("WorkspaceAbout").hide()
-	check(not top._menus[8].visible and top._more_actions.size() > 0,
+	check(not top._menus[9].visible and top._more_actions.size() > 0,
 		"hidden menus remain represented by live More commands")
-	check(top.options_region.get_child_count() == 3 and top.more_menu.visible,
+	check(top.options_region.get_child_count() == 2 and top.more_menu.visible,
 		"narrow options preserve real controls and the overflow menu")
+	# With fewer Brush controls, explicitly exercise a crowded viewport.
+	app.size = Vector2(420, 600)
+	await frames(8)
 	var wheel_value: float = app.width_spin.value
 	var wheel: InputEventMouseButton = InputEventMouseButton.new()
 	wheel.pressed = true
@@ -259,6 +262,8 @@ func run() -> void:
 	check(top.left_cue.visible == (top.options_region.size.x > top.options_scroll.size.x + 1.0)
 		and top.right_cue.visible == top.left_cue.visible,
 		"brush options show edge cues only when their contents actually overflow")
+	top.options_scroll.scroll_horizontal = 0
+	await frames(4)
 	var before_scroll: int = top.options_scroll.scroll_horizontal
 	var shifted: InputEventMouseButton = InputEventMouseButton.new()
 	shifted.pressed = true
@@ -284,11 +289,11 @@ func run() -> void:
 	check(app.width_spin.value == wheel_value and
 		top.options_scroll.scroll_horizontal >= native_before,
 		"Shift+wheel over numeric brush control scrolls options without changing its value")
-	app.snap_toggle.grab_focus()
+	app.brush_preset_control.grab_focus()
 	await frames(5)
 	var viewport_bounds: Rect2 = Rect2(top.options_scroll.global_position, top.options_scroll.size)
-	var focused_bounds: Rect2 = Rect2(app.snap_toggle.global_position, app.snap_toggle.size)
-	check(app.snap_toggle.has_focus() and viewport_bounds.intersects(focused_bounds),
+	var focused_bounds: Rect2 = app.brush_preset_control.get_global_rect()
+	check(app.brush_preset_control.has_focus() and viewport_bounds.intersects(focused_bounds),
 		"keyboard focus scrolls the focused option into the visible region")
 	app._change_tool("Text")
 	check(top.options_scroll.scroll_horizontal == 0 and

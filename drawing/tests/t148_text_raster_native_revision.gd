@@ -1,6 +1,6 @@
 extends SceneTree
-## T-148: text/raster kind transitions preserve unrelated Rust ownership only
-## while parked native-owned text layers retain their tokens through Undo/Redo.
+## T-148: text/raster transitions preserve unrelated native history.
+## T-323 reclaims parked glyph sources when conversion Redo is abandoned.
 
 const STRIDE: int = 64
 var checks: int = 0
@@ -73,9 +73,10 @@ func run() -> void:
 	check(doc._native_raster_store == store and
 		int(store.call("stats").get("revision", -1)) == doc.revision and
 		int(store.call("stats").get("undo", -1)) == original_undo,
-		"unreferenced rasterization preserves unrelated Rust history")
-	check(int(store.call("stats").get("bytes_imported", -1)) == imported,
-		"text rasterization does not reimport unrelated native source")
+		"structural rasterization preserves unrelated Rust history")
+	var glyph_imported: int = imported + doc.tile_keys(text_id).size() * STRIDE * STRIDE * 4
+	check(int(store.call("stats").get("bytes_imported", -1)) == glyph_imported,
+		"text rasterization imports only the newly derived glyph source")
 	var post: DrawingResult = DrawingRenderer.render(doc, view)
 	check(post.ok and preview.ok and
 		(post.value as Image).get_data() == (preview.value as Image).get_data(),
@@ -83,7 +84,7 @@ func run() -> void:
 	check(stroke(doc, ink, Vector2(37, 38)).ok and doc._native_raster_store == store,
 		"second Brush uses persistent Rust owner")
 	check(int(store.call("stats").get("undo", -1)) == original_undo + 1 and
-		int(store.call("stats").get("bytes_imported", -1)) == imported,
+		int(store.call("stats").get("bytes_imported", -1)) == glyph_imported,
 		"second Brush adds native token without source reload")
 	check(doc.undo().ok, "Undo newest Brush")
 	check(doc.undo().ok and doc.inspect_node(text_id).kind == DrawingLayerNode.TEXT,
@@ -104,8 +105,8 @@ func run() -> void:
 		int(store.call("stats").get("revision", -1)) == doc.revision and
 		int(store.call("stats").get("undo", -1)) == original_undo + 1,
 		"native history tokens survive complete Undo/Redo replay")
-	# The newly rasterized layer was not imported at conversion time. Its
-	# first native Brush must import the real text RGBA8 before painting it.
+	# T-313 publishes the real text RGBA8 at conversion time, so the first
+	# native Brush on an existing glyph tile need not reimport it.
 	var text_tile: String = "0,0"
 	var before_text_paint: DrawingResult = doc.request_chunk(text_id, text_tile)
 	check(before_text_paint.ok and before_text_paint.value != null,
@@ -115,8 +116,8 @@ func run() -> void:
 		"first native Brush of rasterized text keeps persistent store")
 	var changed_text_bytes: PackedByteArray = (doc.request_chunk(text_id, text_tile).value as DrawingRasterTile).to_rgba8()
 	check(changed_text_bytes != original_text_bytes and
-		int(store.call("stats").get("bytes_imported", -1)) > imported,
-		"first text Brush imports glyph tiles and changes source RGBA8")
+		int(store.call("stats").get("bytes_imported", -1)) == glyph_imported,
+		"first text Brush changes canonical glyph RGBA8 without reimport")
 	check(doc.undo().ok and
 		(doc.request_chunk(text_id, text_tile).value as DrawingRasterTile).to_rgba8() == original_text_bytes,
 		"text-derived native Brush Undo restores exact glyph bytes")
@@ -144,22 +145,57 @@ func run() -> void:
 	var base: String = str(guarded.create_layer(DrawingLayerNode.RASTER, "Ink").value)
 	check(stroke(guarded, base, Vector2(9, 10)).ok, "negative control owns a raster source")
 	var guard_store: Object = guarded._native_raster_store
+	var base_token: int = (guarded._events.back()["delta"] as DrawingDelta).native_history_token
+	var base_before: PackedByteArray = (guarded.request_chunk(base, "0,0").value as DrawingRasterTile).to_rgba8()
 	var label: String = str(guarded.commit_text("", text_element(), guarded.revision).value)
 	check(guarded.rasterize_text(label, guarded.revision).ok and
 		stroke(guarded, label, Vector2(35, 35)).ok,
-		"text-derived raster is explicitly imported on first native paint")
+		"text-derived raster supports native painting after conversion")
+	var glyph_token: int = (guarded._events.back()["delta"] as DrawingDelta).native_history_token
+	var glyph_keys: Array = guarded.tile_keys(label)
+	check(not glyph_keys.is_empty(), "conversion has native raster coordinates")
 	check(guarded.undo().ok and guarded.inspect_node(label).kind == DrawingLayerNode.RASTER,
 		"Undo text-derived native Brush")
 	check(guarded.undo().ok and guarded.inspect_node(label).kind == DrawingLayerNode.TEXT and
 		int(guard_store.call("stats").get("revision", -1)) == guarded.revision and
 		guard_store.call("is_layer_parked", label),
 		"previously native-owned layer is parked without revision divergence")
-	check(stroke(guarded, base, Vector2(36, 37)).ok and
-		guarded._native_raster_store == guard_store and
-		int(guard_store.call("stats").get("revision", -1)) == guarded.revision and
-		int(guard_store.call("stats").get("undo", -1)) == 2 and
-		guard_store.call("is_layer_parked", label),
-		"next Brush preserves existing native history and parked glyphs")
+	check(stroke(guarded, base, Vector2(36, 37)).ok, "next Brush branches successfully")
+	check(guarded._native_raster_store == guard_store, "next Brush preserves native store identity")
+	check(int(guard_store.call("stats").get("revision", -1)) == guarded.revision,
+		"next Brush preserves native revision synchronization")
+	var branch_token: int = (guarded._events.back()["delta"] as DrawingDelta).native_history_token
+	check(int(guard_store.call("stats").get("undo", -1)) == 2 and
+		base_token > 0 and branch_token > 0 and base_token != branch_token and
+		bool(guard_store.call("has_retained_history_token", base_token)) and
+		bool(guard_store.call("has_retained_history_token", branch_token)),
+		"next Brush retains both unrelated native paint tokens")
+	check(glyph_token > 0 and not bool(guard_store.call("has_retained_history_token", glyph_token)),
+		"abandoned glyph paint token is reclaimed")
+	check(not bool(guard_store.call("is_layer_parked", label)),
+		"abandoned conversion releases its parked glyph reservation")
+	var remaining: int = 0
+	for identity: String in guarded._native_source_identities:
+		if identity.begins_with(label + ":"):
+			remaining += 1
+	check(remaining == 0, "abandoned glyph projection identities are reclaimed")
+	for key: String in glyph_keys:
+		var coords: PackedStringArray = key.split(",")
+		check(not bool(guard_store.call("has_source", label, int(coords[0]), int(coords[1]), guarded.revision)),
+			"abandoned glyph native source reclaimed: " + key)
+	check(guarded.inspect_node(label).kind == DrawingLayerNode.TEXT and guarded.snapshot_for_save().ok,
+		"abandoned conversion preserves live semantic text")
 	check(not guarded.can_redo(), "new Brush invalidates text-raster Redo")
-	print("T148_TEXT_RASTER_PASSED (%d checks; %d failed)" % [checks, failures])
+	var base_after: PackedByteArray = (guarded.request_chunk(base, "0,0").value as DrawingRasterTile).to_rgba8()
+	check(base_before != base_after, "branch Brush changes canonical raster bytes")
+	check(guarded.undo().ok and
+		(guarded.request_chunk(base, "0,0").value as DrawingRasterTile).to_rgba8() == base_before,
+		"branch Brush Undo restores exact previous native raster")
+	check(guarded.redo().ok and
+		(guarded.request_chunk(base, "0,0").value as DrawingRasterTile).to_rgba8() == base_after,
+		"branch Brush Redo restores exact painted native raster")
+	if failures == 0:
+		print("T148_TEXT_RASTER_PASSED (%d checks; 0 failed)" % checks)
+	else:
+		printerr("T148_TEXT_RASTER_FAILED: %d/%d checks" % [failures, checks])
 	quit(0 if failures == 0 else 1)

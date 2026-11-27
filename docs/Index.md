@@ -1,4 +1,106 @@
-**2026-11-25 owner review — next Drawing sprint:** [review and ordered queue](DRAWING_UX_REVIEW_2026-11-25.md), T-302–T-312 Ready. Prior dock/ColorPicker corrections received positive feedback, but missing tools, export, color, text, object, panels, storage and layer/icon polish remain. T-250 is Blocked pending corrections and explicit owner acceptance. T-148–T-152 native consolidation remains open; hosted beta4 CI on PR #23 head `da308376` passed (see review). Do not infer full approval.
+**2026-11-27 owner direction — binary-only persistence:** [T-329](Tickets/T-329.md) through [T-333](Tickets/T-333.md) supersede legacy JSON save compatibility and are prioritized before PR #24 finalization. [T-334](Tickets/T-334.md) plans later legacy/unused-code cleanup after persistence and T-150. T-329 and T-332 are Ready; the dependent tickets are Blocked. T-250 remains Manual Review, not approved. On `320eeba`, hosted T-180 passed and fast desktop passed 45/46; T-110 remains red (2/20 failures). No new implementation or migration claimed.
+
+**2026-11-27 PR #24 CI checkpoint:** [Regression fixture reconciliation](Tickets/T-106.md#2026-11-27--pr-24-regression-fixture-reconciliation) addresses the hosted T-120/T-110/T-148 failures on `7c53e17`; T-180 stopped at the same T-148 assertion. Fresh hosted validation is pending; T-106/T-148/T-180 remain In Progress and T-250 remains Manual Review.
+
+**2026-11-25 owner review — next Drawing sprint:** [review and ordered queue](DRAWING_UX_REVIEW_2026-11-25.md), T-302–T-312 engineering Done. T-250 is Manual Review pending explicit owner acceptance of the corrected build. T-148–T-152 native consolidation remains open; hosted beta4 CI on PR #23 head `da308376` passed (see review). Do not infer full approval.
+
+**[T-328](Tickets/T-328.md) P0 implementation Done (2026-11-26):**
+[Checked chronological detached replay](evidence/T-328-2026-11-26-ordered-detached-history.md) across the native 64-entry limit;
+newer native Undo/Redo tokens are retained. T-148 stays In Progress;
+T-250 stays Manual Review.
+
+**[T-327](Tickets/T-327.md) P0 implementation Done (2026-11-26):**
+[Host transfer publication boundary](evidence/T-327-2026-11-26-transfer-publication-boundary.md)
+checks retained outgoing sources and revision headroom, restores original
+sibling order within import, permits checked protected Copy Undo, and
+eliminates fallible post-publication export. T-148 stays In Progress; T-250 Manual Review.
+
+**[T-326](Tickets/T-326.md) P0 implementation Done (2026-11-26):**
+[Transferred raster history](evidence/T-326-2026-11-26-transfer-source-history.md)
+retains affected native tokens between document visits, releases departing
+live tiles, restores blank history authorizations and preserves chronological
+Move/Copy, branching and reset. T-148 stays In Progress; T-250 Manual Review.
+
+**[T-325](Tickets/T-325.md) P0 implementation Done (2026-11-26):**
+[External transfer Redo ownership](evidence/T-325-2026-11-26-transfer-redo-ownership.md)
+keeps unrelated native tokens through raster/semantic Move/Copy replay,
+rejects busy/stale structural transfer boundaries and delegates branch
+reclamation to the host. T-148 stays In Progress; T-250 Manual Review.
+
+**[T-324](Tickets/T-324.md) P0 implementation Done (2026-11-26):**
+[Applied orphaned subtree reclamation](evidence/T-324-2026-11-26-orphaned-subtree-reclamation.md)
+retires native parked descendants and live raster siblings atomically when a
+local ancestor is permanently deleted, preserving surviving commands and
+recorded removal replay. T-148 stays In Progress; T-250 Manual Review.
+
+**[T-323](Tickets/T-323.md) P0 implementation Done (2026-11-26):**
+[Parked text reclamation](evidence/T-323-2026-11-26-parked-text-reclamation.md)
+releases abandoned local conversion glyph sources after checking snapshot
+parity and dropping abandoned native tokens, preserving live semantic text
+and unrelated active edits. T-148 stays In Progress; T-250 Manual Review.
+
+**[T-322](Tickets/T-322.md) P0 implementation Done (2026-11-26):**
+[Native history reclamation](evidence/T-322-2026-11-26-history-reclamation.md)
+links abandoned local/Atlas command events to exact native token reclamation;
+non-raster branches and reset preserve canonical bytes and unrelated history.
+T-148 remains In Progress; T-250 remains Manual Review.
+
+**[T-321](Tickets/T-321.md) P0 implementation Done (2026-11-25):**
+[Raster creation history](evidence/T-321-2026-11-25-raster-creation-history.md)
+fixes ordinary create → Brush → Undo Brush → Undo creation and exact Redo,
+retains native tokens, rejects nonempty/unresolved sources and reclaims
+abandoned empty creation branches. T-148 remains In Progress; T-250 remains Manual Review.
+
+**[T-320](Tickets/T-320.md) P0 implementation Done (2026-11-25):**
+[Mixed subtree raster source admission](evidence/T-320-2026-11-25-mixed-subtree-source.md)
+acquires missing coordinates during recorded removal and mixed history replay,
+checks the complete native source set, retains history and rejects divergent
+pending descriptors. T-148 remains In Progress; T-250 remains Manual Review.
+
+**[T-319](Tickets/T-319.md) P0 implementation Done (2026-11-25):**
+[Detached subtree history source admission](evidence/T-319-2026-11-25-subtree-history-source.md)
+restores or parks retained multi-layer RGBA8 atomically in an absent or
+unreferenced owner, validates subsequent replay and retains unrelated Redo.
+T-148 stays In Progress for mixed ownership and host timeline consolidation;
+T-250 stays Manual Review.
+
+**[T-318](Tickets/T-318.md) P0 implementation Done (2026-11-25):**
+[Detached text raster history source admission](evidence/T-318-2026-11-25-text-history-source.md)
+acquires or parks glyph bytes atomically during structural Undo/Redo, rejects
+stale owners and preserves unrelated native redo. T-148 stays In Progress;
+T-250 stays Manual Review.
+
+**[T-317](Tickets/T-317.md) P0 implementation Done (2026-11-25):**
+[Bounded pristine physical sparse renderer residency](evidence/T-317-2026-11-25-sparse-eviction.md)
+restores verified pending descriptors and releases native/projection copies
+on quiescent renderer misses while preserving history and dirty sources.
+T-148 remains In Progress and T-250 remains Manual Review.
+
+**[T-316](Tickets/T-316.md) P0 implementation Done (2026-11-25):**
+[Lazy physical sparse source authority](evidence/T-316-2026-11-25-native-sparse-sources.md)
+now admits each verified source before publishing its Godot projection, without
+an edit or eager campaign decode; structural Redo retains late-loaded bytes.
+The bounded renderer residency follow-up is T-317; general host history
+remains open in T-148. T-250 remains Manual Review.
+
+**[T-315](Tickets/T-315.md) P0 implementation Done (2026-11-25):**
+[Portable Open source authority](evidence/T-315-2026-11-25-native-file-sources.md)
+now initializes a provisional native owner at the saved revision for validated
+binary, legacy and Object sources; no dirty/history change or partial owner.
+Sparse campaign loading remains lazy. T-148 stays In Progress and T-250
+remains Manual Review.
+
+**[T-314](Tickets/T-314.md) P0 implementation Done (2026-11-25):**
+[Atomic multi-layer native source publication at detached import](evidence/T-314-2026-11-25-native-subtree-source.md)
+now authorizes signed RGBA8 before first paint, bootstraps an absent native owner,
+and preserves unrelated native Undo across copy/move and structural replay.
+T-148 remains In Progress and T-250 remains Manual Review.
+
+**[T-313](Tickets/T-313.md) P0 implementation Done (2026-11-25):**
+[Atomic native ownership of derived text raster sources](evidence/T-313-2026-11-25-native-text-source.md)
+bootstraps the native store at conversion, preserves unrelated history,
+parks/unparks unpainted glyphs, and permits semantic Save/Copy while parked.
+The T-148–T-152 integration chain and T-250 owner gate remain open.
 
 **[T-301](Tickets/T-301.md) P1 implementation Done (2026-11-24):**
 [True polygon interior vs selected-pixel bounded preflight](evidence/T-301-2026-11-24-polygon-selection.md)
@@ -460,7 +562,7 @@ Statuses: T-146 and T-147 **Done**; T-153 **Done** and required before T-148 can
 | [T-235 · Preflight tile-local patch descriptors before lazy source reads](Tickets/T-235.md) | Done | [17-failure control, 34-check descriptor/source reentrancy guard, native/Atlas](evidence/T-235-2026-11-22-tile-patch-preflight.md); T-148 host lifetime remains open | [T-232](Tickets/T-232.md), [T-234](Tickets/T-234.md) |
 | [T-234 · Preflight native Brush tile publication before lazy sources](Tickets/T-234.md) | Done | [13-failure control, 32-check final descriptor/reentrancy test, native ABI/Atlas/X11](evidence/T-234-2026-11-22-publication-preflight.md); T-148 host lifetime remains open | [T-231](Tickets/T-231.md) |
 | [T-233 · Bootstrap native authority on first direct pixel-map edit](Tickets/T-233.md) | Done | [12-failure control, 37-check native edit bootstrap, T-100/T-095 oracles, historical replay, Atlas/Rust/X11](evidence/T-233-2026-11-22-pixel-bootstrap.md); T-148 host lifecycle remains open | [T-232](Tickets/T-232.md) |
-| [T-148 · Native-owned tiled raster editing and atomic undo transactions](Tickets/T-148.md) | In Progress | [Atlas native history](evidence/T-148-2026-11-15-atlas-native-history.md), [Object-native Save/Save As](evidence/T-148-2026-11-15-object-native.md), [reentrant history replay](evidence/T-148-2026-11-16-native-history-replay.md) and [atomic native payload parity](evidence/T-148-2026-11-16-native-history-payload.md) and [detached native replay](evidence/T-148-2026-11-16-detached-native-replay.md) with [absent/stale-store bootstrap](evidence/T-148-2026-11-16-detached-bootstrap.md) and [bounded history transfers](evidence/T-229-2026-11-22-history-budget.md) and [first pixel replay native bootstrap](evidence/T-230-2026-11-22-detached-pixel-bootstrap.md) and [first tile-local publication native bootstrap](evidence/T-232-2026-11-22-tile-bootstrap.md) and [first direct pixel publication native bootstrap](evidence/T-233-2026-11-22-pixel-bootstrap.md) verified; next: host-owned command lifetime and remaining raster producers | [T-147](Tickets/T-147.md), [T-153](Tickets/T-153.md) |
+| [T-148 · Native-owned tiled raster editing and atomic undo transactions](Tickets/T-148.md) | In Progress | [Atlas native history](evidence/T-148-2026-11-15-atlas-native-history.md), [Object-native Save/Save As](evidence/T-148-2026-11-15-object-native.md), [reentrant history replay](evidence/T-148-2026-11-16-native-history-replay.md) and [atomic native payload parity](evidence/T-148-2026-11-16-native-history-payload.md) and [detached native replay](evidence/T-148-2026-11-16-detached-native-replay.md) with [absent/stale-store bootstrap](evidence/T-148-2026-11-16-detached-bootstrap.md) and [bounded history transfers](evidence/T-229-2026-11-22-history-budget.md) and [first pixel replay native bootstrap](evidence/T-230-2026-11-22-detached-pixel-bootstrap.md) and [first tile-local publication native bootstrap](evidence/T-232-2026-11-22-tile-bootstrap.md) and [first direct pixel publication native bootstrap](evidence/T-233-2026-11-22-pixel-bootstrap.md) verified; [T-313 immediate glyph source ownership](evidence/T-313-2026-11-25-native-text-source.md) Done; [T-314 detached subtree native ownership](evidence/T-314-2026-11-25-native-subtree-source.md) Done; [T-315 portable Open source authority](evidence/T-315-2026-11-25-native-file-sources.md) Done; [T-316 physical sparse admission](evidence/T-316-2026-11-25-native-sparse-sources.md) Done; [T-317 renderer pristine-source residency](evidence/T-317-2026-11-25-sparse-eviction.md) Done; [T-321 ordinary raster creation history](evidence/T-321-2026-11-25-raster-creation-history.md) Done; remaining general native residency/host-history authority | [T-147](Tickets/T-147.md), [T-153](Tickets/T-153.md) |
 | [T-149 · Godot native dirty-tile preview, display and persistence seams](Tickets/T-149.md) | Blocked | After T-148: batched Godot inputs and native dirty-tile display/save seams | [T-148](Tickets/T-148.md) |
 | [T-150 · Remove Legacy Brush backend and compatibility paths](Tickets/T-150.md) | Blocked | After T-149: retire Legacy without migration or native-free fallback | [T-149](Tickets/T-149.md) |
 | [T-151 · Profile post-consolidation native Brush critical path](Tickets/T-151.md) | Blocked | After T-150: profile the consolidated full editor and all native seams | [T-150](Tickets/T-150.md) |
@@ -540,7 +642,7 @@ Do **not** infer signoff from software tests or prior product scope. T-096 was m
 | [T-038 · Broader code-only review](Tickets/T-038.md) | Manual Review | Completed scope; see ticket evidence | [T-033](Tickets/T-033.md), [T-034](Tickets/T-034.md), [T-035](Tickets/T-035.md), [T-036](Tickets/T-036.md) |
 | [T-039 · Player projection and privacy contract](Tickets/T-039.md) | Blocked | Completed scope; see ticket evidence | [E-003](Epics/E-003.md), [E-004](Epics/E-004.md), [E-006](Epics/E-006.md), [E-SAVE](Epics/E-SAVE.md), [T-250](Tickets/T-250.md) |
 
-| [T-250 · Owner manual review of Drawing before Atlas](Tickets/T-250.md) | Blocked | **2026-11-25 owner feedback:** prior fixes look good so far; T-302–T-312 corrective work and explicit owner acceptance remain open; no Atlas release signoff | [T-251](Tickets/T-251.md), [T-252](Tickets/T-252.md), [T-253](Tickets/T-253.md), [T-254](Tickets/T-254.md), [T-273](Tickets/T-273.md), [T-274](Tickets/T-274.md), [T-302](Tickets/T-302.md), [T-303](Tickets/T-303.md), [T-304](Tickets/T-304.md), [T-305](Tickets/T-305.md), [T-306](Tickets/T-306.md), [T-307](Tickets/T-307.md), [T-308](Tickets/T-308.md), [T-309](Tickets/T-309.md), [T-310](Tickets/T-310.md), [T-311](Tickets/T-311.md), [T-312](Tickets/T-312.md) |
+| [T-250 · Owner manual review of Drawing before Atlas](Tickets/T-250.md) | Manual Review | **2026-11-25:** all 17 engineering prerequisites Done; explicit hands-on owner acceptance remains open; no Atlas release signoff | [T-251](Tickets/T-251.md), [T-252](Tickets/T-252.md), [T-253](Tickets/T-253.md), [T-254](Tickets/T-254.md), [T-273](Tickets/T-273.md), [T-274](Tickets/T-274.md), [T-302](Tickets/T-302.md), [T-303](Tickets/T-303.md), [T-304](Tickets/T-304.md), [T-305](Tickets/T-305.md), [T-306](Tickets/T-306.md), [T-307](Tickets/T-307.md), [T-308](Tickets/T-308.md), [T-309](Tickets/T-309.md), [T-310](Tickets/T-310.md), [T-311](Tickets/T-311.md), [T-312](Tickets/T-312.md) |
 
 ## 4. Other ready backlog
 
@@ -548,17 +650,35 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 
 | Ticket | Status | Scope / next gate | Hard dependencies |
 | --- | --- | --- | --- |
-| [T-302 · Expose standalone Bucket tool](Tickets/T-302.md) | Ready | **P1 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); No Bucket tool in the standalone toolbar. | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
-| [T-303 · Add raster Shapes tool and contextual options](Tickets/T-303.md) | Ready | **P1 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); No shape tool in standalone Drawing. | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
-| [T-304 · Simplify Selection menu, shortcut captions and snapping chrome](Tickets/T-304.md) | Ready | **P1 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); Rectangle selection and Move selected pixels duplicate toolbar tools in Selection; selection modes need Selection > Selection mode; shortcut labels need distinct color; Snap (8 px) toggle should be removed. | [T-063](Tickets/T-063.md), [T-090](Tickets/T-090.md) |
-| [T-305 · Export PNG, WebP and JPEG with format-specific settings](Tickets/T-305.md) | Ready | **P1 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); No ability to export common image formats with respective export options. | [T-053](Tickets/T-053.md), [T-120](Tickets/T-120.md) |
-| [T-306 · Verify end-to-end sRGB artwork color pipeline](Tickets/T-306.md) | Ready | **P1 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); Ensure the application uses sRGB color space. | [T-052](Tickets/T-052.md), [T-190](Tickets/T-190.md) |
-| [T-307 · Text Options panel, live text preview and menu commands](Tickets/T-307.md) | Ready | **P1 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); Need a Text Options panel with real-time text preview and common text options accessible from the menu bar. | [T-058](Tickets/T-058.md), [T-063](Tickets/T-063.md) |
-| [T-308 · Restore Object Editor background and standalone asset drag/drop](Tickets/T-308.md) | Ready | **P1 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); Asset Browser lists contents, but Object Editor lacks a background and objects cannot be dragged onto the canvas. | [T-062](Tickets/T-062.md), [T-093](Tickets/T-093.md), [T-109](Tickets/T-109.md) |
-| [T-309 · Restore individual hidden panels from Window menu](Tickets/T-309.md) | Ready | **P1 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); Closing a floating window hides its panels; only Show hidden floating panels restores them all. Window > Float selected dock group is unwanted convenience chrome. | [T-081](Tickets/T-081.md), [T-082](Tickets/T-082.md), [T-225](Tickets/T-225.md) |
-| [T-310 · Versioned binary .drawing document and measured storage optimization](Tickets/T-310.md) | Ready | **P1 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); Binary .drawing file format and space usage optimizations requested. | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md), [T-066](Tickets/T-066.md), [T-067](Tickets/T-067.md) |
-| [T-311 · Interactive layer-group disclosure and structural indentation](Tickets/T-311.md) | Ready | **P1 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); Layers panel uses text-based group markers and whitespace indentation instead of clickable expand/collapse buttons and actual button indentation. | [T-089](Tickets/T-089.md) |
-| [T-312 · Unify panel icon texture filtering](Tickets/T-312.md) | Ready | **P2 owner queue:** [2026-11-25 review](DRAWING_UX_REVIEW_2026-11-25.md); Popup panel icons use nearest-neighbor while other states use bilinear filtering; owner notes nearest-neighbor looks stylish. | [T-225](Tickets/T-225.md), [T-254](Tickets/T-254.md) |
+| [T-329 · Make standalone and registry-owned Drawing files binary-only](Tickets/T-329.md) | Ready | Retire JSON Drawing codec; replace failing T-110 with binary authorization tests. | [T-310](Tickets/T-310.md), [T-315](Tickets/T-315.md) |
+| [T-332 · Replace application preference JSON files with native configuration](Tickets/T-332.md) | Ready | Native dock/preferences/recent colors/Object root persistence. | [T-078](Tickets/T-078.md) |
+| [T-302 · Expose standalone Bucket tool](Tickets/T-302.md) | Done | Shared Bucket toolbar and bounded fill; standalone/Atlas native pointer witnesses and visual inspection passed. | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
+| [T-303 · Add raster Shapes tool and contextual options](Tickets/T-303.md) | Done | Shared Rectangle/Ellipse/Polygon, fill/stroke, FG/BG and width; native pointer, history and visual witnesses passed. | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
+| [T-304 · Simplify Selection menu, shortcut captions and snapping chrome](Tickets/T-304.md) | Done | Native synchronized Selection mode submenu; duplicate tool commands and Snap chrome removed; distinct accelerator captions, overflow click fix; 59 standalone + 15 hosted checks and actual menu inspection passed. | [T-063](Tickets/T-063.md), [T-090](Tickets/T-090.md) |
+| [T-305 · Export PNG, WebP and JPEG with format-specific settings](Tickets/T-305.md) | Done | Bounded visible composite export; PNG/WebP/JPEG options, encoded preview, atomic publication; codec, standalone and hosted native tests and visual inspection passed. | [T-053](Tickets/T-053.md), [T-120](Tickets/T-120.md) |
+| [T-306 · Verify end-to-end sRGB artwork color pipeline](Tickets/T-306.md) | Done | Corrected double-encoded Brush RGB at Hokusai input; sRGB storage, real SDR framebuffer, import/export profile limits and native regressions verified. | [T-052](Tickets/T-052.md), [T-190](Tickets/T-190.md) |
+| [T-307 · Text Options panel, live text preview and menu commands](Tickets/T-307.md) | Done | Shared dock-owned Text Options and menu, detached live glyphs in canonical layer order; exact preview/commit, one-event history, cancellation, portable Save/Open and real native standalone/hosted witnesses. | [T-058](Tickets/T-058.md), [T-063](Tickets/T-063.md) |
+| [T-308 · Restore Object Editor background and standalone asset drag/drop](Tickets/T-308.md) | Done | **2026-11-25:** shared Object checkerboard, native standalone stable-ID linked drag/drop with graph authorization, atomic history and Save/Open; 40/40 standalone + 12/12 hosted; Atlas registry boundary preserved. | [T-062](Tickets/T-062.md), [T-093](Tickets/T-093.md), [T-109](Tickets/T-109.md) |
+| [T-309 · Restore individual hidden panels from Window menu](Tickets/T-309.md) | Done | Individual Window panel recovery with checkmarks, original host ownership, partial persistence and no unwanted peers; removed Float selected dock group. 69 standalone / 20 hosted native checks and visual inspection. | [T-081](Tickets/T-081.md), [T-082](Tickets/T-082.md), [T-225](Tickets/T-225.md) |
+| [T-310 · Versioned binary .drawing document and measured storage optimization](Tickets/T-310.md) | Done | Versioned typed binary standalone codec; legacy reader, bounded sparse RGBA8, exact fonts/objects, atomic save and [307 checks plus measured storage evidence](evidence/T-310-2026-11-25-binary-drawing.md); Atlas format unchanged. | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md), [T-066](Tickets/T-066.md), [T-067](Tickets/T-067.md) |
+| [T-311 · Interactive layer-group disclosure and structural indentation](Tickets/T-311.md) | Done | Native TreeItem hierarchy, pointer/keyboard disclosure, view-only tab state, filtered/paged ancestor context and [47 standalone/11 hosted checks with visual review](evidence/T-311-2026-11-25-layer-disclosure.md). | [T-089](Tickets/T-089.md) |
+| [T-312 · Unify panel icon texture filtering](Tickets/T-312.md) | Done | Shared explicit icon-only nearest sampling across dock/rail/flyout/floating states; [32 standalone/36 hosted checks and before/after visual review](evidence/T-312-2026-11-25-panel-icon-filtering.md). | [T-225](Tickets/T-225.md), [T-254](Tickets/T-254.md) |
+| [T-313 · Publish rasterized text sources atomically into native tile authority](Tickets/T-313.md) | Done | P0 T-148 integration: [immediate native glyph ownership, structural replay, semantic persistence and hosted checks](evidence/T-313-2026-11-25-native-text-source.md). | [T-155](Tickets/T-155.md) |
+| [T-314 · Publish detached subtree raster sources atomically into native authority](Tickets/T-314.md) | Done | P0 T-148 integration: [immediate multi-layer source adoption, exact persistence, and Atlas transfer replay](evidence/T-314-2026-11-25-native-subtree-source.md). | [T-169](Tickets/T-169.md), [T-313](Tickets/T-313.md) |
+| [T-315 · Authorize portable file raster sources immediately on Open](Tickets/T-315.md) | Done | P0 T-148 integration: [binary/legacy/Object Open at saved native revision, exact source parity and lifecycle](evidence/T-315-2026-11-25-native-file-sources.md). | [T-310](Tickets/T-310.md), [T-314](Tickets/T-314.md) |
+| [T-316 · Authorize verified physical sparse raster sources on first read](Tickets/T-316.md) | Done | P0 T-148 integration: [lazy native admission, structural replay and campaign generation](evidence/T-316-2026-11-25-native-sparse-sources.md). | [T-157](Tickets/T-157.md), [T-315](Tickets/T-315.md) |
+| [T-317 · Bound pristine physical sparse source residency during rendering](Tickets/T-317.md) | Done | P0 T-148 integration: [native clean-source release/re-admission and real renderer pressure](evidence/T-317-2026-11-25-sparse-eviction.md). | [T-316](Tickets/T-316.md) |
+| [T-318 · Acquire native text raster ownership during detached structural history replay](Tickets/T-318.md) | Done | P0 T-148 integration: [atomic detached glyph history admission and stale-owner fence](evidence/T-318-2026-11-25-text-history-source.md). | [T-313](Tickets/T-313.md), [T-314](Tickets/T-314.md) |
+| [T-319 · Acquire native raster ownership during detached subtree removal history](Tickets/T-319.md) | Done | P0 T-148 integration: [atomic multi-layer detached history admission and native redo retention](evidence/T-319-2026-11-25-subtree-history-source.md). | [T-314](Tickets/T-314.md), [T-318](Tickets/T-318.md) |
+| [T-320 · Admit mixed raster sources during recorded subtree removal and history](Tickets/T-320.md) | Done | P0 T-148 integration: [atomic mixed source admission and checked native history](evidence/T-320-2026-11-25-mixed-subtree-source.md). | [T-319](Tickets/T-319.md), [T-316](Tickets/T-316.md) |
+| [T-321 · Preserve native paint history across raster layer creation Undo/Redo](Tickets/T-321.md) | Done | P0 T-148 integration: [checked empty creation replay and abandoned branch reclamation](evidence/T-321-2026-11-25-raster-creation-history.md). | [T-177](Tickets/T-177.md), [T-320](Tickets/T-320.md) |
+| [T-322 · Reclaim abandoned native raster history from the command owner](Tickets/T-322.md) | Done | P0 T-148 integration: [exact-token lifetime and host branch/reset reclamation](evidence/T-322-2026-11-26-history-reclamation.md). | [T-321](Tickets/T-321.md), [T-247](Tickets/T-247.md) |
+| [T-323 · Reclaim abandoned parked text raster sources](Tickets/T-323.md) | Done | P0 T-148 integration: [checked parked glyph lifetime](evidence/T-323-2026-11-26-parked-text-reclamation.md). | [T-318](Tickets/T-318.md), [T-322](Tickets/T-322.md) |
+| [T-324 · Reclaim applied orphaned subtree sources on permanent ancestor removal](Tickets/T-324.md) | Done | P0 T-148 integration: [atomic orphaned source retirement](evidence/T-324-2026-11-26-orphaned-subtree-reclamation.md). | [T-320](Tickets/T-320.md), [T-323](Tickets/T-323.md) |
+| [T-325 · Preserve unrelated native Redo during external subtree transfer replay](Tickets/T-325.md) | Done | P0 T-148 integration: [host transfer replay and branch ownership](evidence/T-325-2026-11-26-transfer-redo-ownership.md). | [T-172](Tickets/T-172.md), [T-314](Tickets/T-314.md), [T-322](Tickets/T-322.md) |
+| [T-328 · Preserve retained native history during chronological detached replay](Tickets/T-328.md) | Done | P0 T-148 integration: [real bounded history eviction and retained token replay](evidence/T-328-2026-11-26-ordered-detached-history.md). | [T-239](Tickets/T-239.md), [T-322](Tickets/T-322.md), [T-327](Tickets/T-327.md) |
+| [T-327 · Preflight host transfer publication and ordered restoration](Tickets/T-327.md) | Done | P0 T-148 integration: [checked source/ordered publication](evidence/T-327-2026-11-26-transfer-publication-boundary.md). | [T-326](Tickets/T-326.md) |
+| [T-326 · Preserve transferred raster layers' own native history between visits](Tickets/T-326.md) | Done | P0 T-148 integration: [native source release/re-admission and host token lifetime](evidence/T-326-2026-11-26-transfer-source-history.md). | [T-325](Tickets/T-325.md) |
 | [T-273 · Align whole right-dock toggle with outer edge](Tickets/T-273.md) | Done | **P0 engineering:** [real X11 screenshots and behavioral input proof](evidence/T-273-2026-11-23-dock-edge.md); T-250 owner review unapproved | [T-251](Tickets/T-251.md) |
 | [T-274 · Compact native ColorPicker width and duplicate chrome](Tickets/T-274.md) | Done | **P0 engineering:** [native full-width picker, optional exact RGBA8, real X11 screenshots and Drawing/Atlas regression](evidence/T-274-2026-11-23-native-picker-composition.md); owner approval remains T-250 | [T-226](Tickets/T-226.md), [T-252](Tickets/T-252.md) |
 | [T-275 · Repair stale workspace CI/owner-gate test contracts](Tickets/T-275.md) | Done | **P1 CI engineering:** [T-063/T-072 canonical status dependencies and 73-check native workspace regression](evidence/T-275-2026-11-23-workspace-ci-gates.md); T-250 approval and other hosted CI gates remain open | [T-063](Tickets/T-063.md), [T-072](Tickets/T-072.md) |
@@ -633,6 +753,10 @@ T-096 is blocked on T-149 because the pending native source/preview path would i
 
 | Ticket | Status | Scope / next gate | Hard dependencies |
 | --- | --- | --- | --- |
+| [T-330 · Replace sparse Drawing manifests and Atlas generation records with binary](Tickets/T-330.md) | Blocked | Binary root/backup, generations, indexes and sparse manifests; preserve atomic recovery. | [T-066](Tickets/T-066.md), [T-329](Tickets/T-329.md) |
+| [T-331 · Eliminate transitional Object-index JSON persistence](Tickets/T-331.md) | Blocked | Remove or replace transitional sidecar; keep a single authority and portable copies. | [T-329](Tickets/T-329.md), [T-330](Tickets/T-330.md) |
+| [T-333 · Audit and verify binary-only application persistence](Tickets/T-333.md) | Blocked | No-JSON persistence audit and exact-head native/offline/hosted validation before PR finalization. | [T-329](Tickets/T-329.md), [T-330](Tickets/T-330.md), [T-331](Tickets/T-331.md), [T-332](Tickets/T-332.md) |
+| [T-334 · Plan repository-wide legacy and unused code removal](Tickets/T-334.md) | Blocked | Deferred reachability audit and bounded cleanup plan; no deletions yet. | [T-333](Tickets/T-333.md), [T-150](Tickets/T-150.md) |
 
 
 | [T-013 · Projector framing object](Tickets/T-013.md) | Blocked | Completed scope; see ticket evidence | [T-039](Tickets/T-039.md), [T-022](Tickets/T-022.md), [T-250](Tickets/T-250.md) |

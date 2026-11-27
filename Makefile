@@ -23,7 +23,7 @@ TY_VERSION = $(shell "$(PYTHON)" tools/toolchain.py pin ty)
 PYTHON_CHECKS = tools/toolchain.py tools/prepare_native_project.py tools/check_offline_toolchain.py tools/run_t185_profile.py tools/package_linux_export.py tests/test_t201_linux_native_package.py tests/test_t185_profile.py tests/test_t198_matched_callbacks.py tests/test_t199_canvas_draw_cadence.py tests/test_t217_pck_index.py tests/test_t218_pck_payload_integrity.py tests/test_t219_pck_resource_names.py tests/test_t220_pck_project_identity.py tests/t217_pck_fixture.py
 
 .PHONY: help doctor native stage-drawing import-drawing import-atlas drawing atlas build \
-        test test-graphical test-dock-toggle test-dock-flyout test-floating-tabs test-floating-context test-floating-cancel test-floating-focus test-floating-release test-dock-release test-document-tabs test-color-interruption test-live-stroke test-viewport-cache test-selection-native test-large-move test-layer-hierarchy test-floating-dock test-object-sources check lint format clean bundle bundle-check bundle-verify python-test
+        test test-graphical test-bucket test-shapes test-selection-menu test-raster-export test-srgb test-text-options test-object-drop test-window-panels test-panel-icons test-binary-drawing verify-binary-drawing test-native-text-source verify-native-text-source test-native-subtree-source verify-native-subtree-source test-native-file-sources verify-native-file-sources test-native-sparse-sources verify-native-sparse-sources test-native-sparse-eviction verify-native-sparse-eviction test-native-text-history-source verify-native-text-history-source test-native-subtree-history-source verify-native-subtree-history-source test-native-mixed-subtree-source verify-native-mixed-subtree-source test-raster-creation-history verify-raster-creation-history test-history-reclamation verify-history-reclamation test-parked-text-reclamation verify-parked-text-reclamation test-orphaned-subtree-reclamation verify-orphaned-subtree-reclamation test-transfer-redo-ownership verify-transfer-redo-ownership test-transfer-source-history verify-transfer-source-history test-transfer-publication-boundary verify-transfer-publication-boundary test-ordered-detached-history verify-ordered-detached-history test-dock-toggle test-dock-flyout test-floating-tabs test-floating-context test-floating-cancel test-floating-focus test-floating-release test-dock-release test-document-tabs test-color-interruption test-live-stroke test-viewport-cache test-selection-native test-large-move test-layer-hierarchy verify-layer-disclosure test-floating-dock test-object-sources check lint format clean bundle bundle-check bundle-verify python-test
 
 help:
 	@printf '%s\n' 'make drawing [GODOT=/path] [TOOLCHAIN=system|bundle] [BUNDLE=/path/to.tar.zst]' \
@@ -57,6 +57,23 @@ atlas: import-atlas
 build: import-drawing import-atlas
 
 test: build
+	@$(MAKE) verify-binary-drawing
+	@$(MAKE) verify-native-text-source
+	@$(MAKE) verify-native-subtree-source
+	@$(MAKE) verify-native-file-sources
+	@$(MAKE) verify-native-sparse-sources
+	@$(MAKE) verify-native-sparse-eviction
+	@$(MAKE) verify-native-text-history-source
+	@$(MAKE) verify-native-subtree-history-source
+	@$(MAKE) verify-native-mixed-subtree-source
+	@$(MAKE) verify-raster-creation-history
+	@$(MAKE) verify-history-reclamation
+	@$(MAKE) verify-parked-text-reclamation
+	@$(MAKE) verify-orphaned-subtree-reclamation
+	@$(MAKE) verify-transfer-redo-ownership
+	@$(MAKE) verify-transfer-publication-boundary
+	@$(MAKE) verify-ordered-detached-history
+	@$(MAKE) verify-transfer-source-history
 	@$(WITH_TOOL) bash tools/build_native_brush.sh --test
 	@$(WITH_TOOL) godot --headless --path drawing --script res://tests/native_brush_integration.gd
 	@$(WITH_TOOL) godot --headless --path drawing --script res://tests/t148_native_tiles_contract.gd
@@ -78,6 +95,388 @@ test-graphical: import-drawing
 	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path drawing --script res://tests/t195_release_catchup.gd
 	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path drawing --script res://tests/t196_release_deferred.gd
 	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path drawing --script res://tests/t197_first_preview_callback.gd
+
+# T-302: actual standalone and Atlas Object Editor Bucket pointer transactions.
+test-bucket: import-drawing import-atlas
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path drawing --script res://tests/t302_bucket_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T302_NATIVE_PASSED
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path . --script res://tests/t302_atlas_bucket_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T302_ATLAS_PASSED
+
+# T-303: actual standalone and Atlas Object Editor Shapes pointer transactions.
+test-shapes: import-drawing import-atlas
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path drawing --script res://tests/t303_shapes_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T303_NATIVE_PASSED
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path . --script res://tests/t303_atlas_shapes_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T303_ATLAS_PASSED
+
+# T-304: real native menus, shortcuts and synchronized selection-mode routing.
+test-selection-menu: import-drawing import-atlas
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path drawing --script res://tests/t304_selection_menu_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T304_NATIVE_PASSED
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path . --script res://tests/t304_atlas_selection_menu_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T304_ATLAS_PASSED
+
+# T-305: bounded codec roundtrips and real native export/overwrite dialogs.
+test-raster-export: import-drawing import-atlas
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path drawing --script res://tests/t305_export_model.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T305_MODEL_PASSED
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path drawing --script res://tests/t305_export_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T305_NATIVE_PASSED
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path . --script res://tests/t305_atlas_export_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T305_ATLAS_PASSED
+
+# T-306: independent encoded-sRGB swatches, import metadata, and actual software framebuffers.
+test-srgb: import-drawing import-atlas
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path drawing --script res://tests/t306_srgb_model.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T306_MODEL_PASSED
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path drawing --script res://tests/t306_srgb_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T306_NATIVE_PASSED
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path . --script res://tests/t306_atlas_srgb_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T306_ATLAS_PASSED
+
+# T-307: real dock text authoring, semantic history and detached compositing.
+test-text-options: import-drawing import-atlas
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path drawing --script res://tests/t307_text_options_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T307_NATIVE_PASSED
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path . --script res://tests/t307_atlas_text_options_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T307_ATLAS_PASSED
+
+# T-308: standalone linked-source pointer placement and hosted Object background.
+test-object-drop: import-drawing import-atlas
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path drawing --script res://tests/t308_object_drop_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T308_NATIVE_PASSED
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path . --script res://tests/t308_atlas_object_background_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T308_ATLAS_PASSED
+
+# T-309: individual Window panel recovery, native popup input and persisted ownership.
+test-window-panels: import-drawing import-atlas
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 150s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path drawing --script res://tests/t309_window_panels_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T309_NATIVE_PASSED
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path . --script res://tests/t309_atlas_window_panels_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T309_ATLAS_PASSED
+
+# T-312: shared panel icon sampling and actual dock/rail/flyout/floating input.
+test-panel-icons: import-drawing import-atlas
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s xvfb-run -a --server-args='-screen 0 2200x1500x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path drawing --script res://tests/t312_panel_icons_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T312_NATIVE_PASSED
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s xvfb-run -a --server-args='-screen 0 2200x1500x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path . --script res://tests/t312_atlas_panel_icons_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T312_ATLAS_PASSED
+
+# T-310: binary standalone persistence; required by the ordinary fast CI test.
+test-binary-drawing: import-drawing
+	@$(MAKE) verify-binary-drawing
+
+verify-binary-drawing:
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path drawing \
+	    --script res://tests/t310_binary_drawing.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T310_BINARY_PASSED
+
+# T-313: canonical source adoption at semantic text rasterization.
+test-native-text-source: import-drawing import-atlas
+	@$(MAKE) verify-native-text-source
+	@$(WITH_TOOL) bash tools/build_native_brush.sh --test
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path . \
+	    --script res://tests/drawing_text_smoke.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker DRAWING_TEXT_PASSED
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path . --script res://tests/t307_atlas_text_options_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T307_ATLAS_PASSED
+
+verify-native-text-source:
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  for case in t313_native_text_source:T313_NATIVE_TEXT_SOURCE_PASSED \
+	      t148_text_raster_native_revision:T148_TEXT_RASTER_PASSED \
+	      t154_text_raster_parked_history:T154_PARKED_PASSED \
+	      t155_text_reraster_native_history:T155_RERASTER_PASSED; do \
+	    timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path drawing \
+	      --script "res://tests/$${case%:*}.gd" 2>&1 | tee "$$log"; \
+	    "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker "$${case#*:}"; \
+	  done
+
+# T-314: complete detached-subtree source publication.
+test-native-subtree-source: import-drawing import-atlas
+	@$(MAKE) verify-native-subtree-source
+	@$(WITH_TOOL) bash tools/build_native_brush.sh --test
+
+verify-native-subtree-source:
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  for case in t314_native_subtree_source:T314_NATIVE_SUBTREE_PASSED \
+	      t148_import_subtree_native_revision:T148_IMPORT_PASSED \
+	      t169_native_import_fence:T169_IMPORT_PASSED \
+	      t175_semantic_import_native_fence:T175_SEMANTIC_IMPORT_PASSED; do \
+	    timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path drawing \
+	      --script "res://tests/$${case%:*}.gd" 2>&1 | tee "$$log"; \
+	    "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker "$${case#*:}"; \
+	  done
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path . \
+	    --script res://tests/t172_atlas_transfer_undo_preflight.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T172_UNDO_PASSED
+
+# T-315: authorize portable Open at the saved revision before first paint.
+test-native-file-sources: import-drawing import-atlas
+	@$(MAKE) verify-native-file-sources
+
+verify-native-file-sources:
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  for case in t315_native_file_sources:T315_NATIVE_FILE_PASSED \
+	      t310_binary_drawing:T310_BINARY_PASSED \
+	      t166_native_save_source_fence:T166_SAVE_FENCE_PASSED \
+	      t158_signed_lazy_tile_bounds:T158_TILE_BOUNDS_PASSED \
+	      t230_detached_pixel_bootstrap:T230_PIXEL_BOOTSTRAP_PASSED \
+	      t232_tile_native_bootstrap:T232_TILE_BOOTSTRAP_PASSED \
+	      t233_pixel_native_bootstrap:T233_PIXEL_BOOTSTRAP_PASSED \
+	      standalone_smoke:DRAWING_STANDALONE_PASSED \
+	      asset_browser_transfer_smoke:T065_TRANSFERS_PASSED; do \
+	    timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path drawing \
+	      --script "res://tests/$${case%:*}.gd" 2>&1 | tee "$$log"; \
+	    "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker "$${case#*:}"; \
+	  done
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path . \
+	    --script res://tests/t148_object_native_source.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T148_OBJECT_NATIVE_PASSED
+
+# T-316: lazy native admission for physical sparse manifests and campaign generations.
+test-native-sparse-sources: import-drawing import-atlas
+	@$(MAKE) verify-native-sparse-sources
+
+verify-native-sparse-sources:
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  for case in t316_native_sparse_sources:T316_NATIVE_SPARSE_PASSED \
+	      t157_lazy_source_reentrant_guard:T157_LAZY_GUARD_PASSED \
+	      t158_signed_lazy_tile_bounds:T158_TILE_BOUNDS_PASSED \
+	      t166_native_save_source_fence:T166_SAVE_FENCE_PASSED \
+	      t315_native_file_sources:T315_NATIVE_FILE_PASSED; do \
+	    timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path drawing \
+	      --script "res://tests/$${case%:*}.gd" 2>&1 | tee "$$log"; \
+	    "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker "$${case#*:}"; \
+	  done
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  for case in campaign_bundle_smoke:ATLAS_BUNDLE_PASSED \
+	      campaign_bundle_editor_smoke:ATLAS_BUNDLE_EDITOR_PASSED \
+	      t172_atlas_transfer_undo_preflight:T172_UNDO_PASSED; do \
+	    timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path . \
+	      --script "res://tests/$${case%:*}.gd" 2>&1 | tee "$$log"; \
+	    "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker "$${case#*:}"; \
+	  done
+
+# T-317: real aggregate native residency pressure and pristine-source fences.
+test-native-sparse-eviction: import-drawing import-atlas
+	@$(MAKE) verify-native-sparse-eviction
+	@$(MAKE) verify-native-sparse-sources
+	@$(WITH_TOOL) bash tools/build_native_brush.sh --test
+
+verify-native-sparse-eviction:
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path drawing \
+	    --script res://tests/t317_sparse_eviction.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T317_SPARSE_EVICTION_PASSED
+
+# T-318: detached glyph source replay and unrelated native redo retention.
+test-native-text-history-source: import-drawing import-atlas
+	@$(MAKE) verify-native-text-history-source
+	@$(MAKE) verify-native-text-source
+	@$(WITH_TOOL) bash tools/build_native_brush.sh --test
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path . \
+	    --script res://tests/drawing_text_smoke.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker DRAWING_TEXT_PASSED
+
+verify-native-text-history-source:
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path drawing \
+	    --script res://tests/t318_text_history_source.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T318_TEXT_HISTORY_SOURCE_PASSED
+
+# T-319: detached subtree replay and preserved native history.
+test-native-subtree-history-source: import-drawing import-atlas
+	@$(MAKE) verify-native-subtree-history-source
+	@$(MAKE) verify-native-subtree-source
+	@$(MAKE) verify-native-text-history-source
+	@$(WITH_TOOL) bash tools/build_native_brush.sh --test
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path . \
+	    --script res://tests/t148_atlas_native_tile_history.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T148_ATLAS_NATIVE_PASSED
+
+verify-native-subtree-history-source:
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path drawing \
+	    --script res://tests/t319_subtree_history_source.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T319_SUBTREE_HISTORY_SOURCE_PASSED
+
+# T-320: mixed owned/unowned structural sources in one native revision.
+test-native-mixed-subtree-source: import-drawing import-atlas
+	@$(MAKE) verify-native-mixed-subtree-source
+	@$(MAKE) verify-native-subtree-history-source
+	@$(MAKE) verify-native-subtree-source
+	@$(WITH_TOOL) bash tools/build_native_brush.sh --test
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path . \
+	    --script res://tests/t148_atlas_native_tile_history.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T148_ATLAS_NATIVE_PASSED
+
+verify-native-mixed-subtree-source:
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path drawing \
+	    --script res://tests/t320_mixed_subtree_source.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T320_MIXED_SUBTREE_SOURCE_PASSED
+
+# T-321: created raster Undo/Redo retains native paint history and reclaims abandoned branches.
+test-raster-creation-history: import-drawing import-atlas
+	@$(MAKE) verify-raster-creation-history
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path drawing \
+	    --script res://tests/t177_raster_history_native_fence.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T177_RASTER_PASSED
+	@$(WITH_TOOL) bash tools/build_native_brush.sh --test
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path . \
+	    --script res://tests/t148_atlas_native_tile_history.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T148_ATLAS_NATIVE_PASSED
+
+verify-raster-creation-history:
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path drawing \
+	    --script res://tests/t321_raster_creation_history.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T321_RASTER_CREATION_HISTORY_PASSED
+
+# T-322: native event lifetime follows local and global command branches.
+test-history-reclamation: import-drawing import-atlas
+	@$(MAKE) verify-history-reclamation
+	@$(WITH_TOOL) bash tools/build_native_brush.sh --test
+
+verify-history-reclamation:
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path . \
+	    --script res://tests/t322_history_reclamation.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T322_HISTORY_RECLAMATION_PASSED
+
+# T-323: reclaim abandoned parked glyphs without touching live native history.
+test-parked-text-reclamation: import-drawing import-atlas
+	@$(MAKE) verify-parked-text-reclamation
+	@$(WITH_TOOL) bash tools/build_native_brush.sh --test
+
+verify-parked-text-reclamation:
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path drawing \
+	    --script res://tests/t323_parked_text_reclamation.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T323_PARKED_TEXT_RECLAMATION_PASSED
+
+# T-324: permanent ancestor retirement must not strand parked descendants.
+test-orphaned-subtree-reclamation: import-drawing import-atlas
+	@$(MAKE) verify-orphaned-subtree-reclamation
+	@$(WITH_TOOL) bash tools/build_native_brush.sh --test
+
+verify-orphaned-subtree-reclamation:
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path drawing \
+	    --script res://tests/t324_orphaned_subtree_reclamation.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T324_ORPHANED_SUBTREE_RECLAMATION_PASSED
+
+# T-325: external structural replay must preserve unrelated native Redo.
+test-transfer-redo-ownership: import-drawing import-atlas
+	@$(MAKE) verify-transfer-redo-ownership
+
+verify-transfer-redo-ownership:
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path . \
+	    --script res://tests/t325_transfer_redo_ownership.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T325_TRANSFER_REDO_OWNERSHIP_PASSED
+
+# T-326: retain the transferred raster's own native history between visits.
+test-transfer-source-history: import-drawing import-atlas
+	@$(MAKE) verify-transfer-source-history
+	@$(WITH_TOOL) bash tools/build_native_brush.sh --test
+
+verify-transfer-source-history:
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path . \
+	    --script res://tests/t326_transfer_source_history.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T326_TRANSFER_SOURCE_HISTORY_PASSED
+
+# T-327: checked two-document structural publication and ordered replay.
+test-transfer-publication-boundary: import-drawing import-atlas
+	@$(MAKE) verify-transfer-publication-boundary
+
+verify-transfer-publication-boundary:
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path . \
+	    --script res://tests/t327_transfer_publication_boundary.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T327_TRANSFER_PUBLICATION_BOUNDARY_PASSED
+
+# T-328: chronological detached replay must retain bounded native history.
+test-ordered-detached-history: import-drawing import-atlas
+	@$(MAKE) verify-ordered-detached-history
+	@$(WITH_TOOL) bash tools/build_native_brush.sh --test
+
+verify-ordered-detached-history:
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path . \
+	    --script res://tests/t328_ordered_detached_history.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T328_ORDERED_DETACHED_HISTORY_PASSED
 
 # T-262: reproducible T-085 held-preview native CI witness after both imports.
 # Retain complete process logs during validation, then remove temporary files.
@@ -184,6 +583,21 @@ test-layer-hierarchy: import-drawing import-atlas
 	    --path . --script res://tests/t269_atlas_layers_native.gd 2>&1 | tee "$$log"; \
 	  grep -Fxq 'T269_ATLAS: 27 checks; 0 failures' "$$log"; \
 	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T269_ATLAS_PASSED
+
+	@$(MAKE) verify-layer-disclosure
+
+# T-311: real native hierarchy disclosure and hosted Object view isolation.
+verify-layer-disclosure:
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 150s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path drawing --script res://tests/t311_layer_disclosure_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T311_NATIVE_PASSED
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 150s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path . --script res://tests/t311_atlas_layer_disclosure_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T311_ATLAS_PASSED
 
 # T-270: required-native T-091 floating width/grip/regroup and Atlas cancellation.
 # All logged processes fail closed through Bash pipefail and strict log checks.

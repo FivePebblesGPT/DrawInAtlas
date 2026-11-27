@@ -96,6 +96,8 @@ func _run() -> void:
 	var file_path: String = ProjectSettings.globalize_path("user://drawing-t053-test.drawing")
 	shell._save_file(file_path)
 	check(FileAccess.file_exists(file_path) and not document.is_dirty(), "Save produces clean standalone file")
+	check(FileAccess.get_file_as_bytes(file_path).slice(0, 8).get_string_from_ascii() == "DIADRAW2",
+		"standalone Save writes versioned binary file")
 	shell._open_file(file_path)
 	check(shell.tabs.size() == 2, "Open creates a new document tab")
 	var reopened: DrawingDocument = shell.current_document()

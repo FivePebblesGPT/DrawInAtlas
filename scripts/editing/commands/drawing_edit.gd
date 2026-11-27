@@ -51,7 +51,7 @@ func apply(_campaign: AtlasCampaign) -> bool:
 	if _applied or document == null or document.id != document_id \
 			or document.revision != _expected_revision or not document.external_history:
 		return false
-	var result: DrawingResult = document.replay_delta(delta, false)
+	var result: DrawingResult = document.replay_delta(delta, false, true)
 	if not result.ok:
 		return false
 	_expected_revision = document.revision
@@ -63,7 +63,7 @@ func revert(_campaign: AtlasCampaign) -> bool:
 	if not _applied or document == null or document.id != document_id \
 			or document.revision != _expected_revision or not document.external_history:
 		return false
-	var result: DrawingResult = document.replay_delta(delta, true)
+	var result: DrawingResult = document.replay_delta(delta, true, true)
 	if not result.ok:
 		return false
 	_expected_revision = document.revision

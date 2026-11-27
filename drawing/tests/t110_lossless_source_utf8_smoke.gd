@@ -1,6 +1,7 @@
 extends SceneTree
-## A portable source is indexed only when its exact bytes are valid UTF-8.
+## Legacy JSON sources are indexed only when their exact bytes are valid UTF-8.
 ## JSON's replacement-character fallback must never authorize malformed bytes.
+## T-310 binary envelopes have separate validation; this fixture targets JSON.
 
 const INDEX: Script = preload("res://addons/drawing/asset_browser_index.gd")
 const TRANSFER: Script = preload("res://addons/drawing/asset_browser_transfer.gd")
@@ -22,7 +23,7 @@ func check(condition: bool, label: String) -> void:
 
 func write_source(path: String, id: String, name: String) -> bool:
 	return DrawingObjectEditorFile.save(DrawingDocument.new(id, 16), path, name,
-		Vector2i(-17, 9), Rect2i(-33, -7, 9, 11), 1).ok
+		Vector2i(-17, 9), Rect2i(-33, -7, 9, 11), 1, true).ok
 
 
 func replace_one_utf8_byte(path: String, token: String) -> bool:

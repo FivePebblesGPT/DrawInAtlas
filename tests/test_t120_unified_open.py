@@ -21,9 +21,12 @@ class T120UnifiedOpenContracts(unittest.TestCase):
             'top_bar.add_menu_spec("Object"', 1)[0]
         object_spec = self.workspace.split('top_bar.add_menu_spec("Object"', 1)[1].split(
             'top_bar.add_menu_spec("Edit"', 1)[0]
-        for label in ("New  Ctrl+N", "Open…  Ctrl+O", "Save  Ctrl+S",
-                      "Save As…  Ctrl+Shift+S", "Close Tab  Ctrl+W"):
+        for label in ("New", "Open…", "Save", "Save As…", "Close Tab"):
             self.assertIn(label, file_spec)
+        for accelerator in ("0: KEY_MASK_CTRL | KEY_N", "1: KEY_MASK_CTRL | KEY_O",
+                            "2: KEY_MASK_CTRL | KEY_S", "3: KEY_MASK_CTRL | KEY_MASK_SHIFT | KEY_S",
+                            "4: KEY_MASK_CTRL | KEY_W"):
+            self.assertIn(accelerator, file_spec)
         for label in ("New Source", "Open Source…", "Rename Source…",
                       "Save Source As…", "Browse Sources…"):
             self.assertIn(label, object_spec)
@@ -51,7 +54,10 @@ class T120UnifiedOpenContracts(unittest.TestCase):
         self.assertIn('if not path.to_lower().ends_with(".drawing"):', self.workspace)
 
     def test_real_overflow_maps_original_commands_with_checkmark_parity(self) -> None:
-        for contract in ('more.add_item("%s › %s"', '_more_actions.append(handlers[command])',
+        for contract in ('var label: String = "%s › %s" % [spec["title"], labels[command]]',
+                         'more.add_item(label, item_id)', '_more_actions.append(handlers[command])',
+                         '_more_item_ids[Vector2i(index, command)] = item_id',
+                         'more.set_item_disabled(item_id, original.is_item_disabled(command))',
                          'more.set_item_checked(item_id, original.is_item_checked(command))',
                          'var available_width: float = size.x',
                          'available_width = minf(available_width, (ancestor as Control).size.x)'):

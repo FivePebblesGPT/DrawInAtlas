@@ -27,17 +27,17 @@ Object Assets. These requirements remain fixed regardless of final UX changes.
 
 **Current UI audit (T-063; source: `addons/drawing/workspace.gd` and
 `addons/drawing/editor_top_bar.gd`):** the shared shell now implements the
-fixed File/Edit/View/Image/Layers/Select/Window/Help menu order, context-sensitive
-Brush/Eraser/Select/Move/Text controls, horizontal tool-option scrolling with
+fixed File/Object/Edit/View/Image/Layers/Selection/Window/Text/Help menu order, context-sensitive
+Brush/Eraser/Bucket/Shapes/Select controls, horizontal tool-option scrolling with
 chevrons/Shift+wheel, keyboard focus-to-view, reset on tool switch and a
 narrow-screen **More** menu. It uses a single top row, without duplicate
-quick-access toolbar, plus a six-tool rail (**Brush, Eraser, Select, Move,
+quick-access toolbar, plus an eight-tool rail (**Brush, Eraser, Bucket, Shapes, Select, Move,
 Text, Pan**), document tabs, a resizable/hideable Colors/Layers/History dock,
-and a clipped status bar. The selection-history preference (OFF by default)
-is in the History dock, not a tool option. Unsupported options (opacity,
+and a clipped status bar. T-302 adds the Bucket tolerance field and press-preview/release-commit workflow; see [Bucket workflow](BUCKET_WORKFLOW.md). T-303 adds Rectangle/Ellipse/Polygon, Fill/Stroke, FG/BG and contextual stroke width; see [Shapes workflow](POLYGON_WORKFLOW.md). The selection-history preference (OFF by default)
+is in Edit > Preferences, not a tool option. T-304 removes the exposed Snap toggle and duplicate Select/Move menu commands; Selection > Selection mode and the Select contextual dropdown share Replace/Add/Subtract/Intersect state. More preserves the submenu and key captions when Selection overflows. T-311 uses native layer TreeItem parenting, contrasting group disclosure chevrons and keyboard Left/Right. Disclosure is per live tab, outside artwork/history; search shows matching descendants with ancestor context and ordinary paging excludes folded descendants. T-307 introduces a dockable Text Options panel and Text menu, sharing style, alignment, size, Apply and Cancel commands. Live semantic drafts render in layer order without writing history until Apply; see the [Drawing guide](../drawing/README.md#editable-text-t-058-t-307). Unsupported options (opacity,
 feather and arbitrary transforms) are **not** displayed as working controls.
 
-**Visible shortcut labels:** File/Edit menus expose New `Ctrl+N`, Open
+**Visible shortcut labels:** T-304 uses a separate muted native accelerator column (including More), with focus-aware shortcut handling unchanged. File/Edit menus expose New `Ctrl+N`, Open
 `Ctrl+O`, Save `Ctrl+S`, Save As `Ctrl+Shift+S`, Undo `Ctrl+Z` and primary
 Redo `Ctrl+Y`; `Ctrl+Shift+Z` remains a supported redo alias. Native automation
 (`drawing/tests/compact_workspace_smoke.gd`) verifies Save As, narrow overflow,
@@ -134,8 +134,13 @@ Suggested commands and shortcuts:
 | File | Open | Ctrl+O |
 | File | Save | Ctrl+S |
 | File | Save As | Ctrl+Shift+S |
+| File | Export… | — |
 | Edit | Undo | Ctrl+Z |
 | Edit | Redo | Ctrl+Y or Ctrl+Shift+Z (choose one default) |
+
+**Artwork color (T-306):** Straight encoded sRGB RGBA8 with linear alpha is the canonical document and pigment boundary. Hokusai's internal linear-light pigment is decoded/encoded exactly once; ordinary source-over uses the existing encoded-byte compositor. Both projects use SDR Compatibility rendering. PNG carries an sRGB declaration; JPEG/WebP are unprofiled sRGB output. Arbitrary ICC conversion and monitor calibration are not provided. See [color contract](DRAWING_COLOR_SPACE.md) for decoder behavior and measured witnesses.
+
+**Raster export (T-305):** File > Export… is independent of Save and exports the visible composite clipped to the current signed image frame (Object frame for a hosted editor). A finite frame is required; maximum side 4096, total 4,194,304 pixels, encoded size 32 MiB. PNG preserves alpha losslessly; WebP offers lossless or quality-controlled lossy encoding; JPEG offers quality and an explicit opaque matte. Update encoded preview shows the actual encoded byte count and decoded preview, with bounded display size and scrollable compact options. Confirm a matching output extension in the export chooser; existing files require overwrite confirmation. Cancellation, pending edits, stale sources and write errors never implicitly commit or save the document.
 
 Keep a visible modified-document indicator (`*`), preserve unsaved-change prompts, and show shortcuts in menu items.
 
@@ -168,7 +173,7 @@ Example contextual content:
 | Eraser | Size, Opacity, Hardness, Mode |
 | Rectangle | Fill, Stroke color, Stroke width, Corner radius, Shape/Pixel mode |
 | Selection | Selection mode (New/Add/Subtract/Intersect), Feather, Antialias |
-| Text | Font, Size, Style, Alignment, Color |
+| Text | Dockable Text Options (bundled font style, size, alignment, color, angle); common commands in Text menu |
 | Move/Transform | Position, Width, Height, Rotation, Constrain proportions |
 
 Only show controls supported by the Draw engine; do not render misleading or nonfunctional options.

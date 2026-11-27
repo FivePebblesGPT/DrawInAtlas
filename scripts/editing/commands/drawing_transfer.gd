@@ -1,6 +1,7 @@
 class_name AtlasDrawingTransfer
 extends AtlasEditCommand
 ## One global history step transfers a detached Drawing layer/group tree.
+## The timeline alone abandons unrelated Redo; replay must retain it.
 ## Documents are required to use Atlas-owned history. Different density needs
 ## a separate, explicitly approved resampling transaction (T-061).
 
@@ -15,6 +16,7 @@ var copied: bool = false
 var before_context: DrawingHistoryContext
 var after_context: DrawingHistoryContext
 var _snapshot: Dictionary = {}
+# Only Copy needs a second snapshot: its layer/object identities are remapped.
 var _inserted_snapshot: Dictionary = {}
 var _source_revision: int = -1
 var _target_revision: int = -1
@@ -41,18 +43,24 @@ func _init(from: DrawingDocument, into: DrawingDocument, node_id: String,
 			or source.tile_stride != target.tile_stride \
 			or source.density_numerator * target.density_denominator != target.density_numerator * source.density_denominator:
 		return
-	var node: DrawingLayerNode = source.inspect_node(source_node_id)
-	if node == null or not target.has_node(target_parent_id) \
+	var node: Dictionary = source.node_metadata(source_node_id)
+	if node.is_empty() or not target.has_node(target_parent_id) \
 			or (not copied and not source.can_remove_subtree(source_node_id)):
 		return
-	source_parent_id = node.parent_id
+	source_parent_id = String(node["parent"])
 	source_index = source.list_children(source_parent_id).find(source_node_id)
-	var exported: DrawingResult = source.export_subtree(source_node_id)
-	if not exported.ok:
+	if source_index < 0:
 		return
-	_snapshot = exported.value
+	# A lazy source provider can mutate either document synchronously. Do not
+	# accept its new destination revision as if it were the original context.
 	_source_revision = source.revision
 	_target_revision = target.revision
+	var target_epoch: int = target.display_source_epoch
+	var exported: DrawingResult = source.export_subtree(source_node_id)
+	if not exported.ok or source.revision != _source_revision or target.revision != _target_revision or \
+			target.display_source_epoch != target_epoch:
+		return
+	_snapshot = exported.value
 	_prepared = true
 
 
@@ -64,37 +72,31 @@ func expect_live_revisions() -> void:
 
 func apply(_campaign: AtlasCampaign) -> bool:
 	if not _prepared or _applied or source.revision != _source_revision \
-			or target.revision != _target_revision:
+			or target.revision != _target_revision or not source.external_history or not target.external_history \
+			or _snapshot.get("root") != source_node_id:
 		return false
-	# Atlas owns the history cursor, not a two-document native transaction.
-	# Reject a busy, stale or tampered Rust source before publishing the
-	# destination; the later source retirement uses the same native check.
-	if not copied and not source.preflight_unrecorded_subtree_removal(source_node_id).ok:
+	# All lazy fetches are finished. Check the outgoing tree and retirement
+	# before importing anything. Copy Redo uses the retained independent copy.
+	var first_import: bool = target_node_id.is_empty()
+	if (not copied or first_import) and not source.preflight_host_transfer_source(_snapshot, not copied).ok:
 		return false
+	var capture_copy: bool = copied and first_import
 	var inserted: DrawingResult = target.import_subtree(
-		_inserted_snapshot if not _inserted_snapshot.is_empty() else _snapshot,
-		target_parent_id, not _inserted_snapshot.is_empty() or not copied)
+		_inserted_snapshot if copied and not first_import else _snapshot,
+		target_parent_id, not capture_copy, true, -1, capture_copy)
 	if not inserted.ok:
 		return false
-	var new_id: String = String(inserted.value)
+	var new_id: String = String(inserted.value["id"]) if capture_copy else String(inserted.value)
 	if not copied:
-		var removed: DrawingResult = source.remove_subtree(source_node_id)
+		var removed: DrawingResult = source.remove_subtree(source_node_id, false, true)
 		if not removed.ok:
-			target.remove_subtree(new_id)
+			# No provider or ordinary failure point remains after preflight.
+			# Keep defensive recovery for unexpected internal divergence.
+			target.remove_subtree(new_id, false, true)
 			_target_revision = target.revision
 			return false
-	if _inserted_snapshot.is_empty():
-		var exported: DrawingResult = target.export_subtree(new_id)
-		if not exported.ok:
-			# An unexpected bad chunk must not leave a half-moved tree.
-			if not copied:
-				source.import_subtree(_snapshot, source_parent_id, true)
-				source.reorder(source_node_id, source_parent_id, source_index)
-			target.remove_subtree(new_id)
-			_source_revision = source.revision
-			_target_revision = target.revision
-			return false
-		_inserted_snapshot = exported.value
+	if capture_copy:
+		_inserted_snapshot = inserted.value["snapshot"]
 	target_node_id = new_id
 	_applied = true
 	_source_revision = source.revision
@@ -104,27 +106,26 @@ func apply(_campaign: AtlasCampaign) -> bool:
 
 func revert(_campaign: AtlasCampaign) -> bool:
 	if not _applied or source.revision != _source_revision \
-			or target.revision != _target_revision or not target.has_node(target_node_id):
+			or target.revision != _target_revision or not target.has_node(target_node_id) \
+			or not source.external_history or not target.external_history \
+			or (copied and _inserted_snapshot.get("root") != target_node_id) or _snapshot.get("root") != source_node_id \
+			or (not copied and target_node_id != source_node_id):
 		return false
-	# Undo of a move must not restore the source before Rust approves
-	# retirement of the target's native-owned raster subtree. If the target
-	# is busy, stale or has modified source bytes, compensating deletion of
-	# the restored source would be another fallible transaction.
-	if not target.preflight_unrecorded_subtree_removal(target_node_id).ok:
-		return false
+	# Validate the exact imported source before touching the original tree.
+	# Copy Undo is allowed to remove its own protected root, not an arbitrary
+	# locked/hidden layer. Move Undo restores sibling order with the import.
 	if not copied:
-		var restored: DrawingResult = source.import_subtree(_snapshot, source_parent_id, true)
+		# Move uses one immutable logical source snapshot for both visits.
+		if not target.preflight_host_transfer_source(_snapshot, true, false, target_parent_id).ok:
+			return false
+		var restored: DrawingResult = source.import_subtree(_snapshot, source_parent_id, true, true, source_index)
 		if not restored.ok:
 			return false
-		# Restore original sibling position, not just the layer identity.
-		var reordered: DrawingResult = source.reorder(source_node_id, source_parent_id, source_index)
-		if not reordered.ok:
-			source.remove_subtree(source_node_id)
-			return false
-	var removed: DrawingResult = target.remove_subtree(target_node_id)
+	var removed: DrawingResult = target.remove_host_copied_subtree(_inserted_snapshot) if copied else \
+		target.remove_subtree(target_node_id, false, true)
 	if not removed.ok:
 		if not copied:
-			source.remove_subtree(source_node_id)
+			source.remove_subtree(source_node_id, false, true)
 		return false
 	_applied = false
 	_source_revision = source.revision

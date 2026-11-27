@@ -39,7 +39,7 @@ func click_row(workspace: Control, node_id: String, button_index: int = -1) -> b
 	var tree: Tree = workspace.layers
 	var item: TreeItem = tree.get_root().get_first_child()
 	while item != null and String(item.get_metadata(0)) != node_id:
-		item = item.get_next()
+		item = item.get_next_in_tree()
 	if item == null:
 		return false
 	var rect: Rect2 = tree.get_item_area_rect(item, 0, button_index)
@@ -47,7 +47,7 @@ func click_row(workspace: Control, node_id: String, button_index: int = -1) -> b
 		return false
 	var target: Vector2 = tree.global_position + rect.get_center()
 	if button_index < 0:
-		target.x = tree.global_position.x + 18.0
+		target.x = tree.global_position.x + rect.size.x * 0.45
 	await click_at(target)
 	return true
 
@@ -140,7 +140,7 @@ func run() -> void:
 		if String(item.get_metadata(0)) == top:
 			top_item = item
 			break
-		item = item.get_next()
+		item = item.get_next_in_tree()
 	check(top_item != null and top_item.get_button_count(0) == 2,
 		"each row has direct eye and lock buttons")
 	var before_scroll_revision: int = doc.revision
@@ -247,8 +247,8 @@ func run() -> void:
 	# Short viewport is a separate native layout smoke, without changing source data.
 	root.size = Vector2i(880, 550)
 	await frames(4)
-	check(workspace.layers.size.y > 0 and workspace.layers.get_root().get_child_count() > 0 and
-		workspace.layers.get_root().get_child_count() <= workspace.ROW_PAGE,
+	check(workspace.layers.size.y > 0 and not workspace._layer_items.is_empty() and
+		workspace._layer_items.size() <= workspace.ROW_PAGE,
 		"short viewport keeps a bounded, populated layer tree")
 	workspace.queue_free()
 	await frames(2)

@@ -21,6 +21,8 @@ static func import_file(index: DrawingAssetBrowserIndex, source_path: String) ->
 	var read: DrawingResult = DrawingObjectEditorFile.open(source)
 	if not read.ok:
 		return read
+	if not (read.value["document"] as DrawingDocument).linked_records().is_empty():
+		return DrawingResult.failure("NESTED_IMPORT", "A linked Object requires its authorized source library; single-source import is not supported")
 	if not _safe_source_file(source) or FileAccess.get_sha256(source) != selected_sha256:
 		return DrawingResult.failure("STALE_SOURCE", "Incoming Object source changed during validation")
 	var source_id: String = String(read.value["source_id"])
@@ -77,6 +79,11 @@ static func export_file(index: DrawingAssetBrowserIndex, entry: Dictionary,
 		destination_path: String) -> DrawingResult:
 	if index == null or not index.safe_to_open(entry):
 		return DrawingResult.failure("STALE_SOURCE", "Refresh before exporting a changed Object source")
+	var read: DrawingResult = DrawingObjectEditorFile.open(String(entry["path"]))
+	if not read.ok:
+		return read
+	if not (read.value["document"] as DrawingDocument).linked_records().is_empty():
+		return DrawingResult.failure("NESTED_EXPORT", "Nested single-source export requires an explicit link/copy policy")
 	var destination: String = destination_path.simplify_path()
 	if destination.begins_with(index.root_path + "/"):
 		return DrawingResult.failure("EXPORT_PATH", "Export outside the current Objects/ folder")
@@ -108,16 +115,23 @@ static func _copy_to_new_file(source: String, target: String,
 			FileAccess.file_exists(target):
 		return DrawingResult.failure("EXISTS", "Destination exists or is not a safe directory")
 	var reader: FileAccess = FileAccess.open(source, FileAccess.READ)
-	if reader == null or reader.get_length() <= 0 or reader.get_length() > MAX_BYTES:
-		return DrawingResult.failure("FILE_LIMIT", "Source is missing, empty or oversized")
+	if reader == null:
+		return DrawingResult.failure("FILE_LIMIT", "Source is missing or unreadable")
+	var length: int = reader.get_length()
+	if length <= 0 or length > MAX_BYTES:
+		reader.close()
+		return DrawingResult.failure("FILE_LIMIT", "Source is empty or oversized")
 	var before: String = FileAccess.get_sha256(source)
-	var bytes: PackedByteArray = reader.get_buffer(reader.get_length())
+	var bytes: PackedByteArray = reader.get_buffer(length)
 	reader.close()
-	# An incoming .drawing can be valid JSON *after* Godot replaces malformed
-	# UTF-8. Never publish bytes the portable index must later reject. Perform
-	# this check on the captured copy, before creating a .pending file.
-	if bytes.get_string_from_utf8().to_utf8_buffer() != bytes:
-		return DrawingResult.failure("SOURCE_UTF8", "Portable Object source must be valid UTF-8")
+	if bytes.size() != length:
+		return DrawingResult.failure("STALE_SOURCE", "Source was truncated while copying")
+	# Validate the captured envelope before publishing the byte-for-byte copy.
+	# Legacy JSON still requires exact UTF-8; binary payloads use their own
+	# version, bounds and digest checks rather than a text conversion.
+	var envelope: DrawingResult = DrawingFileIO.parse_payload(bytes)
+	if not envelope.ok:
+		return envelope
 	var hashed: HashingContext = HashingContext.new()
 	hashed.start(HashingContext.HASH_SHA256)
 	hashed.update(bytes)

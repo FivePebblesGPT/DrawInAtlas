@@ -30,9 +30,9 @@ func _run() -> void:
 	_check(doc.revision == starting_revision, "Switching tools has no content effect")
 	var world_point: Vector2i = Vector2i(-24, -19)
 	app._edit_text_at(world_point)
-	_check(doc.revision == starting_revision and app.text_dialog.visible,
+	_check(doc.revision == starting_revision and app.text_panel.is_visible_in_tree() and app.text_edit.editable,
 		"Opening text dialog creates no layer")
-	app.text_dialog.hide()
+	app._cancel_text()
 	_check(doc.revision == starting_revision and doc.layer_count() == first_count,
 		"Cancel creates no layer")
 	app._edit_text_at(world_point)
@@ -57,7 +57,7 @@ func _run() -> void:
 	_check(doc.inspect_node(text_id).kind == DrawingLayerNode.TEXT, "Undo restores editable text")
 	app.layer_search.text = "harbor"
 	app._refresh_layers()
-	_check(app.layers.get_root().get_child_count() == 1, "Search filters layer rows")
+	_check(app._layer_items.has(text_id) and app.layer_page_label.text.ends_with("· 1"), "Search filters layer rows")
 	app.layer_search.text = ""
 	app._refresh_layers()
 	var path: String = OS.get_cache_dir().path_join("text-ui-t058.drawing")

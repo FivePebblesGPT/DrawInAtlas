@@ -106,7 +106,7 @@ func test_layer_commands(base: String) -> void:
 		"rejected Tree selection visibly restores active layer")
 	var row: TreeItem = app.layers.get_root().get_first_child()
 	while row != null and String(row.get_metadata(0)) != second:
-		row = row.get_next()
+		row = row.get_next_in_tree()
 	check(row != null, "alternate Tree row available for real selection event")
 	if row != null:
 		row.select(0)

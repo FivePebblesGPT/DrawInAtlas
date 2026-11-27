@@ -5,6 +5,13 @@ extends RefCounted
 
 const TILES: Script = preload("res://addons/drawing/signed_tiles.gd")
 const ROOT_ID: String = "root"
+const LINK_KIND: String = "drawing-linked-object-v1"
+const MAX_LINKS: int = 64
+const MAX_STRUCTURAL_REVISION: int = 9223372036854775807
+## Explicit browser authorization supplies detached *published* sources only.
+## Never serialized, never inferred from a path in a Drawing file.
+var linked_sources: Dictionary = {}
+var linked_source_error: String = ""
 ## Native store cap; three full spans per touched tile cover source and replay buffers.
 const MAX_NATIVE_HISTORY_TRANSFER_BYTES: int = 256 * 1024 * 1024
 ## Also bound direct external tile publication before lazy source resolution.
@@ -64,6 +71,16 @@ var _native_source_identities: Dictionary[String, Variant] = {}
 var _open_edit_sessions: Array[WeakRef] = []
 ## Reentrant lazy providers must never resolve the same key recursively.
 var _resolving_chunks: Dictionary[String, bool] = {}
+## Physical sparse manifests opt in to checked native admission at first read.
+## Portable decode instead adopts all validated sources as one provisional store.
+var _native_lazy_admission: bool = false
+## Only verified first-read physical sources are candidates. Weak tile
+## identity prevents a cache entry from retaining a detached or replaced tile.
+## The original callable/ref/digest is the re-admission authority.
+var _sparse_reloads: Dictionary[String, Dictionary] = {}
+const SPARSE_RENDER_HIGH_WATER_BYTES: int = 192 * 1024 * 1024
+const SPARSE_RENDER_TARGET_BYTES: int = 128 * 1024 * 1024
+const SPARSE_RENDER_EVICTION_SCAN: int = 256
 
 
 ## Once Rust is attached, no direct raster publisher may fall back to a
@@ -91,7 +108,52 @@ func _native_store_for_edit(expected: int) -> Object:
 			if not _native_raster_store.call("rebase_external_revision", native_revision, revision):
 				return null
 			_native_source_identities.clear()
+			_sparse_reloads.clear()
 	return _native_raster_store
+
+
+## Adopt a fully validated, newly opened portable document at its saved
+## revision. This is source initialization, not an edit or history event.
+## The provisional owner is invisible until every tile import succeeds.
+## Sparse campaign manifests still resolve sources lazily, independently.
+func _adopt_opened_raster_sources() -> DrawingResult:
+	if _native_raster_store != null or not _native_source_identities.is_empty() or \
+			revision != published_revision or is_dirty() or not _events.is_empty() or \
+			not _pending_tiles.is_empty() or not _dirty_tiles.is_empty() or has_unpublished_edit():
+		return DrawingResult.failure("NATIVE_SOURCE", "Expected a clean, fully resolved portable document")
+	# Historical synthetic strides and native-free model fixtures retain the
+	# existing reader. Production Drawing requires the extension and stride.
+	if tile_stride < 16 or not ClassDB.class_exists("DrawingNativeTiles"):
+		return DrawingResult.success(null, revision)
+	var tile_count: int = 0
+	for node: DrawingLayerNode in _nodes.values():
+		tile_count += node.tiles.size()
+		if tile_count > 4096 or tile_count * tile_stride * tile_stride * 4 > MAX_NATIVE_HISTORY_TRANSFER_BYTES:
+			return DrawingResult.failure("NATIVE_SOURCE", "Opened raster exceeds native source budget")
+	if tile_count == 0:
+		return DrawingResult.success(null, revision)
+	var store: Object = ClassDB.instantiate("DrawingNativeTiles")
+	if store == null or int(store.call("tile_abi_version")) != 1 or \
+			not bool(store.call("configure", tile_stride, revision)):
+		return DrawingResult.failure("NATIVE_SOURCE", "Cannot initialize native portable source owner")
+	var identities: Dictionary[String, Variant] = {}
+	for node: DrawingLayerNode in _nodes.values():
+		for key: String in node.tiles:
+			var tile: DrawingRasterTile = node.tiles[key]
+			var coords: PackedStringArray = key.split(",")
+			if node.kind != DrawingLayerNode.RASTER or tile == null or tile.stride != tile_stride or \
+					not tile.has_canonical_storage() or coords.size() != 2 or \
+					not coords[0].is_valid_int() or not coords[1].is_valid_int():
+				return DrawingResult.failure("NATIVE_SOURCE", "Invalid opened raster source")
+			var cx: int = int(coords[0])
+			var cy: int = int(coords[1])
+			if key != "%d,%d" % [cx, cy] or not TILES.tile_coordinates_in_projection_range(cx, cy, tile_stride) or \
+					not bool(store.call("import_source", node.id, cx, cy, revision, tile.to_rgba8())):
+				return DrawingResult.failure("NATIVE_SOURCE", "Native opened tile rejected: " + node.id + ":" + key)
+			identities[node.id + ":" + key] = tile
+	_native_raster_store = store
+	_native_source_identities = identities
+	return DrawingResult.success(null, revision)
 
 
 ## Metadata-only mutation: preserve native raster ownership and Undo tokens
@@ -107,6 +169,7 @@ func _advance_nonraster_revision(discard_redo: bool = true) -> void:
 	if not _native_raster_store.call("advance_metadata_revision", previous, discard_redo):
 		_native_raster_store = null
 		_native_source_identities.clear()
+		_sparse_reloads.clear()
 
 
 ## Public metadata and semantic operations acquire the native revision *before*
@@ -115,6 +178,8 @@ func _advance_nonraster_revision(discard_redo: bool = true) -> void:
 ## failure must never detach canonical Rust source. No callbacks occur
 ## between the checked native step and the deterministic live-state write.
 func _advance_checked_layer_metadata(discard_redo: bool = true) -> DrawingResult:
+	if revision < 0 or revision >= MAX_STRUCTURAL_REVISION:
+		return DrawingResult.failure("STALE_REVISION", "Metadata revision cannot advance")
 	if _native_raster_store != null:
 		if not _attached_native_revision_matches(revision):
 			return DrawingResult.failure("STALE_REVISION", "Native metadata revision diverged")
@@ -154,8 +219,15 @@ func _native_tree_sources_match(nodes: Dictionary, restore: bool) -> bool:
 		if not nodes.has(layer_id):
 			continue
 		var key: String = identity.substr(layer_id.length() + 1)
+		var node: DrawingLayerNode = nodes[layer_id]
+		# A semantic text node can share its ID with a parked raster from a
+		# future Redo. It has no live raster projection to compare or save.
+		# Actual raster restoration still validates the complete native bytes.
+		if node.kind == DrawingLayerNode.TEXT and node.tiles.is_empty() and \
+				_native_raster_store != null and bool(_native_raster_store.call("is_layer_parked", layer_id)):
+			continue
 		var source: Variant = _native_source_identities[identity]
-		var current: Variant = (nodes[layer_id] as DrawingLayerNode).tiles.get(key)
+		var current: Variant = node.tiles.get(key)
 		if restore:
 			var old_bytes: PackedByteArray = source.to_rgba8() if source != null else PackedByteArray()
 			var new_bytes: PackedByteArray = current.to_rgba8() if current != null else PackedByteArray()
@@ -208,18 +280,19 @@ func _advance_parked_structure_revision(layers: Array[String], restore: bool,
 	return true
 
 
-## A direct, unrecorded removal has no structural Undo to restore its raster
-## children. Preflight their resident source identity/bytes before Rust drops
-## only those layers; unrelated canonical tiles and tokens remain live.
-## Rejecting retirement leaves both stores untouched and uses the ordinary
-## later checked rebase. This is deliberately not the recorded park path.
-func _retire_unrecorded_raster_layers(layers: Array[String], nodes: Dictionary) -> bool:
+## A direct removal retires the affected native sources and history. A
+## reversible host transfer releases only the sources and preserves tokens;
+## the command's next visit re-admits them. Both check exact source bytes.
+func _retire_unrecorded_raster_layers(layers: Array[String], nodes: Dictionary,
+		discard_redo: bool = true, reversible_transfer: bool = false) -> bool:
 	if _native_raster_store == null or layers.is_empty() \
 			or not _native_tree_sources_match(nodes, false):
 		return false
 	var previous: int = revision
-	if not bool(_native_raster_store.call("retire_layers_revision",
-			previous, PackedStringArray(layers), true)):
+	var released: bool = bool(_native_raster_store.call("release_transfer_layers_revision",
+		previous, PackedStringArray(layers))) if reversible_transfer else bool(_native_raster_store.call(
+		"retire_layers_revision", previous, PackedStringArray(layers), discard_redo))
+	if not released:
 		return false
 	for layer_id: String in layers:
 		for identity: String in _native_source_identities.keys():
@@ -234,7 +307,7 @@ func _retire_unrecorded_raster_layers(layers: Array[String], nodes: Dictionary) 
 ## native history, but host-owned history is never rewritten here. Surviving
 ## cursor order/content tokens are retained. Installing this detached result
 ## after the native commit does not allocate or invoke external providers.
-func _prepare_retired_local_history(removed_ids: Array[String]) -> Dictionary:
+func _prepare_retired_local_history(removed_ids: Array[String], orphaned: bool = false) -> Dictionary:
 	if external_history or _events.is_empty():
 		return {}
 	var removed: Dictionary[String, bool] = {}
@@ -243,7 +316,7 @@ func _prepare_retired_local_history(removed_ids: Array[String]) -> Dictionary:
 	var retained: Array[Dictionary] = []
 	var states: Array[int] = [_content_states[0]]
 	var cursor: int = 0
-	for index: int in range(_events.size()):
+	for index: int in range(_cursor if orphaned else _events.size()):
 		var event: Dictionary = _events[index]
 		var affected: bool = false
 		match String(event.get("kind", "")):
@@ -253,6 +326,11 @@ func _prepare_retired_local_history(removed_ids: Array[String]) -> Dictionary:
 				affected = removed.has(String(event["layer"]))
 			"structure":
 				affected = removed.has(String(event["id"]))
+				if orphaned:
+					# A surviving node's move cannot replay into a permanently
+					# deleted parent either. Preserve its independent paint.
+					for field: String in ["parent", "old_parent", "new_parent"]:
+						affected = affected or removed.has(String(event.get(field, "")))
 		if affected:
 			continue
 		retained.append(event)
@@ -262,6 +340,59 @@ func _prepare_retired_local_history(removed_ids: Array[String]) -> Dictionary:
 	return {"events": retained, "states": states, "cursor": cursor}
 
 
+## Applied removals are scanned newest-first: an absent parent can itself
+## belong to a later removed subtree. Never resolve pending sparse sources.
+## Only local permanent ancestor deletion can abandon these snapshots.
+func _plan_orphaned_removals(node_id: String) -> DrawingResult:
+	var removed: Array[String] = []
+	_gather_ids(node_id, removed)
+	var dead: Dictionary[String, bool] = {}
+	for identifier: String in removed:
+		dead[identifier] = true
+	var sources: Array[Dictionary] = []
+	for index: int in range(_cursor - 1, -1, -1):
+		var event: Dictionary = _events[index]
+		if event.get("kind") != "structure" or event.get("op") != "remove" or \
+				not dead.has(String(event.get("parent", ""))):
+			continue
+		var snapshots: Dictionary = event["nodes"]
+		var layers: Array[String] = []
+		for identifier: String in snapshots:
+			var snapshot: DrawingLayerNode = snapshots[identifier]
+			if snapshot == null or snapshot.id != identifier or _nodes.has(identifier) or dead.has(identifier):
+				return DrawingResult.failure("HISTORY_TARGET", "Orphan removal snapshot identity diverged")
+			dead[identifier] = true
+			removed.append(identifier)
+			if snapshot.kind == DrawingLayerNode.RASTER and \
+					bool(_native_raster_store.call("is_layer_parked", identifier)):
+				layers.append(identifier)
+		var checked: DrawingResult = _validate_retained_subtree_sources(event, layers, snapshots, true, true)
+		if not checked.ok:
+			return checked
+		# Any tracked source of an absent node must really be parked and
+		# included in the retirement batch. Never silently orphan live bytes.
+		for identity: String in _native_source_identities:
+			var owner: String = identity.get_slice(":", 0)
+			if snapshots.has(owner) and not layers.has(owner):
+				return DrawingResult.failure("STALE_SOURCE", "Orphan snapshot has an unparked native source")
+		if layers.is_empty():
+			continue
+		if not _native_tree_sources_match(snapshots, true):
+			return DrawingResult.failure("STALE_SOURCE", "Orphaned native snapshot differs")
+		for layer: String in layers:
+			var count: int = 0
+			for identity: String in _native_source_identities:
+				if identity.begins_with(layer + ":"):
+					count += 1
+			sources.append({"layer": layer, "count": count})
+			if sources.size() > 128:
+				return DrawingResult.failure("NATIVE_STRUCTURE", "Orphan retirement exceeds layer budget")
+	if sources.is_empty():
+		return DrawingResult.success({})
+	return DrawingResult.success({"sources": sources,
+		"history": _prepare_retired_local_history(removed, true)})
+
+
 func _native_source_matches(layer_id: String, key: String, tile: Variant) -> bool:
 	var identity: String = layer_id + ":" + key
 	return _native_source_identities.has(identity) \
@@ -269,7 +400,9 @@ func _native_source_matches(layer_id: String, key: String, tile: Variant) -> boo
 
 
 func _remember_native_source(layer_id: String, key: String, tile: Variant) -> void:
-	_native_source_identities[layer_id + ":" + key] = tile
+	var identity: String = layer_id + ":" + key
+	_sparse_reloads.erase(identity)
+	_native_source_identities[identity] = tile
 
 
 
@@ -345,8 +478,10 @@ func create_layer(kind: String, name: String, parent_id: String = ROOT_ID,
 		return DrawingResult.failure("LAYER_ID", "Layer IDs contain only ASCII letters, digits, _ and -")
 	if new_identifier == ROOT_ID or _nodes.has(new_identifier):
 		return DrawingResult.failure("DUPLICATE_ID", "Layer/group identity already exists")
-	if _native_raster_store != null and bool(_native_raster_store.call("is_layer_parked", new_identifier)):
-		return DrawingResult.failure("LAYER_ID", "Raster ID is reserved by native structural history")
+	if _native_raster_store != null:
+		var retained_keys: PackedStringArray = _native_raster_store.call("transfer_history_source_keys", new_identifier)
+		if bool(_native_raster_store.call("is_layer_parked", new_identifier)) or not retained_keys.is_empty():
+			return DrawingResult.failure("LAYER_ID", "Raster ID is reserved by native structural history")
 	var advanced: DrawingResult = _advance_checked_layer_metadata()
 	if not advanced.ok:
 		return advanced
@@ -414,8 +549,26 @@ func _editable(node_id: String) -> bool:
 	return true
 
 
+## External structural commands are part of the existing host timeline.
+## Their caller owns branch disposal; local commands keep the default policy.
+func _preflight_host_structure(needs_revision: bool = true) -> DrawingResult:
+	if revision < 0 or (needs_revision and revision >= MAX_STRUCTURAL_REVISION):
+		return DrawingResult.failure("STALE_REVISION", "Host structural revision cannot advance")
+	if not external_history:
+		return DrawingResult.failure("HISTORY_OWNED", "Only an external command owner may preserve host Redo")
+	if has_unpublished_edit():
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Unpublished edit prevents host structural replay")
+	if not _attached_native_revision_matches(revision):
+		return DrawingResult.failure("STALE_REVISION", "Host structural native revision diverged")
+	return DrawingResult.success(null, revision)
+
+
 func reorder(node_id: String, new_parent: String, new_index: int,
-		record_history: bool = false) -> DrawingResult:
+		record_history: bool = false, preserve_host_redo: bool = false) -> DrawingResult:
+	if preserve_host_redo:
+		var owner: DrawingResult = _preflight_host_structure()
+		if not owner.ok:
+			return owner
 	if not _nodes.has(node_id) or node_id == ROOT_ID or not _nodes.has(new_parent):
 		return DrawingResult.failure("LAYER", "Missing layer or group")
 	if _nodes[new_parent].kind != DrawingLayerNode.GROUP or not _editable(node_id) or not _editable(new_parent):
@@ -432,7 +585,7 @@ func reorder(node_id: String, new_parent: String, new_index: int,
 		(1 if current_parent == new_parent else 0))
 	if current_parent == new_parent and target_index == old_index:
 		return DrawingResult.success(null, revision)
-	var advanced: DrawingResult = _advance_checked_layer_metadata()
+	var advanced: DrawingResult = _advance_checked_layer_metadata(not preserve_host_redo)
 	if not advanced.ok:
 		return advanced
 	original.erase(node_id)
@@ -455,14 +608,27 @@ func can_remove_subtree(node_id: String) -> bool:
 ## raster ownership can be retired. No lazy provider is called by this gate.
 ## Keep this paired with remove_subtree's unrecorded retirement checks.
 func preflight_unrecorded_subtree_removal(node_id: String) -> DrawingResult:
-	if not can_remove_subtree(node_id):
+	return _preflight_unrecorded_subtree_removal(node_id, false)
+
+
+func _can_remove_transfer_root(node_id: String, allow_protected_root: bool) -> bool:
+	return can_remove_subtree(node_id) or (allow_protected_root and node_id != ROOT_ID and
+		_nodes.has(node_id) and _nodes.has(_nodes[node_id].parent_id) and _editable(_nodes[node_id].parent_id))
+
+
+func _preflight_unrecorded_subtree_removal(node_id: String, allow_protected_root: bool) -> DrawingResult:
+	if revision < 0 or revision >= MAX_STRUCTURAL_REVISION:
+		return DrawingResult.failure("STALE_REVISION", "Subtree removal revision cannot advance")
+	if not _can_remove_transfer_root(node_id, allow_protected_root):
 		return DrawingResult.failure("LAYER", "Missing, root or inaccessible layer")
+	if has_unpublished_edit():
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Unpublished edit prevents subtree transfer")
+	if not _attached_native_revision_matches(revision):
+		return DrawingResult.failure("STALE_REVISION", "Native source revision diverged before transfer")
 	var rasters: Array[String] = []
 	_subtree_raster_ids(node_id, rasters)
 	if _native_raster_store == null or rasters.is_empty():
 		return DrawingResult.success(null, revision)
-	if not _attached_native_revision_matches(revision):
-		return DrawingResult.failure("STALE_REVISION", "Native source revision diverged before transfer")
 	var ids: Array[String] = []
 	_gather_ids(node_id, ids)
 	var nodes: Dictionary = {}
@@ -476,8 +642,27 @@ func preflight_unrecorded_subtree_removal(node_id: String) -> DrawingResult:
 	return DrawingResult.success(null, revision)
 
 
-func remove_subtree(node_id: String, record_history: bool = false) -> DrawingResult:
-	if not can_remove_subtree(node_id):
+func remove_subtree(node_id: String, record_history: bool = false,
+		preserve_host_redo: bool = false) -> DrawingResult:
+	return _remove_subtree(node_id, record_history, preserve_host_redo, false)
+
+
+## Undo of a Copy may remove a locked/hidden imported root, but only the
+## exact subtree that the external command published, in an editable parent.
+func remove_host_copied_subtree(snapshot: Dictionary) -> DrawingResult:
+	var checked: DrawingResult = preflight_host_transfer_source(snapshot, true, true)
+	if not checked.ok:
+		return checked
+	return _remove_subtree(String(snapshot["root"]), false, true, true)
+
+
+func _remove_subtree(node_id: String, record_history: bool, preserve_host_redo: bool,
+		allow_protected_root: bool) -> DrawingResult:
+	if preserve_host_redo:
+		var owner: DrawingResult = _preflight_host_structure()
+		if not owner.ok:
+			return owner
+	if not _can_remove_transfer_root(node_id, allow_protected_root):
 		return DrawingResult.failure("LAYER", "Missing, root or inaccessible layer")
 	# The local editor cannot delete locked/hidden descendants indirectly via
 	# an editable ancestor. Legacy API callers keep their historical semantics.
@@ -528,27 +713,61 @@ func remove_subtree(node_id: String, record_history: bool = false) -> DrawingRes
 			resident_nodes[identifier] = _nodes[identifier]
 		if not _native_tree_sources_match(resident_nodes, false):
 			return DrawingResult.failure("STALE_SOURCE", "Native raster subtree source changed")
+	# A permanently removed local ancestor can invalidate already-applied
+	# removal events for absent descendants. Retire those parked sources in
+	# the same native revision as the live subtree, never after partial erase.
+	var orphan_plan: Dictionary = {}
+	if not record_history and not external_history and _native_raster_store != null:
+		var planned: DrawingResult = _plan_orphaned_removals(node_id)
+		if not planned.ok:
+			return planned
+		orphan_plan = planned.value
 	var parked: bool = false
 	if not raster_layers.is_empty() and record_history and not external_history:
-		parked = _advance_parked_structure_revision(raster_layers, false, true)
+		if _native_raster_store != null and _subtree_has_unowned_tiles(before["nodes"], raster_layers):
+			var adopted: DrawingResult = _adopt_mixed_subtree_sources(before, raster_layers,
+				before["nodes"], false, true)
+			if not adopted.ok:
+				return adopted
+			parked = true
+			before["native_detached_adopted"] = true
+		else:
+			parked = _advance_parked_structure_revision(raster_layers, false, true)
 	if parked:
 		before["native_parked"] = true
 	var retired: bool = false
 	var removed_ids: Array[String] = []
 	var retained_history: Dictionary = {}
-	if not parked and not raster_layers.is_empty() and (not record_history or external_history):
-		# External/transfer callers do not create a reversible tree event.
-		# Verify canonical source before permanently retiring these IDs.
+	if not orphan_plan.is_empty():
+		if has_unpublished_edit() or not _attached_native_revision_matches(revision):
+			return DrawingResult.failure("NATIVE_STRUCTURE", "Orphan retirement owner is busy or stale")
+		var sources: Array[Dictionary] = orphan_plan["sources"]
+		if not bool(_native_raster_store.call("retire_orphaned_layers_revision", revision,
+				PackedStringArray(raster_layers), sources)):
+			return DrawingResult.failure("NATIVE_STRUCTURE", "Native orphan retirement rejected")
+		var retired_ids: Array[String] = raster_layers.duplicate()
+		for source: Dictionary in sources:
+			retired_ids.append(String(source["layer"]))
+		for identity: String in _native_source_identities.keys():
+			if retired_ids.has(identity.get_slice(":", 0)):
+				_native_source_identities.erase(identity)
+				_sparse_reloads.erase(identity)
+		revision += 1
+		retired = true
+		retained_history = orphan_plan["history"]
+	elif not parked and not raster_layers.is_empty() and (not record_history or external_history):
+		# Local permanent removal retires IDs. Reversible external transfer
+		# has its own chronological event and retains native paint tokens.
 		_gather_ids(node_id, removed_ids)
 		if _native_raster_store != null:
 			retained_history = _prepare_retired_local_history(removed_ids)
-		retired = _retire_unrecorded_raster_layers(raster_layers, resident_nodes)
+		retired = _retire_unrecorded_raster_layers(raster_layers, resident_nodes, not preserve_host_redo, preserve_host_redo)
 	# Semantic-only subtree deletion must acquire Rust metadata authority
 	# before erasing even one Godot node. The old post-mutation bridge could
 	# detach a busy/stale native store while leaving the local tree deleted.
 	var metadata_advanced: bool = false
-	if raster_layers.is_empty() and _native_raster_store != null:
-		var advanced: DrawingResult = _advance_checked_layer_metadata()
+	if raster_layers.is_empty() and _native_raster_store != null and not retired:
+		var advanced: DrawingResult = _advance_checked_layer_metadata(not preserve_host_redo)
 		if not advanced.ok:
 			return advanced
 		metadata_advanced = true
@@ -558,21 +777,25 @@ func remove_subtree(node_id: String, record_history: bool = false) -> DrawingRes
 		# but Rust must prove it has neither source nor history references.
 		# This is the last fallible step before deterministic Godot erasure.
 		unreferenced = bool(_native_raster_store.call("advance_unreferenced_layers_revision",
-			revision, PackedStringArray(raster_layers), true))
+			revision, PackedStringArray(raster_layers), not preserve_host_redo))
 		if not unreferenced:
 			return DrawingResult.failure("NATIVE_STRUCTURE", "Native raster subtree removal rejected")
 		revision += 1
 	_erase_subtree(node_id)
 	if retired and not retained_history.is_empty():
+		if not orphan_plan.is_empty():
+			# The original redo tail may own other parked sources. Release it
+			# before replacing the local history projection with applied events.
+			_drop_history_redo()
 		_events = retained_history["events"]
 		_content_states = retained_history["states"]
 		_cursor = int(retained_history["cursor"])
 	if parked or retired or unreferenced or metadata_advanced:
 		pass # Rust and document revisions advanced before the deterministic erase.
 	elif not raster_layers.is_empty():
-		_advance_raster_structure_revision(raster_layers)
+		_advance_raster_structure_revision(raster_layers, not preserve_host_redo)
 	else:
-		_advance_nonraster_revision()
+		_advance_nonraster_revision(not preserve_host_redo)
 	_finish_structure(record_history, before)
 	return DrawingResult.success(null, revision)
 
@@ -593,6 +816,9 @@ func _erase_subtree(node_id: String) -> void:
 	for suffix: String in _pending_tiles.keys():
 		if suffix.begins_with(node_id + ":"):
 			_pending_tiles.erase(suffix)
+	for suffix: String in _sparse_reloads.keys():
+		if suffix.begins_with(node_id + ":"):
+			_sparse_reloads.erase(suffix)
 	for suffix: String in _known_refs.keys():
 		if suffix.begins_with(node_id + ":"):
 			_known_refs.erase(suffix)
@@ -673,6 +899,15 @@ func request_chunk_at(layer_id: String, cx: int, cy: int) -> DrawingResult:
 	return request_chunk(layer_id, "%d,%d" % [cx, cy])
 
 
+## Rendering may reclaim verified cache entries before fetching a missing
+## source. Keep the ordinary resolver (including its subclass overrides)
+## unchanged for transactional and instrumented consumers.
+func _resolve_chunk_for_render(layer_id: String, key: String) -> DrawingResult:
+	if _native_lazy_admission and _pending_tiles.has(layer_id + ":" + key):
+		_trim_sparse_render_sources(tile_stride * tile_stride * 4)
+	return _resolve_chunk(layer_id, key)
+
+
 func _resolve_chunk(layer_id: String, key: String) -> DrawingResult:
 	if not _nodes.has(layer_id) or _nodes[layer_id].kind != DrawingLayerNode.RASTER:
 		return DrawingResult.failure("LAYER", "Missing raster layer")
@@ -712,10 +947,103 @@ func _resolve_chunk(layer_id: String, key: String) -> DrawingResult:
 		var decoded: DrawingRasterTile = DrawingRasterTile.from_rgba8(tile_stride, bytes)
 		if decoded == null:
 			return DrawingResult.failure("CORRUPT_TILE", "Invalid RGBA8 chunk " + lookup)
+		if _native_lazy_admission and tile_stride >= 16 and ClassDB.class_exists("DrawingNativeTiles"):
+			var admitted: DrawingResult = _admit_sparse_native_source(layer_id, key, decoded, bytes)
+			if not admitted.ok:
+				return admitted
+			_sparse_reloads[lookup] = {"pending": current.duplicate(), "tile": weakref(decoded)}
 		_nodes[layer_id].tiles[key] = decoded
 		_pending_tiles.erase(lookup)
 	var resident: DrawingRasterTile = _nodes[layer_id].tiles.get(key)
 	return DrawingResult.success(resident, revision)
+
+
+## Quiescent renderer misses may release pristine physical source cache
+## entries. Editing, full subtree export and history replay must retain all
+## resolved identities, so their ordinary _resolve_chunk calls never trim.
+## No source callback, revision, dirty marker or display epoch change occurs
+## here; a successful release restores exactly the previous pending record.
+func _trim_sparse_render_sources(incoming_bytes: int) -> void:
+	if _sparse_reloads.is_empty() or _native_raster_store == null or not _resolving_chunks.is_empty():
+		return
+	var stats: Dictionary = _native_raster_store.call("stats")
+	var resident_bytes: int = int(stats.get("bytes_used", 0))
+	if resident_bytes + incoming_bytes <= SPARSE_RENDER_HIGH_WATER_BYTES or \
+			int(stats.get("revision", -1)) != revision or has_unpublished_edit():
+		return
+	# Recorded structural snapshots may require their exact resident layout
+	# when parked/restored. Keep all their layers, including late promotions.
+	var protected: Dictionary[String, bool] = {}
+	for event: Dictionary in _events:
+		if event.get("kind") == "structure":
+			if event.get("op") == "remove":
+				for owner: String in event["nodes"]:
+					protected[owner] = true
+			elif event.get("op") == "create":
+				protected[String(event["id"])] = true
+		elif event.get("kind") == "text_tree":
+			protected[String(event["layer"])] = true
+	# FIFO among eligible sources. Rotate temporarily protected entries so
+	# repeated misses can find other victims without an unbounded scan.
+	var candidates: Array[String] = []
+	for identity: String in _sparse_reloads:
+		candidates.append(identity)
+		if candidates.size() >= SPARSE_RENDER_EVICTION_SCAN:
+			break
+	for identity: String in candidates:
+		if resident_bytes + incoming_bytes <= SPARSE_RENDER_TARGET_BYTES:
+			break
+		var entry: Dictionary = _sparse_reloads[identity]
+		_sparse_reloads.erase(identity)
+		var layer_id: String = identity.get_slice(":", 0)
+		var key: String = identity.substr(layer_id.length() + 1)
+		var tile: DrawingRasterTile = (entry["tile"] as WeakRef).get_ref() as DrawingRasterTile
+		if tile == null or not _nodes.has(layer_id) or not is_same(_nodes[layer_id].tiles.get(key), tile) or \
+				not _native_source_matches(layer_id, key, tile) or _dirty_tiles.has(identity) or _pending_tiles.has(identity):
+			continue
+		var pending: Dictionary = entry["pending"]
+		if _known_refs.get(identity) != {"ref": pending["ref"], "sha256": pending["sha256"]} or \
+				not (pending["fetch"] as Callable).is_valid():
+			continue
+		if protected.has(layer_id) or not tile.has_canonical_storage():
+			_sparse_reloads[identity] = entry
+			continue
+		var bytes: PackedByteArray = tile.to_rgba8()
+		var coords: PackedStringArray = key.split(",")
+		if DrawingRasterTile.digest_rgba8(bytes, tile_stride) != pending["sha256"] or \
+				not bool(_native_raster_store.call("release_pristine_source", layer_id,
+					int(coords[0]), int(coords[1]), revision, bytes)):
+			# In-place mutation must remain visible to the Save fence; never
+			# hide it behind a pristine lazy reference. Rust also pins tokens.
+			_sparse_reloads[identity] = entry
+			continue
+		_pending_tiles[identity] = pending
+		_nodes[layer_id].tiles.erase(key)
+		_native_source_identities.erase(identity)
+		resident_bytes -= bytes.size()
+
+
+## Source admission is not an edit. All callbacks and digest checks have
+## completed, and import_source can safely admit an unstaged tile even during
+## a native stroke. A provisional owner is attached only after success.
+func _admit_sparse_native_source(layer_id: String, key: String,
+		tile: DrawingRasterTile, bytes: PackedByteArray) -> DrawingResult:
+	var store: Object = _native_raster_store
+	var provisional: bool = store == null
+	if provisional:
+		store = ClassDB.instantiate("DrawingNativeTiles")
+		if store == null or int(store.call("tile_abi_version")) != 1 or \
+				not bool(store.call("configure", tile_stride, revision)):
+			return DrawingResult.failure("NATIVE_SOURCE", "Cannot initialize sparse source owner")
+	elif not _attached_native_revision_matches(revision):
+		return DrawingResult.failure("STALE_REVISION", "Native sparse source revision diverged")
+	var coords: PackedStringArray = key.split(",")
+	if not bool(store.call("import_source", layer_id, int(coords[0]), int(coords[1]), revision, bytes)):
+		return DrawingResult.failure("NATIVE_SOURCE", "Native sparse source admission rejected " + layer_id + ":" + key)
+	if provisional:
+		_native_raster_store = store
+	_remember_native_source(layer_id, key, tile)
+	return DrawingResult.success(null, revision)
 
 
 func register_lazy_chunk(layer_id: String, cx: int, cy: int,
@@ -967,6 +1295,7 @@ func _publish_dense_clear_tiles(layer_id: String, expected: int,
 	if provisional:
 		_native_raster_store = native_store
 		_native_source_identities.clear()
+		_sparse_reloads.clear()
 	return _install_prepared_native_tile_edit(layer_id, expected, expected + 1,
 		checked, true, int(adopted.get("history_token", 0)))
 
@@ -1128,7 +1457,8 @@ func _install_prepared_native_tile_edit(layer_id: String, expected: int,
 
 ## Replay a native tile delta as one atomic history operation. No sparse
 ## pixel maps are materialized; each source is verified before replacement.
-func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> DrawingResult:
+func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool,
+		ordered_history: bool = false) -> DrawingResult:
 	if delta.tile_stride != tile_stride or not _nodes.has(delta.layer_id) \
 			or not _editable(delta.layer_id):
 		return DrawingResult.failure("HISTORY_TARGET", "Native history target unavailable")
@@ -1275,9 +1605,8 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 	var live_token: bool = current_store and source_token > 0 and \
 		replay_store.call("has_history_token", source_token,
 			base_revision, undo_action)
-	# Detached replay invalidates Rust Undo/Redo. A retained token that is not
-	# the next event belongs to the live timeline and must fail without a
-	# fallback, even when the requested tiles are disjoint from newer edits.
+	# A retained token that is not the next event belongs to the live timeline
+	# and must fail without either detached replay policy, even for disjoint tiles.
 	if current_store and source_token > 0 and not live_token \
 			and replay_store.call("has_retained_history_token", source_token):
 		return DrawingResult.failure("HISTORY_ORDER", "Native history token is retained out of order")
@@ -1286,6 +1615,11 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 		native_replay = replay_store.call("replay_history_token",
 			delta.native_history_token, base_revision, undo_action,
 			delta.layer_id, native_tiles)
+	elif ordered_history:
+		# The local cursor or Atlas ledger established chronology. Older bounded-
+		# out events must not invalidate the newer retained Undo/Redo entries.
+		native_replay = replay_store.call("replay_ordered_detached_history",
+			delta.layer_id, base_revision, source_token, native_tiles)
 	else:
 		native_replay = replay_store.call("replay_detached_history",
 			delta.layer_id, base_revision, native_tiles)
@@ -1299,6 +1633,7 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 	if not current_store:
 		_native_raster_store = replay_store
 		_native_source_identities.clear()
+		_sparse_reloads.clear()
 	for key: String in replacement_bytes:
 		if detached.has(key) and not detached[key].is_empty():
 			_nodes[delta.layer_id].tiles[key] = detached[key]
@@ -1501,6 +1836,7 @@ func _install_prepared_edit(layer_id: String, expected: int,
 		if provisional_store:
 			_native_raster_store = native_store
 			_native_source_identities.clear()
+			_sparse_reloads.clear()
 	else:
 		result.delta = DrawingDelta.from_owned_maps(layer_id, before, after) if owned_history_maps \
 			else DrawingDelta.new(layer_id, before, after)
@@ -1571,6 +1907,12 @@ func _has_pending_edit_sessions() -> bool:
 			live.append(holder)
 	_open_edit_sessions = live
 	return not live.is_empty()
+
+
+## Read-only persistence/export guard: a native-only draft is also unpublished.
+func has_unpublished_edit() -> bool:
+	return _has_pending_edit_sessions() or (_native_raster_store != null and (
+		not _native_raster_store.has_method("has_active_edit") or bool(_native_raster_store.call("has_active_edit"))))
 
 
 ## A host must select external ownership *before* it begins committing edits.
@@ -1661,6 +2003,263 @@ func _finish_structure(record_history: bool, event: Dictionary) -> void:
 		_mark_untracked_change()
 
 
+## A sparse read after undoing a removal can authorize a source that was
+## still pending when the event was recorded. Freeze only those newly loaded
+## tiles, checking the original digest and native identity. Redo publishes
+## this cache promotion to the event only after its native park succeeds.
+func _prepare_late_sparse_removal_sources(event: Dictionary) -> DrawingResult:
+	var promoted: Dictionary[String, DrawingRasterTile] = {}
+	for identity: String in event["pending"]:
+		var original: Dictionary = event["pending"][identity]
+		if _pending_tiles.has(identity):
+			if _pending_tiles[identity] != original:
+				return DrawingResult.failure("STALE_SOURCE", "Structural pending source changed")
+			continue
+		var layer_id: String = identity.get_slice(":", 0)
+		var key: String = identity.substr(layer_id.length() + 1)
+		if not _nodes.has(layer_id):
+			return DrawingResult.failure("STALE_SOURCE", "Structural pending layer disappeared")
+		var tile: DrawingRasterTile = _nodes[layer_id].tiles.get(key)
+		if tile == null or not tile.has_canonical_storage() or \
+				not _native_source_matches(layer_id, key, tile) or \
+				DrawingRasterTile.digest_rgba8(tile.to_rgba8(), tile_stride) != original["sha256"]:
+			return DrawingResult.failure("STALE_SOURCE", "Structural late sparse source changed")
+		promoted[identity] = tile.detached_copy()
+	return DrawingResult.success(promoted, revision)
+
+
+## A detached owner can lose the original parked layer reservation. Do not
+## infer native ownership from the retained history event's old parked flag.
+## The native publication call independently refuses any surviving ownership
+## or token, including references not represented in the projection map.
+func _subtree_history_has_native_references(layers: Array[String]) -> bool:
+	if _native_raster_store == null:
+		return false
+	for layer: String in layers:
+		if bool(_native_raster_store.call("is_layer_parked", layer)):
+			return true
+	for identity: String in _native_source_identities:
+		if layers.has(identity.get_slice(":", 0)):
+			return true
+	return false
+
+
+## Validate the retained subtree hierarchy and exact raster bytes before any
+## native mutation. Newly adopted snapshots must remain fully authorized on
+## subsequent park/unpark; late physical sources have their own digest fence.
+func _validate_retained_subtree_sources(event: Dictionary, layers: Array[String],
+		snapshots: Dictionary, restore: bool, require_owned: bool,
+		promoted: Dictionary = {}) -> DrawingResult:
+	var visited: Dictionary[String, bool] = {}
+	var root: String = event["id"]
+	if not _validate_snapshot_tree(root, snapshots, visited) or visited.size() != snapshots.size() or \
+			snapshots[root].parent_id != event["parent"]:
+		return DrawingResult.failure("HISTORY_TARGET", "Detached subtree history hierarchy diverged")
+	if not restore:
+		for identifier: String in snapshots:
+			var snapshot: DrawingLayerNode = snapshots[identifier]
+			var live: DrawingLayerNode = _nodes.get(identifier)
+			if live == null or live.kind != snapshot.kind or live.parent_id != snapshot.parent_id or \
+					live.children != snapshot.children:
+				return DrawingResult.failure("HISTORY_TARGET", "Live subtree hierarchy diverged")
+	if not restore:
+		for identity: String in event["pending"]:
+			if not promoted.has(identity) and _pending_tiles.get(identity) != event["pending"][identity]:
+				return DrawingResult.failure("STALE_SOURCE", "Retained pending subtree source diverged")
+		for identity: String in _pending_tiles:
+			if snapshots.has(identity.get_slice(":", 0)) and not event["pending"].has(identity):
+				return DrawingResult.failure("STALE_SOURCE", "Unexpected pending source in retained subtree")
+	var count: int = 0
+	if layers.size() > 128:
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Detached subtree history exceeds layer budget")
+	for layer: String in layers:
+		var snapshot: DrawingLayerNode = snapshots[layer]
+		if snapshot.id != layer:
+			return DrawingResult.failure("HISTORY_TARGET", "Detached raster snapshot ID diverged")
+		count += snapshot.tiles.size()
+		if count > 8192 or count * tile_stride * tile_stride * 4 > MAX_NATIVE_HISTORY_TRANSFER_BYTES:
+			return DrawingResult.failure("NATIVE_STRUCTURE", "Detached subtree history exceeds tile budget")
+		var live: DrawingLayerNode = _nodes.get(layer) if not restore else null
+		var late_count: int = 0
+		for identity: String in promoted:
+			if identity.begins_with(layer + ":"):
+				late_count += 1
+		if not restore and (live == null or live.kind != DrawingLayerNode.RASTER or
+				live.tiles.size() != snapshot.tiles.size() + late_count):
+			return DrawingResult.failure("STALE_PIXEL", "Detached subtree raster set diverged")
+		for key: String in snapshot.tiles:
+			var tile: DrawingRasterTile = snapshot.tiles[key]
+			var coords: PackedStringArray = key.split(",")
+			if tile == null or tile.stride != tile_stride or not tile.has_canonical_storage() or \
+					coords.size() != 2 or not coords[0].is_valid_int() or not coords[1].is_valid_int():
+				return DrawingResult.failure("STALE_PIXEL", "Invalid detached subtree history tile")
+			var cx: int = int(coords[0])
+			var cy: int = int(coords[1])
+			if key != "%d,%d" % [cx, cy] or not TILES.tile_coordinates_in_projection_range(cx, cy, tile_stride):
+				return DrawingResult.failure("COORD", "Detached subtree history exceeds signed projection")
+			if require_owned and not _native_source_identities.has(layer + ":" + key):
+				return DrawingResult.failure("STALE_PIXEL", "Subtree history tile lacks native authority")
+			if not restore:
+				var current: DrawingRasterTile = live.tiles.get(key)
+				if current == null or current.stride != tile_stride or not current.has_canonical_storage() or \
+						current.to_rgba8() != tile.to_rgba8():
+					return DrawingResult.failure("STALE_PIXEL", "Detached subtree live bytes diverged")
+	return DrawingResult.success(count, revision)
+
+
+## A retained materialized tile can predate native source admission, even
+## when a sibling or another coordinate of the same layer is already owned.
+func _subtree_has_unowned_tiles(snapshots: Dictionary, layers: Array[String]) -> bool:
+	for layer: String in layers:
+		var node: DrawingLayerNode = snapshots[layer]
+		for key: String in node.tiles:
+			if not _native_source_identities.has(layer + ":" + key):
+				return true
+	return false
+
+
+## Supply a complete source set, including explicitly authorized blank tiles.
+## Rust checks ownership, exact bytes and park lifecycle before one revision.
+func _adopt_mixed_subtree_sources(event: Dictionary, layers: Array[String],
+		snapshots: Dictionary, restore: bool, discard_redo: bool,
+		promoted: Dictionary = {}) -> DrawingResult:
+	if has_unpublished_edit() or _native_raster_store == null or not _attached_native_revision_matches(revision):
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Mixed subtree source owner is busy or stale")
+	var checked: DrawingResult = _validate_retained_subtree_sources(event, layers, snapshots,
+		restore, false, promoted)
+	if not checked.ok:
+		return checked
+	var nodes: Dictionary = snapshots if restore else {}
+	if not restore:
+		for identifier: String in snapshots:
+			nodes[identifier] = _nodes[identifier]
+	if not _native_tree_sources_match(nodes, restore):
+		return DrawingResult.failure("STALE_PIXEL", "Mixed subtree native source differs")
+	var descriptors: Array[Dictionary] = []
+	for layer: String in layers:
+		var raster: DrawingLayerNode = nodes[layer]
+		var keys: Dictionary[String, bool] = {}
+		for key: String in raster.tiles:
+			keys[key] = true
+		for identity: String in _native_source_identities:
+			if identity.begins_with(layer + ":"):
+				keys[identity.substr(layer.length() + 1)] = true
+		if descriptors.size() + keys.size() > 8192 or \
+				(descriptors.size() + keys.size()) * tile_stride * tile_stride * 4 > MAX_NATIVE_HISTORY_TRANSFER_BYTES:
+			return DrawingResult.failure("NATIVE_STRUCTURE", "Mixed subtree source budget exceeded")
+		for key: String in keys:
+			var tile: DrawingRasterTile = raster.tiles.get(key)
+			var coords: PackedStringArray = key.split(",")
+			if coords.size() != 2 or not coords[0].is_valid_int() or not coords[1].is_valid_int():
+				return DrawingResult.failure("COORD", "Invalid mixed subtree coordinate")
+			var cx: int = int(coords[0])
+			var cy: int = int(coords[1])
+			if key != "%d,%d" % [cx, cy] or not TILES.tile_coordinates_in_projection_range(cx, cy, tile_stride):
+				return DrawingResult.failure("COORD", "Mixed subtree coordinate exceeds signed projection")
+			var bytes: PackedByteArray = tile.to_rgba8() if tile != null else PackedByteArray()
+			if tile == null:
+				bytes.resize(tile_stride * tile_stride * 4)
+			descriptors.append({"layer": layer, "tile_x": cx, "tile_y": cy, "bytes": bytes,
+				"owned": _native_source_identities.has(layer + ":" + key)})
+	if not bool(_native_raster_store.call("adopt_mixed_subtree_revision", revision,
+			PackedStringArray(layers), descriptors, restore, discard_redo)):
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Mixed subtree publication rejected")
+	for layer: String in layers:
+		var raster: DrawingLayerNode = nodes[layer]
+		for key: String in raster.tiles:
+			_remember_native_source(layer, key, raster.tiles[key])
+	revision += 1
+	return DrawingResult.success(true, revision)
+
+
+## Reacquire an entirely detached removal snapshot in a single checked
+## revision. On Redo, prove the live tile set and bytes before parking it.
+## Pending sparse descriptors remain unresolved; this path never calls I/O.
+func _replay_detached_subtree_source(event: Dictionary, layers: Array[String],
+		snapshots: Dictionary, restore: bool) -> DrawingResult:
+	if has_unpublished_edit():
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Subtree history has an unpublished edit")
+	if _native_raster_store != null and not _attached_native_revision_matches(revision):
+		return DrawingResult.failure("STALE_REVISION", "Raster history native revision diverged")
+	var checked: DrawingResult = _validate_retained_subtree_sources(event, layers, snapshots, restore, false)
+	if not checked.ok:
+		return checked
+	var count: int = int(checked.value)
+	# Empty/unresolved removals do not need to allocate an owner or tombstones.
+	var store: Object = _native_raster_store
+	var provisional: bool = store == null
+	if provisional and count == 0:
+		revision += 1
+		return DrawingResult.success(false, revision)
+	if provisional:
+		store = ClassDB.instantiate("DrawingNativeTiles")
+		if store == null or int(store.call("tile_abi_version")) != 1 or not bool(store.call("configure", tile_stride, revision)):
+			return DrawingResult.failure("NATIVE_STRUCTURE", "Detached subtree history bootstrap rejected")
+	var descriptors: Array[Dictionary] = []
+	for layer: String in layers:
+		var raster: DrawingLayerNode = snapshots[layer] if restore else _nodes[layer]
+		for key: String in raster.tiles:
+			var coords: PackedStringArray = key.split(",")
+			descriptors.append({"layer": layer, "tile_x": int(coords[0]), "tile_y": int(coords[1]),
+				"bytes": raster.tiles[key].to_rgba8()})
+	if not bool(store.call("publish_subtree_history_source_revision", revision,
+			PackedStringArray(layers), descriptors, not restore and count > 0)):
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Detached subtree history publication rejected")
+	if provisional:
+		_native_raster_store = store
+		_native_source_identities.clear()
+		_sparse_reloads.clear()
+	for layer: String in layers:
+		var raster: DrawingLayerNode = snapshots[layer] if restore else _nodes[layer]
+		for key: String in raster.tiles:
+			_remember_native_source(layer, key, raster.tiles[key])
+	revision += 1
+	return DrawingResult.success(count > 0, revision)
+
+
+## Undoing the creation of a raster is not the same as removing a never-
+## imported ID. Undoing its strokes leaves native-authorized blank tiles and
+## Redo tokens. Check both projections before parking/restoring the empty node.
+func _replay_empty_raster_creation(node_id: String, parent_id: String,
+		snapshot: DrawingLayerNode, restore: bool) -> DrawingResult:
+	if has_unpublished_edit():
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Raster creation history has an unpublished edit")
+	if snapshot == null or snapshot.id != node_id or snapshot.parent_id != parent_id or \
+			snapshot.kind != DrawingLayerNode.RASTER or not snapshot.children.is_empty() or \
+			not snapshot.tiles.is_empty() or not snapshot.objects.is_empty() or \
+			not snapshot.text_value.is_empty() or snapshot.text_element != null:
+		return DrawingResult.failure("HISTORY_TARGET", "Invalid empty raster creation snapshot")
+	if not restore:
+		var live: DrawingLayerNode = _nodes[node_id]
+		if live.id != node_id or live.kind != snapshot.kind or live.name != snapshot.name or \
+				live.visible != snapshot.visible or live.locked != snapshot.locked or \
+				not live.children.is_empty() or not live.tiles.is_empty() or \
+				not live.objects.is_empty() or not live.text_value.is_empty() or live.text_element != null:
+			return DrawingResult.failure("HISTORY_TARGET", "Created raster is no longer empty or its metadata diverged")
+	for identity: String in _pending_tiles:
+		if identity.begins_with(node_id + ":"):
+			return DrawingResult.failure("STALE_SOURCE", "Created raster has an unresolved source")
+	for identity: String in _known_refs:
+		if identity.begins_with(node_id + ":"):
+			return DrawingResult.failure("STALE_SOURCE", "Created raster has a retained physical source")
+	if _native_raster_store == null:
+		return _advance_checked_layer_metadata(false)
+	if not _attached_native_revision_matches(revision):
+		return DrawingResult.failure("STALE_REVISION", "Raster creation native revision diverged")
+	var sources: int = 0
+	for identity: String in _native_source_identities:
+		if identity.begins_with(node_id + ":"):
+			sources += 1
+	var nodes: Dictionary = {node_id: snapshot if restore else _nodes[node_id]}
+	if not _native_tree_sources_match(nodes, restore):
+		return DrawingResult.failure("STALE_PIXEL", "Created raster native source differs")
+	if not bool(_native_raster_store.call("advance_empty_created_layer_revision",
+			revision, node_id, sources, restore)):
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Native empty raster creation history rejected")
+	revision += 1
+	return DrawingResult.success(null, revision)
+
+
 ## Structural replay is failure-atomic: all preconditions are checked before
 ## modifying the tree. Content events are undone first in chronological order.
 func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
@@ -1705,13 +2304,22 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 		if not _nodes.has(parent_id) or _nodes[parent_id].kind != DrawingLayerNode.GROUP:
 			return DrawingResult.failure("HISTORY_TARGET", "Structural parent disappeared")
 		var affected_raster: Array[String] = []
+		var retained_raster_source: bool = false
 		if op == "remove":
-			for snapshot: DrawingLayerNode in (event["nodes"] as Dictionary).values():
+			for identifier: String in event["nodes"]:
+				var snapshot: DrawingLayerNode = event["nodes"][identifier]
+				if snapshot == null or snapshot.id != identifier:
+					return DrawingResult.failure("HISTORY_TARGET", "Structural history node identity diverged")
 				if snapshot.kind == DrawingLayerNode.RASTER:
-					affected_raster.append(snapshot.id)
-		var restored: Dictionary = event["nodes"] if op == "remove" else {node_id: event["node"]}
+					affected_raster.append(identifier)
+					retained_raster_source = retained_raster_source or not snapshot.tiles.is_empty()
+		var created_node: DrawingLayerNode = event.get("node") as DrawingLayerNode
+		if op == "create" and (created_node == null or created_node.id != node_id or
+				created_node.parent_id != parent_id):
+			return DrawingResult.failure("HISTORY_TARGET", "Structural creation snapshot diverged")
+		var restored: Dictionary = event["nodes"] if op == "remove" else {node_id: created_node}
 		var raster_layers: Array[String] = affected_raster.duplicate()
-		if op == "create" and (event["node"] as DrawingLayerNode).kind == DrawingLayerNode.RASTER:
+		if op == "create" and created_node.kind == DrawingLayerNode.RASTER:
 			raster_layers.append(node_id)
 		# All tree preconditions precede the Rust revision update; rejected
 		# structural replays must leave both histories and trees unchanged.
@@ -1722,11 +2330,13 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 		elif not _nodes.has(node_id) or _nodes[node_id].parent_id != parent_id or \
 				_nodes[parent_id].children.find(node_id) != int(event["index"]):
 			return DrawingResult.failure("HISTORY_TARGET", "Removed subtree diverged")
+		if op == "create" and not restore and _nodes[node_id].kind != created_node.kind:
+			return DrawingResult.failure("HISTORY_TARGET", "Created layer kind diverged")
 		# A semantic-only tree replay is another checked Rust revision boundary.
 		# The detached nodes and parent slot are validated above, so a rejected
 		# native transition cannot publish even a partial subtree.
 		if affected_raster.is_empty() and (op != "create" or
-				(event["node"] as DrawingLayerNode).kind != DrawingLayerNode.RASTER):
+				created_node.kind != DrawingLayerNode.RASTER):
 			var metadata: DrawingResult = _advance_checked_layer_metadata(false)
 			if not metadata.ok:
 				return metadata
@@ -1734,10 +2344,58 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 		# Raster-bearing replay must acquire the exact Rust revision *before*
 		# touching Godot's hierarchy. A failed park/unpark or unreferenced-ID
 		# bridge cannot degrade into an unchecked local-only history step.
-		if not raster_layers.is_empty() and _native_raster_store != null:
+		if op == "create" and not raster_layers.is_empty():
+			var creation: DrawingResult = _replay_empty_raster_creation(node_id, parent_id,
+				created_node, restore)
+			if not creation.ok:
+				return creation
+			raster_advanced = true
+			parked_replay = _native_raster_store != null
+		elif op == "remove" and not raster_layers.is_empty() and \
+				(retained_raster_source or bool(event.get("native_parked", false))) and \
+				(_native_raster_store != null or (tile_stride >= 16 and ClassDB.class_exists("DrawingNativeTiles"))) and \
+				not _subtree_history_has_native_references(raster_layers):
+			var detached: DrawingResult = _replay_detached_subtree_source(event, raster_layers, restored, restore)
+			if not detached.ok:
+				return detached
+			parked_replay = bool(detached.value)
+			event["native_parked"] = parked_replay
+			event["native_detached_adopted"] = parked_replay
+			raster_advanced = true
+		elif not raster_layers.is_empty() and _native_raster_store != null:
 			if not _attached_native_revision_matches(revision):
 				return DrawingResult.failure("STALE_REVISION", "Raster history native revision diverged")
-			if bool(event.get("native_parked", false)):
+			var promoted: Dictionary = {}
+			if _native_lazy_admission and op == "remove" and not restore:
+				var prepared: DrawingResult = _prepare_late_sparse_removal_sources(event)
+				if not prepared.ok:
+					return prepared
+				promoted = prepared.value
+			if op == "remove" and not bool(event.get("native_detached_adopted", false)) and \
+					_subtree_has_unowned_tiles(restored, raster_layers):
+				var mixed: DrawingResult = _adopt_mixed_subtree_sources(event, raster_layers,
+					restored, restore, false, promoted)
+				if not mixed.ok:
+					return mixed
+				for identity: String in promoted:
+					var owner: String = identity.get_slice(":", 0)
+					var key: String = identity.substr(owner.length() + 1)
+					(restored[owner] as DrawingLayerNode).tiles[key] = promoted[identity]
+					event["pending"].erase(identity)
+				event["native_parked"] = true
+				event["native_detached_adopted"] = true
+				parked_replay = true
+				raster_advanced = true
+			if not raster_advanced and bool(event.get("native_detached_adopted", false)):
+				if has_unpublished_edit():
+					return DrawingResult.failure("NATIVE_STRUCTURE", "Subtree history has an unpublished edit")
+				var checked: DrawingResult = _validate_retained_subtree_sources(event,
+					raster_layers, restored, restore, true, promoted)
+				if not checked.ok:
+					return checked
+			if raster_advanced:
+				pass # Mixed source publication already advanced the native revision.
+			elif bool(event.get("native_parked", false)) or not promoted.is_empty():
 				if restore and not _native_tree_sources_match(restored, true):
 					return DrawingResult.failure("STALE_PIXEL", "Structural snapshot differs from native source")
 				if not restore:
@@ -1748,6 +2406,13 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 						return DrawingResult.failure("STALE_PIXEL", "Structural source identity changed")
 				if not _advance_parked_structure_revision(raster_layers, restore, false):
 					return DrawingResult.failure("NATIVE_STRUCTURE", "Native parked raster history rejected")
+				for identity: String in promoted:
+					var owner: String = identity.get_slice(":", 0)
+					var key: String = identity.substr(owner.length() + 1)
+					(restored[owner] as DrawingLayerNode).tiles[key] = promoted[identity]
+					event["pending"].erase(identity)
+				if not promoted.is_empty():
+					event["native_parked"] = true
 				parked_replay = true
 			else:
 				if not bool(_native_raster_store.call("advance_unreferenced_layers_revision",
@@ -1790,7 +2455,85 @@ func _mark_untracked_change() -> void:
 	_drop_history_redo()
 
 
+## A local branch can abandon a parked empty creation. Release its native
+## sources and Redo tokens only after the absent node and exact native state
+## are established. Other parked structural events have a separate lifecycle.
+func _release_abandoned_raster_creation(event: Dictionary) -> void:
+	if event.get("kind") != "structure" or event.get("op") != "create" or \
+			_native_raster_store == null or not _attached_native_revision_matches(revision):
+		return
+	var snapshot: DrawingLayerNode = event.get("node") as DrawingLayerNode
+	var node_id: String = event.get("id", "")
+	if snapshot == null or snapshot.id != node_id or snapshot.kind != DrawingLayerNode.RASTER or \
+			not snapshot.tiles.is_empty() or _nodes.has(node_id) or \
+			not bool(_native_raster_store.call("is_layer_parked", node_id)):
+		return
+	var identities: Array[String] = []
+	for identity: String in _native_source_identities:
+		if identity.begins_with(node_id + ":"):
+			identities.append(identity)
+	if not _native_tree_sources_match({node_id: snapshot}, true) or \
+			not bool(_native_raster_store.call("discard_empty_creation_history",
+				revision, node_id, identities.size())):
+		return
+	for identity: String in identities:
+		_native_source_identities.erase(identity)
+		_sparse_reloads.erase(identity)
+
+
+## An undone text conversion retains a parked raster for Redo. Once its
+## command is abandoned, verify the complete snapshot and release only that
+## absent raster. An unrelated pending edit may remain reserved.
+func _release_abandoned_text_raster(event: Dictionary) -> void:
+	if event.get("kind") != "text_tree" or _native_raster_store == null or \
+			not _attached_native_revision_matches(revision):
+		return
+	var before: DrawingLayerNode = event.get("before") as DrawingLayerNode
+	var after: DrawingLayerNode = event.get("after") as DrawingLayerNode
+	var layer_id: String = event.get("layer", "")
+	if before == null or after == null or before.id != layer_id or after.id != layer_id or \
+			before.kind != DrawingLayerNode.TEXT or after.kind != DrawingLayerNode.RASTER or \
+			(_nodes.has(layer_id) and _nodes[layer_id].kind != DrawingLayerNode.TEXT) or \
+			not bool(_native_raster_store.call("is_layer_parked", layer_id)):
+		return
+	for key: String in after.tiles:
+		var tile: DrawingRasterTile = after.tiles[key]
+		if tile == null or tile.stride != tile_stride or not tile.has_canonical_storage() or \
+				not _native_source_identities.has(layer_id + ":" + key):
+			return
+	var identities: Array[String] = []
+	for identity: String in _native_source_identities:
+		if identity.begins_with(layer_id + ":"):
+			identities.append(identity)
+	if not _native_tree_sources_match({layer_id: after}, true) or \
+			not bool(_native_raster_store.call("discard_parked_source", revision, layer_id, identities.size())):
+		return
+	for identity: String in identities:
+		_native_source_identities.erase(identity)
+		_sparse_reloads.erase(identity)
+
+
+## Only the command owner may abandon an event permanently. Tokens are unique
+## across native stores; do not clear a whole stack or replay a detached delta.
+## Rust checks the revision itself; avoid scanning the store's memory stats
+## on every retired event. A stale or detached token cannot affect its owner.
+func _release_discarded_history_delta(delta: DrawingDelta, applied: bool) -> void:
+	if delta == null or delta.native_history_token <= 0 or _native_raster_store == null:
+		return
+	_native_raster_store.call("forget_history_token", revision, delta.layer_id,
+		delta.native_history_token, applied)
+
+
 func _drop_history_redo() -> void:
+	# Drop abandoned paint tokens before checking parked structural sources.
+	for index: int in range(_events.size() - 1, _cursor - 1, -1):
+		var event: Dictionary = _events[index]
+		if event.get("kind") == "content":
+			_release_discarded_history_delta(event["delta"] as DrawingDelta, false)
+	for index: int in range(_cursor, _events.size()):
+		var event: Dictionary = _events[index]
+		_release_abandoned_raster_creation(event)
+		_release_abandoned_text_raster(event)
 	_events.resize(_cursor)
 	_content_states.resize(_cursor + 1)
 
@@ -1829,7 +2572,8 @@ func record_selection_change(before: DrawingHistoryContext,
 ## native Brush attached its tile store. Convert those cold history entries
 ## into checked whole-tile replay once Rust owns the document revision;
 ## publishing only the Godot pixels would silently leave Rust one step behind.
-func _replay_pixel_delta_native(delta: DrawingDelta, undo_action: bool) -> DrawingResult:
+func _replay_pixel_delta_native(delta: DrawingDelta, undo_action: bool,
+		ordered_history: bool = false) -> DrawingResult:
 	if not _nodes.has(delta.layer_id) or not _editable(delta.layer_id):
 		return DrawingResult.failure("HISTORY_TARGET", "Legacy history layer unavailable")
 	var expected: Dictionary[String, int] = (delta.after if undo_action else delta.before).duplicate()
@@ -1894,24 +2638,28 @@ func _replay_pixel_delta_native(delta: DrawingDelta, undo_action: bool) -> Drawi
 	# bytes after every lazy callback and inside the atomic Rust transaction.
 	var native_delta: DrawingDelta = DrawingDelta.from_owned_tile_bytes(
 		source_layer, tile_stride, originals, changed)
-	return _replay_native_tile_delta(native_delta, false)
+	return _replay_native_tile_delta(native_delta, false, ordered_history)
 
 
 ## Replays a detached delta without creating a second history entry.
 ## The caller must validate the stable document identity before invoking it.
-func replay_delta(delta: DrawingDelta, undo_action: bool) -> DrawingResult:
+## Only the chronological command owner may assert ordered_history after
+## validating its cursor and revision ledger. Unordered recovery invalidates
+## native tokens conservatively; it cannot establish their chronological order.
+func replay_delta(delta: DrawingDelta, undo_action: bool,
+		ordered_history: bool = false) -> DrawingResult:
 	if delta == null:
 		return DrawingResult.failure("DELTA", "Missing drawing delta")
 	var result: DrawingResult
 	if delta.tile_stride > 0:
-		result = _replay_native_tile_delta(delta, undo_action)
+		result = _replay_native_tile_delta(delta, undo_action, ordered_history)
 	elif _native_raster_store != null or (tile_stride >= 16 and tile_stride <= 2048
 			and ClassDB.class_exists("DrawingNativeTiles")):
 		# Even a detached legacy/Atlas pixel event must acquire Rust ownership
 		# when its storage stride is supported by the native tile ABI.
 		# Otherwise it advances Godot alone and the next native gesture has to
 		# invalidate the host timeline at a checked rebase boundary.
-		result = _replay_pixel_delta_native(delta, undo_action)
+		result = _replay_pixel_delta_native(delta, undo_action, ordered_history)
 	else:
 		result = _publish_edit(delta.layer_id, revision,
 			delta.after if undo_action else delta.before,
@@ -1927,7 +2675,7 @@ func undo() -> DrawingResult:
 	var event: Dictionary = _events[_cursor - 1]
 	var result: DrawingResult
 	if event["kind"] == "content":
-		result = replay_delta(event["delta"] as DrawingDelta, true)
+		result = replay_delta(event["delta"] as DrawingDelta, true, true)
 	elif event["kind"] == "text_tree":
 		result = _replay_text_tree(event, true)
 	elif event["kind"] == "structure":
@@ -1947,7 +2695,7 @@ func redo() -> DrawingResult:
 	var event: Dictionary = _events[_cursor]
 	var result: DrawingResult
 	if event["kind"] == "content":
-		result = replay_delta(event["delta"] as DrawingDelta, false)
+		result = replay_delta(event["delta"] as DrawingDelta, false, true)
 	elif event["kind"] == "text_tree":
 		result = _replay_text_tree(event, false)
 	elif event["kind"] == "structure":
@@ -1961,7 +2709,81 @@ func redo() -> DrawingResult:
 	return result
 
 
+## Standalone links live in ordinary generic semantic layers; the Atlas
+## registry is deliberately not involved. Runtime source bytes are not stored.
+static func valid_link(record: Dictionary) -> bool:
+	return record.get("kind") == LINK_KIND and record.get("source_id") is String \
+		and valid_identifier(record["source_id"]) and record["source_id"] != ROOT_ID \
+		and record.get("position") is Vector2i \
+		and absi(record["position"].x) <= 1000000000 \
+		and absi(record["position"].y) <= 1000000000 \
+		and record.size() == 3
+
+
+func layer_links(layer_id: String) -> Array[Dictionary]:
+	var links: Array[Dictionary] = []
+	if not _nodes.has(layer_id) or _nodes[layer_id].kind != DrawingLayerNode.OBJECTS:
+		return links
+	for record: Dictionary in _nodes[layer_id].objects.values():
+		if record.get("kind") == LINK_KIND:
+			links.append(record.duplicate(true))
+	return links
+
+
+func linked_records() -> Array[Dictionary]:
+	var links: Array[Dictionary] = []
+	for layer_id: String in _nodes:
+		links.append_array(layer_links(layer_id))
+	return links
+
+
+func set_linked_sources(sources: Dictionary, error: String = "") -> void:
+	linked_sources = sources.duplicate()
+	linked_source_error = error
+	display_source_epoch += 1
+
+
+## A complete detached semantic layer is installed by ONE checked metadata
+## revision and ONE structural event, rather than create + untracked add.
+func commit_linked_object(token: Dictionary, catalog: DrawingAssetBrowserIndex, position: Vector2i,
+		parent_id: String, insertion_index: int, expected_revision: int) -> DrawingResult:
+	var entry: Dictionary = DrawingLinkedObjects.entry_for_token(catalog, token)
+	if entry.is_empty():
+		return DrawingResult.failure("LINK_SOURCE", "Source is not authorized by the standalone catalog")
+	var source_id: String = entry["id"]
+	var label: String = entry["name"]
+	var record: Dictionary = {"kind": LINK_KIND, "source_id": source_id, "position": position}
+	if revision != expected_revision or has_unpublished_edit() or external_history:
+		return DrawingResult.failure("LINK_REVISION", "Destination changed or is not locally editable")
+	if not valid_link(record) or source_id == id or linked_records().size() >= MAX_LINKS:
+		return DrawingResult.failure("LINK_SOURCE", "Invalid, self-referential or over-budget Object link")
+	if not _nodes.has(parent_id) or _nodes[parent_id].kind != DrawingLayerNode.GROUP or not _editable(parent_id):
+		return DrawingResult.failure("LINK_TARGET", "Destination group is hidden or locked")
+	var authorized: DrawingResult = DrawingLinkedObjects.resolve(self, catalog, record)
+	if not authorized.ok:
+		return authorized
+	var layer: String = new_id()
+	if _nodes.has(layer) or (_native_raster_store != null and bool(_native_raster_store.call("is_layer_parked", layer))):
+		return DrawingResult.failure("LINK_ID", "Object layer identity already exists")
+	var node: DrawingLayerNode = DrawingLayerNode.new(layer, DrawingLayerNode.OBJECTS, "Object: " + label, parent_id)
+	node.objects[new_id()] = record
+	var advanced: DrawingResult = _advance_checked_layer_metadata()
+	if not advanced.ok:
+		return advanced
+	var siblings: Array[String] = _nodes[parent_id].children
+	var index: int = clampi(insertion_index, 0, siblings.size())
+	_nodes[layer] = node
+	siblings.insert(index, layer)
+	_content_committed = true
+	_finish_structure(true, {"kind": "structure", "op": "create", "id": layer,
+		"parent": parent_id, "index": index, "node": node.detached_copy()})
+	set_linked_sources(authorized.value)
+	return DrawingResult.success(layer, revision)
+
+
 func add_object(layer_id: String, data: Dictionary, requested_id: String = "") -> DrawingResult:
+	if data.get("kind") == LINK_KIND:
+		return DrawingResult.failure("LINK_RECORD", "Use the checked linked placement transaction")
 	if not _nodes.has(layer_id) or _nodes[layer_id].kind != DrawingLayerNode.OBJECTS or not _editable(layer_id):
 		return DrawingResult.failure("LAYER", "Unavailable semantic-object layer")
 	var object_id: String = requested_id if not requested_id.is_empty() else new_id()
@@ -1983,6 +2805,8 @@ func move_object(layer_id: String, object_id: String, position: Vector2) -> Draw
 	if not _nodes[layer_id].objects.has(object_id) or not position.is_finite():
 		return DrawingResult.failure("OBJECT", "Missing object or invalid position")
 	var updated: Dictionary = _nodes[layer_id].objects[object_id].duplicate(true)
+	if updated.get("kind") == LINK_KIND:
+		return DrawingResult.failure("LINK_RECORD", "Linked Object transforms require a checked placement transaction")
 	updated["position"] = position
 	var advanced: DrawingResult = _advance_checked_layer_metadata()
 	if not advanced.ok:
@@ -2060,8 +2884,10 @@ func set_text(layer_id: String, content: String) -> DrawingResult:
 
 
 func rasterize_text(layer_id: String, expected_revision: int) -> DrawingResult:
-	if revision != expected_revision:
+	if revision != expected_revision or not _attached_native_revision_matches(expected_revision):
 		return DrawingResult.failure("STALE_REVISION", "Text changed before rasterization")
+	if has_unpublished_edit():
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Cannot convert text during a pending raster edit")
 	if not _nodes.has(layer_id) or _nodes[layer_id].kind != DrawingLayerNode.TEXT or not _editable(layer_id):
 		return DrawingResult.failure("LAYER", "Unavailable editable text layer")
 	var before: DrawingLayerNode = _nodes[layer_id].detached_copy()
@@ -2097,33 +2923,43 @@ func rasterize_text(layer_id: String, expected_revision: int) -> DrawingResult:
 			for channel: int in range(4):
 				rgba |= int(bytes[offset + channel]) << (channel * 8)
 			after.tiles[tile_key].set_rgba(local.x, local.y, rgba)
-	# A new semantic glyph source may reuse an ID that Rust parked when the
-	# *previous* text-to-raster conversion was undone. Its old canonical tiles
-	# and redo tokens no longer describe this source. Retire only that parked ID
-	# at one checked native revision boundary; preserve all other raster tokens.
-	# A current non-parked ID must still be provably unreferenced in Rust.
-	if _native_raster_store != null:
-		var native_revision: int = int(_native_raster_store.call("stats").get("revision", -1))
-		if native_revision > revision:
-			return DrawingResult.failure("STALE_REVISION", "Text conversion native store is ahead")
-		if native_revision == revision:
-			var ids: PackedStringArray = PackedStringArray([layer_id])
-			if bool(_native_raster_store.call("is_layer_parked", layer_id)):
-				if not bool(_native_raster_store.call(
-						"replace_parked_layers_revision", revision, ids)):
-					return DrawingResult.failure("NATIVE_STRUCTURE", "Parked text source could not be replaced")
-				for identity: String in _native_source_identities.keys():
-					if identity.begins_with(layer_id + ":"):
-						_native_source_identities.erase(identity)
-			else:
-				if not bool(_native_raster_store.call(
-						"advance_unreferenced_layers_revision", revision, ids, true)):
-					return DrawingResult.failure("NATIVE_STRUCTURE", "Text ID has live native ownership")
-			revision += 1
-		else:
-			# An already-behind store is reauthorized on the next native edit.
-			_advance_raster_structure_revision([layer_id])
+	# Publish the complete derived raster source before exposing the new tree.
+	# The structural event owns the semantic transition; Rust must not invent
+	# a second pixel-history entry. A parked predecessor is replaced atomically.
+	var native_store: Object = _native_raster_store
+	var provisional: bool = native_store == null
+	if native_store != null and not _attached_native_revision_matches(revision):
+		return DrawingResult.failure("STALE_REVISION", "Text conversion native revision diverged")
+	if provisional and tile_stride >= 16 and ClassDB.class_exists("DrawingNativeTiles"):
+		native_store = ClassDB.instantiate("DrawingNativeTiles")
+		if native_store == null or int(native_store.call("tile_abi_version")) != 1 \
+				or not native_store.call("configure", tile_stride, revision):
+			return DrawingResult.failure("NATIVE_STRUCTURE", "Text source bootstrap rejected")
+	if native_store != null:
+		if after.tiles.size() > 8192 or after.tiles.size() * tile_stride * tile_stride * 4 > MAX_NATIVE_HISTORY_TRANSFER_BYTES:
+			return DrawingResult.failure("RASTER_LIMIT", "Text tile source exceeds native budget")
+		var descriptors: Array[Dictionary] = []
+		for key: String in after.tiles:
+			var coordinates: PackedStringArray = key.split(",")
+			var cx: int = int(coordinates[0])
+			var cy: int = int(coordinates[1])
+			if not TILES.tile_coordinates_in_projection_range(cx, cy, tile_stride):
+				return DrawingResult.failure("COORD", "Text source exceeds signed native projection")
+			descriptors.append({"tile_x": cx, "tile_y": cy, "bytes": after.tiles[key].to_rgba8()})
+		if not native_store.call("publish_structural_source_revision", layer_id, revision, descriptors):
+			return DrawingResult.failure("NATIVE_STRUCTURE", "Text raster source publication rejected")
+		if provisional:
+			_native_raster_store = native_store
+			_native_source_identities.clear()
+			_sparse_reloads.clear()
+		for identity: String in _native_source_identities.keys():
+			if identity.begins_with(layer_id + ":"):
+				_native_source_identities.erase(identity)
+		for key: String in after.tiles:
+			_remember_native_source(layer_id, key, after.tiles[key])
+		revision += 1
 	else:
+		# Retain the model-only path for synthetic sub-native tile strides.
 		_advance_raster_structure_revision([layer_id])
 	_nodes[layer_id] = after
 	for tile_key: String in after.tiles:
@@ -2138,29 +2974,78 @@ func rasterize_text(layer_id: String, expected_revision: int) -> DrawingResult:
 	return DrawingResult.success(layer_id, revision)
 
 
-## Text-to-raster Undo/Redo can temporarily hide a layer that Rust already
-## owns. Park its canonical source/history rather than invalidating every
-## native token. Validate caller-owned tree snapshots before touching Rust;
-## an unowned text layer still takes the no-source structural revision bridge.
+## Text/raster history never falls back to Godot-only publication at a
+## supported stride. Park existing owned glyphs, or atomically adopt the
+## detached history source without branching unrelated native redo tokens.
 func _replay_text_raster_native(layer_id: String, expected: DrawingLayerNode,
 		target: DrawingLayerNode) -> DrawingResult:
-	if _native_raster_store == null:
-		return DrawingResult.success(false, revision)
-	var native_revision: int = int(_native_raster_store.call("stats").get("revision", -1))
-	if native_revision != revision:
+	if not _attached_native_revision_matches(revision):
 		return DrawingResult.failure("STALE_REVISION", "Text history native revision diverged")
+	if has_unpublished_edit():
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Cannot replay text during a pending raster edit")
 	var restore: bool = target.kind == DrawingLayerNode.RASTER
-	var source_nodes: Dictionary = {layer_id: target if restore else _nodes[layer_id]}
-	if not _native_tree_sources_match(source_nodes, restore):
-		return DrawingResult.failure("STALE_PIXEL", "Text history native RGBA8 source diverged")
-	var ids: PackedStringArray = PackedStringArray([layer_id])
-	if _native_raster_store.call("advance_parked_layers_revision", revision,
-			ids, restore, false):
-		return DrawingResult.success(true, revision + 1)
-	if _native_raster_store.call("advance_unreferenced_layers_revision", revision,
-			ids, false):
-		return DrawingResult.success(false, revision + 1)
-	return DrawingResult.failure("NATIVE_STRUCTURE", "Text history native layer transition rejected")
+	var raster: DrawingLayerNode = target if restore else _nodes[layer_id]
+	if raster.tiles.size() > 8192 or raster.tiles.size() * tile_stride * tile_stride * 4 > MAX_NATIVE_HISTORY_TRANSFER_BYTES:
+		return DrawingResult.failure("RASTER_LIMIT", "Text history source exceeds native budget")
+	# Validate backing storage before either the native parity check or packing.
+	for key: String in raster.tiles:
+		var coords: PackedStringArray = key.split(",")
+		var tile: DrawingRasterTile = raster.tiles[key]
+		if coords.size() != 2 or not coords[0].is_valid_int() or not coords[1].is_valid_int() or \
+				tile == null or tile.stride != tile_stride or not tile.has_canonical_storage():
+			return DrawingResult.failure("STALE_PIXEL", "Invalid text history source")
+		var cx: int = int(coords[0])
+		var cy: int = int(coords[1])
+		if key != "%d,%d" % [cx, cy] or not TILES.tile_coordinates_in_projection_range(cx, cy, tile_stride):
+			return DrawingResult.failure("COORD", "Text history exceeds signed native projection")
+	var store: Object = _native_raster_store
+	var provisional: bool = store == null
+	if provisional:
+		store = ClassDB.instantiate("DrawingNativeTiles")
+		if store == null or int(store.call("tile_abi_version")) != 1 or \
+				not bool(store.call("configure", tile_stride, revision)):
+			return DrawingResult.failure("NATIVE_STRUCTURE", "Text history source bootstrap rejected")
+	else:
+		if not _native_tree_sources_match({layer_id: raster}, restore):
+			return DrawingResult.failure("STALE_PIXEL", "Text history native RGBA8 source diverged")
+		# The parked/live owner must cover every visible raster tile, not just
+		# the subset already recorded in the source identity map.
+		var complete: bool = true
+		for key: String in raster.tiles:
+			if not _native_source_identities.has(layer_id + ":" + key):
+				complete = false
+				break
+		if complete and bool(store.call("advance_parked_layers_revision", revision,
+				PackedStringArray([layer_id]), restore, false)):
+			return DrawingResult.success(true, revision + 1)
+	# No live/parked authority may be overwritten by this fallback. The FFI
+	# verifies the ID is unreferenced before admitting any detached bytes.
+	if not restore:
+		if raster.tiles.size() != expected.tiles.size():
+			return DrawingResult.failure("STALE_PIXEL", "Detached text raster tile set diverged")
+		for key: String in raster.tiles:
+			var prior: DrawingRasterTile = expected.tiles.get(key)
+			var current: DrawingRasterTile = raster.tiles[key]
+			if prior == null or prior.stride != tile_stride or not prior.has_canonical_storage() or \
+					prior.to_rgba8() != current.to_rgba8():
+				return DrawingResult.failure("STALE_PIXEL", "Detached text raster bytes diverged")
+	var descriptors: Array[Dictionary] = []
+	for key: String in raster.tiles:
+		var coords: PackedStringArray = key.split(",")
+		descriptors.append({"layer": layer_id, "tile_x": int(coords[0]),
+			"tile_y": int(coords[1]), "bytes": raster.tiles[key].to_rgba8()})
+	if not bool(store.call("publish_text_history_source_revision", revision,
+			layer_id, descriptors, not restore and not descriptors.is_empty())):
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Detached text history source publication rejected")
+	if provisional:
+		_native_raster_store = store
+		_native_source_identities.clear()
+		_sparse_reloads.clear()
+	for key: String in raster.tiles:
+		_remember_native_source(layer_id, key, raster.tiles[key])
+	# A restored projection is detached again by the caller; rebind identities
+	# just as for an existing parked source.
+	return DrawingResult.success(not descriptors.is_empty(), revision + 1)
 
 
 func _replay_text_tree(event: Dictionary, undo_action: bool) -> DrawingResult:
@@ -2190,19 +3075,13 @@ func _replay_text_tree(event: Dictionary, undo_action: bool) -> DrawingResult:
 		if not metadata.ok:
 			return metadata
 		metadata_advanced = true
-	if kind_transition and _native_raster_store != null:
-		var native_revision: int = int(_native_raster_store.call("stats").get("revision", -1))
-		if native_revision > revision:
-			return DrawingResult.failure("STALE_REVISION", "Text history native store is ahead")
-		if native_revision == revision:
-			var bridge: DrawingResult = _replay_text_raster_native(layer_id, expected, target)
-			if not bridge.ok:
-				return bridge
-			native_bridged = true
-			parked = bool(bridge.value)
-		# Older previously-rebased consumers may already be behind the host
-		# revision. They cannot preserve an obsolete native timeline; leave
-		# that store untouched and let the normal checked rebase reauthorize it.
+	if kind_transition and (_native_raster_store != null or
+			(tile_stride >= 16 and ClassDB.class_exists("DrawingNativeTiles"))):
+		var bridge: DrawingResult = _replay_text_raster_native(layer_id, expected, target)
+		if not bridge.ok:
+			return bridge
+		native_bridged = true
+		parked = bool(bridge.value)
 	if target == null:
 		_nodes.erase(layer_id)
 		_nodes[parent_id].children.erase(layer_id)
@@ -2311,7 +3190,65 @@ func _validate_snapshot_tree(node_id: String, nodes: Dictionary,
 	return true
 
 
-func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool = false) -> DrawingResult:
+## Host publication consumes a detached snapshot, not a newly fetched source.
+## Check the actual outgoing tree (including untracked lazy descriptors) before
+## the other document changes. This never calls a source provider.
+func preflight_host_transfer_source(snapshot: Dictionary, removing: bool,
+		allow_protected_root: bool = false, root_parent_override: String = "") -> DrawingResult:
+	var owner: DrawingResult = _preflight_host_structure(removing)
+	if not owner.ok:
+		return owner
+	var root: Variant = snapshot.get("root")
+	var nodes: Variant = snapshot.get("nodes")
+	if not root is String or root == ROOT_ID or not nodes is Dictionary or not _nodes.has(root):
+		return DrawingResult.failure("SNAPSHOT", "Missing transfer source")
+	var visited: Dictionary[String, bool] = {}
+	if not _validate_snapshot_tree(root, nodes, visited) or visited.size() != nodes.size():
+		return DrawingResult.failure("SNAPSHOT", "Invalid transfer source tree")
+	var ids: Array[String] = []
+	_gather_ids(root, ids)
+	if ids.size() != nodes.size():
+		return DrawingResult.failure("STALE_SOURCE", "Transfer source hierarchy changed")
+	for identifier: String in ids:
+		var live: DrawingLayerNode = _nodes[identifier]
+		var expected: DrawingLayerNode = nodes.get(identifier) as DrawingLayerNode
+		if expected == null:
+			return DrawingResult.failure("STALE_SOURCE", "Transfer source layer missing")
+		var expected_parent: String = root_parent_override if identifier == root and not root_parent_override.is_empty() else expected.parent_id
+		if live.parent_id != expected_parent or live.kind != expected.kind or \
+				live.name != expected.name or live.visible != expected.visible or live.locked != expected.locked or \
+				live.children != expected.children or live.objects != expected.objects or \
+				live.text_value != expected.text_value or \
+				(live.text_element.to_record() if live.text_element != null else null) != \
+				(expected.text_element.to_record() if expected.text_element != null else null):
+			return DrawingResult.failure("STALE_SOURCE", "Transfer source metadata changed")
+		if tile_keys(identifier).size() != expected.tiles.size() or live.tiles.size() != expected.tiles.size():
+			return DrawingResult.failure("STALE_SOURCE", "Transfer source tile set changed or is unresolved")
+		for key: String in expected.tiles:
+			var tile: DrawingRasterTile = live.tiles.get(key)
+			var retained: DrawingRasterTile = expected.tiles[key]
+			if tile == null or retained == null or tile.stride != retained.stride or \
+					not tile.has_canonical_storage() or not retained.has_canonical_storage() or \
+					tile.to_rgba8() != retained.to_rgba8():
+				return DrawingResult.failure("STALE_SOURCE", "Transfer source raster changed")
+	if removing:
+		return _preflight_unrecorded_subtree_removal(root, allow_protected_root)
+	return _preflight_native_subtree_export(ids)
+
+
+## An external transfer may restore its original sibling position in the same
+## publication. On first import it may also capture the fully remapped detached
+## tree before publication, avoiding a second fallible live export afterward.
+## Ordinary callers receive the root ID; capture returns {id, snapshot}.
+func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool = false,
+		preserve_host_redo: bool = false, insertion_index: int = -1,
+		capture_snapshot: bool = false) -> DrawingResult:
+	if (capture_snapshot or insertion_index != -1) and not preserve_host_redo:
+		return DrawingResult.failure("HISTORY_OWNED", "Ordered transfer capture requires a host command")
+	if preserve_host_redo:
+		var owner: DrawingResult = _preflight_host_structure()
+		if not owner.ok:
+			return owner
 	if not _nodes.has(parent_id) or _nodes[parent_id].kind != DrawingLayerNode.GROUP or not _editable(parent_id):
 		return DrawingResult.failure("PARENT", "Missing or inaccessible destination group")
 	var original_nodes: Variant = snapshot.get("nodes")
@@ -2331,14 +3268,47 @@ func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool 
 		var next_id: String = String(old_id) if preserve_ids else new_id()
 		if _nodes.has(next_id):
 			return DrawingResult.failure("DUPLICATE_ID", "Imported layer ID already exists")
+		if _native_raster_store != null:
+			var retained_keys: PackedStringArray = _native_raster_store.call("transfer_history_source_keys", next_id)
+			if bool(_native_raster_store.call("is_layer_parked", next_id)) or \
+					(not retained_keys.is_empty() and (not preserve_host_redo or nodes[old_id].kind != DrawingLayerNode.RASTER)):
+				return DrawingResult.failure("LAYER_ID", "Imported ID is reserved by native structural history")
 		mapping[String(old_id)] = next_id
 	for old_id: Variant in nodes:
 		var source: DrawingLayerNode = nodes[old_id]
 		if source.id != old_id:
 			return DrawingResult.failure("SNAPSHOT", "Inconsistent detached node ID")
+		for record: Dictionary in source.objects.values():
+			if record.get("kind") == LINK_KIND:
+				return DrawingResult.failure("NESTED_TRANSFER", "Transferring a linked subtree requires explicit source authorization and link/copy policy")
 		for child: String in source.children:
 			if not nodes.has(child) or nodes[child].parent_id != old_id:
 				return DrawingResult.failure("SNAPSHOT", "Broken nested group reference")
+	# Validate source tiles before copying any projection or materializing buffers.
+	var raster_count: int = 0
+	var tile_count: int = 0
+	var native_required: bool = _native_raster_store != null or (tile_stride >= 16 and ClassDB.class_exists("DrawingNativeTiles"))
+	for old_id: Variant in nodes:
+		var source: DrawingLayerNode = nodes[old_id]
+		if source.kind != DrawingLayerNode.RASTER:
+			if not source.tiles.is_empty():
+				return DrawingResult.failure("SNAPSHOT", "Non-raster node contains tiles")
+			continue
+		raster_count += 1
+		tile_count += source.tiles.size()
+		if native_required and (raster_count > 128 or tile_count > 8192 or tile_count * tile_stride * tile_stride * 4 > MAX_NATIVE_HISTORY_TRANSFER_BYTES):
+			return DrawingResult.failure("NATIVE_STRUCTURE", "Detached subtree exceeds native source budget")
+		for key: String in source.tiles:
+			var tile: DrawingRasterTile = source.tiles[key]
+			var coords: PackedStringArray = key.split(",")
+			if tile == null or tile.stride != tile_stride or not tile.has_canonical_storage() or coords.size() != 2 or not coords[0].is_valid_int() or not coords[1].is_valid_int():
+				return DrawingResult.failure("SNAPSHOT", "Invalid detached raster tile or stride")
+			var cx: int = int(coords[0])
+			var cy: int = int(coords[1])
+			if key != "%d,%d" % [cx, cy] or not TILES.tile_coordinates_in_projection_range(cx, cy, tile_stride):
+				return DrawingResult.failure("COORD", "Invalid detached tile coordinate")
+	if raster_count > 0 and has_unpublished_edit():
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Cannot import raster during an unpublished edit")
 	# Prepare the entire detached projection before publishing. A failed copy
 	# must not install a partial group, advance either revision or leave a
 	# half-populated dirty map. Native parked IDs are reserved even while the
@@ -2364,37 +3334,78 @@ func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool 
 		prepared[imported.id] = imported
 		if imported.kind == DrawingLayerNode.RASTER:
 			imported_rasters.append(imported.id)
+	var inserted_id: String = mapping[original_root]
+	var captured: Dictionary = {}
+	if capture_snapshot:
+		var detached: Dictionary[String, DrawingLayerNode] = {}
+		for identifier: String in prepared:
+			detached[identifier] = prepared[identifier].detached_copy()
+		captured = {"id": inserted_id, "snapshot": {"root": inserted_id, "nodes": detached}}
 	# Prepare the full tree before a checked, single-step native revision.
-	# The previous raster import used a bare increment and forced a rebase even when
-	# every imported raster layer was new to Rust. The checked bridge keeps
-	# unrelated native Brush history and source authorizations alive.
+	# Adopt every imported raster tile before exposing the tree; the untracked
+	# structural event keeps unrelated native Brush history and authorizations.
 	if imported_rasters.is_empty():
 		# Semantic-only detached imports must obey the same fail-closed native
 		# revision boundary as public object/text edits. The old post-mutation
 		# bridge advanced Godot and dropped the Rust attachment on rejection.
-		var metadata: DrawingResult = _advance_checked_layer_metadata()
+		var metadata: DrawingResult = _advance_checked_layer_metadata(not preserve_host_redo)
 		if not metadata.ok:
 			return metadata
 	else:
-		# A rejected native bridge is not permission to publish a Godot-only
-		# subtree. Keep the detached projection uninstalled and allow retry.
-		# Every imported ID is new to this document, so Rust may advance only
-		# after proving that none is resident, parked or referenced in history.
-		if _native_raster_store != null:
-			if not _attached_native_revision_matches(revision):
-				return DrawingResult.failure("STALE_REVISION", "Native raster revision diverged before import")
-			if not bool(_native_raster_store.call("advance_unreferenced_layers_revision",
-					revision, PackedStringArray(imported_rasters), true)):
+		var store: Object = _native_raster_store
+		var provisional: bool = store == null
+		if store != null and not _attached_native_revision_matches(revision):
+			return DrawingResult.failure("STALE_REVISION", "Native raster revision diverged before import")
+		if provisional and native_required:
+			store = ClassDB.instantiate("DrawingNativeTiles")
+			if store == null or int(store.call("tile_abi_version")) != 1 or not store.call("configure", tile_stride, revision):
+				return DrawingResult.failure("NATIVE_STRUCTURE", "Detached subtree native bootstrap rejected")
+		if store != null:
+			var descriptors: Array[Dictionary] = []
+			for layer: String in imported_rasters:
+				var keys: Dictionary[String, bool] = {}
+				for key: String in prepared[layer].tiles:
+					keys[key] = true
+				if preserve_host_redo:
+					# Retained history may reference blank coordinates omitted
+					# from the detached source snapshot at this visit.
+					var history_keys: PackedStringArray = store.call("transfer_history_source_keys", layer)
+					for key: String in history_keys:
+						keys[key] = true
+				if descriptors.size() + keys.size() > 8192 or \
+						(descriptors.size() + keys.size()) * tile_stride * tile_stride * 4 > MAX_NATIVE_HISTORY_TRANSFER_BYTES:
+					return DrawingResult.failure("NATIVE_STRUCTURE", "Transferred history source budget exceeded")
+				for key: String in keys:
+					var coords: PackedStringArray = key.split(",")
+					var tile: DrawingRasterTile = prepared[layer].tiles.get(key)
+					var bytes: PackedByteArray = tile.to_rgba8() if tile != null else PackedByteArray()
+					if tile == null:
+						bytes.resize(tile_stride * tile_stride * 4)
+					descriptors.append({"layer": layer, "tile_x": int(coords[0]), "tile_y": int(coords[1]), "bytes": bytes})
+			var published: bool = bool(store.call("publish_transfer_subtree_revision",
+				revision, PackedStringArray(imported_rasters), descriptors)) if preserve_host_redo else \
+				bool(store.call("publish_subtree_revision", revision, PackedStringArray(imported_rasters), descriptors))
+			if not published:
 				return DrawingResult.failure("NATIVE_STRUCTURE", "Native raster import was rejected")
+			if provisional:
+				_native_raster_store = store
+				_native_source_identities.clear()
+				_sparse_reloads.clear()
+			for descriptor: Dictionary in descriptors:
+				var layer: String = descriptor["layer"]
+				var key: String = "%d,%d" % [descriptor["tile_x"], descriptor["tile_y"]]
+				_remember_native_source(layer, key, prepared[layer].tiles.get(key))
 		revision += 1
 	for identifier: String in prepared:
 		var imported: DrawingLayerNode = prepared[identifier]
 		_nodes[identifier] = imported
 		for tile_key: String in imported.tiles:
 			_dirty_tiles[identifier + ":" + tile_key] = true
-	_nodes[parent_id].children.append(mapping[original_root])
+	var siblings: Array[String] = _nodes[parent_id].children
+	var index: int = siblings.size() if insertion_index < 0 else mini(insertion_index, siblings.size())
+	siblings.insert(index, inserted_id)
 	_mark_untracked_change()
-	return DrawingResult.success(mapping[original_root], revision)
+	return DrawingResult.success(captured if capture_snapshot else inserted_id, revision)
 
 
 static func transfer_subtree(source: DrawingDocument, target: DrawingDocument,
@@ -2606,12 +3617,18 @@ static func open_manifest(manifest: Dictionary, loader: Callable) -> DrawingResu
 		for object_id: Variant in objects:
 			if not object_id is String or not objects[object_id] is Dictionary:
 				return DrawingResult.failure("MANIFEST", "Invalid generic object record")
+			var object_record: Dictionary = objects[object_id]
+			if object_record.get("kind") == LINK_KIND and (kind != DrawingLayerNode.OBJECTS or \
+					not valid_identifier(object_id) or not valid_link(object_record)):
+				return DrawingResult.failure("LINK_RECORD", "Malformed standalone Object link")
 			node.objects[object_id] = (objects[object_id] as Dictionary).duplicate(true)
 		var chunks: Variant = record.get("chunks", [])
 		if not chunks is Array or (not chunks.is_empty() and kind != DrawingLayerNode.RASTER):
 			return DrawingResult.failure("MANIFEST", "Invalid raster chunk placement")
 		chunk_descriptors[node_id] = chunks
 		document._nodes[node_id] = node
+	if document.linked_records().size() > MAX_LINKS:
+		return DrawingResult.failure("LINK_LIMIT", "Too many standalone Object links")
 	if not document._nodes.has(ROOT_ID) or document._nodes[ROOT_ID].kind != DrawingLayerNode.GROUP:
 		return DrawingResult.failure("MANIFEST", "Missing generic root group")
 	if document._nodes[ROOT_ID].parent_id != "":

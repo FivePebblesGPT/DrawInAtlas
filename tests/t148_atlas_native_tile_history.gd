@@ -248,4 +248,6 @@ func run() -> void:
 		packed(document, layer, "0,0") == continued_bytes,
 		"mixed detached/native Atlas redo restores latest canonical bytes")
 	print("T148_ATLAS_NATIVE_RESULT checks=%d failures=%d" % [checks, failures])
+	if failures == 0:
+		print("T148_ATLAS_NATIVE_PASSED")
 	quit(0 if failures == 0 else 1)

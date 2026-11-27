@@ -128,13 +128,14 @@ func run() -> void:
 		check(reopened.ok and reopened.value != null, "native pixel-map source reopens")
 		if reopened.ok:
 			var fresh: DrawingDocument = reopened.value
-			check(fresh._native_raster_store == null, "portable reopen starts detached")
+			var opened_store: Object = fresh._native_raster_store
+			check(opened_store != null and native_matches(fresh, host_layer, "-1,0"), "portable Open authorizes exact native source")
 			var original: DrawingResult = fresh.read_pixel(host_layer, -1, 0)
 			var retry: DrawingResult = fresh._publish_edit(host_layer, fresh.revision,
 				{"-1,0": HIDDEN}, {"-1,0": VISIBLE})
-			check(original.ok and retry.ok and fresh._native_raster_store != null and
+			check(original.ok and retry.ok and fresh._native_raster_store == opened_store and
 				native_matches(fresh, host_layer, "-1,0"),
-				"post-open direct edit bootstraps from loaded RGBA8 source")
+				"post-open direct edit retains the loaded native owner")
 		DirAccess.remove_absolute(path)
 
 	var free_pair: Dictionary = make_document("t233-untracked")

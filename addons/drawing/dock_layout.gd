@@ -69,10 +69,15 @@ func select_panel(panel_id: String) -> bool:
 	return _commit(candidate)
 
 
+func is_panel_visible(panel_id: String) -> bool:
+	return _panels.has(panel_id) and bool(_panels[panel_id]["visible"])
+
+
 func set_panel_visible(panel_id: String, visible: bool) -> bool:
 	if not _panels.has(panel_id):
 		return false
 	_panels[panel_id]["visible"] = visible
+	_select_visible_members(_containers, _panels)
 	return true
 
 
@@ -276,6 +281,7 @@ func restore(data: Dictionary) -> bool:
 		candidate.append(container.duplicate(true))
 	if not _valid(candidate, panels):
 		return false
+	_select_visible_members(candidate, panels)
 	_containers = candidate
 	_panels = panels
 	return true
@@ -323,8 +329,23 @@ func _remove_group(containers: Array[Dictionary], group_id: String) -> void:
 func _commit(candidate: Array[Dictionary]) -> bool:
 	if not _valid(candidate, _panels):
 		return false
+	_select_visible_members(candidate, _panels)
 	_containers = candidate
 	return true
+
+
+## A group with available tabs must never display a hidden active member.
+func _select_visible_members(containers: Array[Dictionary], panels: Dictionary) -> void:
+	for container: Dictionary in containers:
+		for group: Dictionary in container["groups"]:
+			if bool(panels[group["active"]]["visible"]):
+				continue
+			for panel_id: String in group["panels"]:
+				if bool(panels[panel_id]["visible"]):
+					group["active"] = panel_id
+					break
+			if not bool(panels[group["active"]]["visible"]) and container["flyout_group"] == group["id"]:
+				container["flyout_group"] = ""
 
 
 func _valid(containers: Array[Dictionary], panels: Dictionary) -> bool:

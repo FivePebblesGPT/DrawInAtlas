@@ -84,10 +84,11 @@ func run() -> void:
 	await frames(12)
 	var top: Control = app.top_bar
 	top._refresh_layout()
-	check(top._menus.size() == 9 and top._menus[0].visible and top._menus[1].visible,
+	check(top._menus.size() >= 2 and top._menus[0].text == "File" and top._menus[1].text == "Object" and
+		top._menus[0].visible and top._menus[1].visible,
 		"normal desktop shows File and Object as independent menu buttons")
-	check(top._menus[0].get_popup().item_count == 5 and top._menus[1].get_popup().item_count == 5,
-		"File and Object each have five distinct commands")
+	check(top._menus[0].get_popup().item_count == 6 and top._menus[1].get_popup().item_count == 5,
+		"File has six and Object has five distinct commands")
 	await click(top._menus[1])
 	check(top._menus[1].get_popup().visible, "real pointer opens top-level Object popup")
 	await screenshot("object-menu-wide")
@@ -172,17 +173,7 @@ func run() -> void:
 	down.global_position = more_target
 	root.push_input(down, true)
 	await frames(3)
-	# At this intentionally below-minimum 300px window, the many-row popup
-	# can cover its trigger. Inspect on pointer-down and complete release only
-	# after the selected action closes the popup.
-	check(more.visible, "native pointer press opens More overflow")
-	await screenshot("object-in-more")
-	if source_id >= 0:
-		more.id_pressed.emit(source_id)
-		await frames(7)
-		check(app.asset_browser != null and app.asset_browser.index.root_path.is_empty(),
-			"overflow Object Browse dispatches same Asset Browser without implicit binding")
-	more.hide()
+	check(not more.visible, "held trigger cannot open tall overflow over its own release")
 	var up: InputEventMouseButton = InputEventMouseButton.new()
 	up.button_index = MOUSE_BUTTON_LEFT
 	up.position = more_target
@@ -190,6 +181,14 @@ func run() -> void:
 	up.pressed = false
 	root.push_input(up, true)
 	await frames(3)
+	check(more.visible, "native pointer release opens More overflow")
+	await screenshot("object-in-more")
+	if source_id >= 0:
+		more.id_pressed.emit(source_id)
+		await frames(7)
+		check(app.asset_browser != null and app.asset_browser.index.root_path.is_empty(),
+			"overflow Object Browse dispatches same Asset Browser without implicit binding")
+	more.hide()
 	root.size = Vector2i(1280, 800)
 	app.size = Vector2(1280, 800)
 	await frames(12)

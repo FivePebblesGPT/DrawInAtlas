@@ -9,6 +9,7 @@ signal query_changed(query: String)
 signal page_requested(offset: int)
 signal choose_root_requested
 signal recent_root_requested
+signal source_index_changed
 
 const INDEX_SCRIPT: Script = preload("res://addons/drawing/asset_browser_index.gd")
 const THUMBNAILS_SCRIPT: Script = preload("res://addons/drawing/asset_browser_thumbnails.gd")
@@ -44,7 +45,7 @@ func _ready() -> void:
 	index = INDEX_SCRIPT.new() as DrawingAssetBrowserIndex
 	thumbnails = THUMBNAILS_SCRIPT.new() as DrawingAssetBrowserThumbnails
 	var heading: Label = Label.new()
-	heading.text = "Object sources — browse and edit"
+	heading.text = "Object sources — browse and edit" if atlas_host_mode else "Object sources — drag to link"
 	add_child(heading)
 	root_display = Label.new()
 	root_display.name = "ObjectsRoot"
@@ -186,6 +187,8 @@ func set_objects_root(path: String) -> DrawingResult:
 		_refresh_view()
 		if not result.ok:
 			message.text = "Cannot use Objects/ root: " + result.message
+	if result.ok:
+		source_index_changed.emit()
 	return result
 
 

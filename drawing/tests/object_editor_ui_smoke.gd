@@ -54,12 +54,12 @@ func _run() -> void:
 		"frame UI controls update authoring guides without raster edits")
 	app._change_tool("Text")
 	app._edit_text_at(Vector2i(6, -4))
-	app.text_dialog.hide()
+	app._cancel_text()
 	await process_frame
 	app._edit_text_at(Vector2i(6, -4))
 	app.text_edit.text = "Object label"
 	app._commit_text_dialog()
-	app.text_dialog.hide()
+	app._cancel_text()
 	await process_frame
 	var text_id: String = app.current_layer()
 	_check(session.document.inspect_node(text_id).text_element.content == "Object label",
@@ -94,11 +94,11 @@ func _run() -> void:
 		copy.origin == Vector2i(-12, 16) and copy.bounds == Rect2i(-30, -20, 64, 96) and
 		app.current_document().read_pixel(app.current_layer(), -3, 7).value == 0x0038220c,
 		"standalone Save As deep-copies IDs but preserves bytes and frame")
-	var metadata: Variant = JSON.parse_string(FileAccess.get_file_as_string(copy_path))
+	var metadata: Dictionary = DrawingFileIO.read_payload(copy_path).value
 	metadata["object_source"]["bounds"] = [0, 0, -1, 999]
 	var tampered: String = ProjectSettings.globalize_path("user://t062-tampered.drawing")
 	var file: FileAccess = FileAccess.open(tampered, FileAccess.WRITE)
-	file.store_string(JSON.stringify(metadata))
+	file.store_buffer(DrawingFileIO.pack_binary(metadata).value)
 	file.close()
 	_check(not DrawingObjectEditorFile.open(tampered).ok,
 		"untrusted negative-size bounds are rejected while decoding a portable Object source")

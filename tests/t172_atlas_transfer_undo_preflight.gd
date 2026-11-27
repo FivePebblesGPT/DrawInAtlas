@@ -92,6 +92,8 @@ func run() -> void:
 	check(int(source_store.call("stats").get("revision", -1)) == source.revision and
 		int(dest_store.call("stats").get("revision", -1)) == dest.revision,
 		"native revisions match both documents after move")
+	check(bool(dest_store.call("has_source", moving, 0, 0, dest.revision)) and native_bytes(dest_store, moving) == original_moving,
+		"moved raster is native-owned immediately in destination")
 	var src_rev: int = source.revision
 	var dst_rev: int = dest.revision
 	var src_children: Array[String] = source.list_children("root")
@@ -123,6 +125,8 @@ func run() -> void:
 		"discard busy target transaction")
 	check(history.undo() and source.has_node(group) and not dest.has_node(group),
 		"Atlas Undo succeeds when native retirement becomes eligible")
+	check(bool(source_store.call("has_source", moving, 0, 0, source.revision)) and native_bytes(source_store, moving) == original_moving,
+		"move Undo immediately reauthorizes source")
 	check(history.redo() and not source.has_node(group) and dest.has_node(group),
 		"Atlas Redo reuses the same transferred identity")
 	check(native_bytes(source_store, keeper) == original_keeper and
@@ -130,6 +134,8 @@ func run() -> void:
 		(dest._nodes[moving] as DrawingLayerNode).tiles["0,0"].to_rgba8() == original_moving,
 		"successful replay preserves resident and moved hidden RGBA8")
 
+	check(bool(dest_store.call("has_source", moving, 0, 0, dest.revision)) and native_bytes(dest_store, moving) == original_moving,
+		"move Redo immediately reauthorizes destination")
 	# A copied subtree also lives in the target timeline: Undo must not remove
 	# it when Rust has an active unrelated transaction. Source stays untouched.
 	var copy_src: DrawingDocument = DrawingDocument.new("undo-copy-source", STRIDE)

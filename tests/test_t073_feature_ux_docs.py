@@ -74,10 +74,10 @@ class ApprovedScopeAndProposedUXTests(unittest.TestCase):
         self.assertIn("func attach_object_session(", WORKSPACE)
 
     def test_actual_palette_and_menu_claims_match_source(self) -> None:
-        self.assertIn('for name: String in ["Brush", "Eraser", "Select", "Move", "Text", "Pan"]', WORKSPACE)
-        for name in ("Brush", "Eraser", "Select", "Move", "Text", "Pan"):
+        self.assertIn('for name: String in ["Brush", "Eraser", "Bucket", "Shapes", "Select", "Move", "Text", "Pan"]', WORKSPACE)
+        for name in ("Brush", "Eraser", "Bucket", "Shapes", "Select", "Move", "Text", "Pan"):
             self.assertIn(name, INVENTORY.split("## T-073 implementation ledger", 1)[1])
-        for menu in ("File", "Edit", "View", "Image", "Layers", "Select", "Window", "Help"):
+        for menu in ("File", "Edit", "View", "Image", "Layers", "Selection", "Window", "Help"):
             self.assertIn(f'top_bar.add_menu_spec("{menu}"', WORKSPACE)
             self.assertIn(menu, UI.split("**Current UI audit", 1)[1].split("### Concrete", 1)[0])
         self.assertIn("native automation", UI)

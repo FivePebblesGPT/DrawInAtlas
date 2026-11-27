@@ -17,6 +17,7 @@ const ASSET_BROWSER_SCRIPT: Script = preload("res://addons/drawing/asset_browser
 const ROOT_HISTORY: Script = preload("res://addons/drawing/object_root_history.gd")
 const BRUSH_SETTINGS: Script = preload("res://addons/drawing/brush_settings.gd")
 const BRUSH_PANEL_SCRIPT: Script = preload("res://addons/drawing/brush_panel.gd")
+const SELECTION_MODES: Array[String] = ["Replace", "Add", "Subtract", "Intersect"]
 const ROW_EYE: int = 1
 const ROW_LOCK: int = 2
 # Keep a compact minimum independent of the active group. At normal desktop
@@ -37,6 +38,7 @@ var initial_extra_panels: Dictionary = {} # Stable id -> Control
 ## Host-provided portable root is registered before dock settings recovery.
 var initial_asset_browser_root: String = ""
 var asset_browser: DrawingAssetBrowserPanel
+var _link_drag: Dictionary = {}
 var asset_browser_directory_dialog: FileDialog
 var recent_objects_root_settings_path: String = "user://drawing-recent-objects-root-v1.json"
 var _recent_objects_root: String = ""
@@ -63,13 +65,17 @@ var layers: Tree
 var status: Label
 var width_spin: SpinBox
 var brush_preset_control: OptionButton
+var bucket_tolerance_control: SpinBox
+var shape_kind_control: OptionButton
+var shape_style_control: OptionButton
+var shape_color_control: OptionButton
+var shape_width_control: SpinBox
 var brush_panel: DrawingBrushPanel
 var selected_brush_preset: String = "hard"
 var brush_width_value: float = 3.0
 var brush_opacity_value: float = 1.0
 var brush_hardness_overrides: Dictionary = {} # preset -> native hardness 0..1
 var brush_density_overrides: Dictionary = {} # preset -> native dabs / actual radius, 1..8
-var snap_toggle: CheckButton
 var grid_dialog: ConfirmationDialog
 var grid_fields: Array[SpinBox] = []
 var image_frame_dialog: ConfirmationDialog
@@ -155,6 +161,11 @@ var _color_write_suspended: bool = false
 var preferences_dialog: AcceptDialog
 var open_dialog: FileDialog
 var save_dialog: FileDialog
+var export_dialog: DrawingExportDialog
+var export_file_dialog: FileDialog
+var _export_target: Dictionary = {}
+var _export_bytes: PackedByteArray = PackedByteArray()
+var _export_format: String = ""
 var new_counter: int = 0
 ## Application preference; existing selection entries survive toggling it off.
 var record_selection_history: bool = false
@@ -165,7 +176,19 @@ var _restoring_context: bool = false
 var drawing_clipboard: DrawingClipboard
 var _paste_serial: int = 0
 var selection_mode_control: OptionButton
-var text_dialog: ConfirmationDialog
+const TEXT_FONTS: Array[String] = ["lato-regular-v1", "lato-bold-v1", "lato-italic-v1"]
+const TEXT_ALIGNMENTS: Array[String] = ["left", "center", "right"]
+const TEXT_STYLE_LABELS: Array[String] = ["Regular", "Bold", "Italic"]
+const TEXT_ALIGNMENT_LABELS: Array[String] = ["Left", "Center", "Right"]
+var text_panel: VBoxContainer
+var text_apply: Button
+var text_cancel: Button
+var text_notice: Label
+var _text_loading: bool = false
+var _text_scale: Vector2 = Vector2.ONE
+var _text_parent: String = DrawingDocument.ROOT_ID
+var _text_source_bounds: Rect2i = Rect2i()
+var _text_original_angle: float = 0.0
 var text_edit: TextEdit
 var text_font: OptionButton
 var text_size: SpinBox
@@ -180,6 +203,8 @@ var layer_rename_dialog: ConfirmationDialog
 var layer_rename_field: LineEdit
 var layer_page: int = 0
 var layer_page_label: Label
+var _layer_items: Dictionary[String, TreeItem] = {}
+var _refreshing_layers: bool = false
 var object_open_dialog: FileDialog
 var close_dialog: ConfirmationDialog
 var rename_dialog: ConfirmationDialog
@@ -235,23 +260,24 @@ func _build_interface() -> void:
 	root.add_child(top_bar)
 	# Ordinary documents and portable Object sources have independent commands.
 	# The same canonical workspace is embedded by standalone Drawing and Atlas.
-	top_bar.add_menu_spec("File", ["New  Ctrl+N", "Open…  Ctrl+O", "Save  Ctrl+S",
-		"Save As…  Ctrl+Shift+S", "Close Tab  Ctrl+W"],
+	top_bar.add_menu_spec("File", ["New", "Open…", "Save", "Save As…", "Close Tab", "Export…"],
 		[Callable(self, "new_drawing"), Callable(self, "_ask_open"),
 		Callable(self, "_save"), Callable(self, "_ask_save"),
-		Callable(self, "_request_close_current")])
+		Callable(self, "_request_close_current"), Callable(self, "_ask_export")],
+		{0: KEY_MASK_CTRL | KEY_N, 1: KEY_MASK_CTRL | KEY_O, 2: KEY_MASK_CTRL | KEY_S,
+		3: KEY_MASK_CTRL | KEY_MASK_SHIFT | KEY_S, 4: KEY_MASK_CTRL | KEY_W})
 	top_bar.add_menu_spec("Object", ["New Source", "Open Source…", "Rename Source…",
 		"Save Source As…", "Browse Sources…"],
 		[Callable(self, "new_object"), Callable(self, "_ask_open_object"),
 		Callable(self, "_ask_rename_object"), Callable(self, "_ask_save"),
 		Callable(self, "_show_asset_browser_empty")])
-	top_bar.add_menu_spec("Edit", ["Undo  Ctrl+Z", "Redo  Ctrl+Y",
-		"Preferences…", "Copy  Ctrl+C", "Cut  Ctrl+X",
-		"Paste  Ctrl+V", "Delete selected pixels  Del"],
+	top_bar.add_menu_spec("Edit", ["Undo", "Redo", "Preferences…", "Copy", "Cut", "Paste", "Delete selected pixels"],
 		[Callable(self, "_undo"), Callable(self, "_redo"),
 		Callable(self, "_show_preferences"), Callable(self, "_copy_selection"),
 		Callable(self, "_cut_selection"), Callable(self, "_paste_selection"),
-		Callable(self, "_delete_selection")])
+		Callable(self, "_delete_selection")],
+		{0: KEY_MASK_CTRL | KEY_Z, 1: KEY_MASK_CTRL | KEY_Y, 3: KEY_MASK_CTRL | KEY_C,
+		4: KEY_MASK_CTRL | KEY_X, 5: KEY_MASK_CTRL | KEY_V, 6: KEY_DELETE})
 	top_bar.add_menu_spec("View", ["Zoom in", "Zoom out", "Reset view",
 		"Show grid", "Grid spacing and origin…", "Pixel grid at high zoom"],
 		[func() -> void: _zoom(1.25), func() -> void: _zoom(0.8),
@@ -270,26 +296,27 @@ func _build_interface() -> void:
 		Callable(self, "_move_selected_layer").bind(-1),
 		Callable(self, "_move_selected_layer").bind(1),
 		Callable(self, "_indent_selected_layer"), Callable(self, "_outdent_selected_layer")])
-	top_bar.add_menu_spec("Select", ["Rectangle selection", "Move selected pixels",
-		"Drop moved pixels  Enter", "Cancel floating Move  Esc",
-		"Deselect  Ctrl+D", "Replace", "Add", "Subtract", "Intersect"],
-		[Callable(self, "_change_tool").bind("Select"),
-		Callable(self, "_change_tool").bind("Move"),
-		Callable(self, "_drop_floating_move"), Callable(self, "_cancel_floating_move"),
-		Callable(self, "_deselect"), Callable(self, "_set_selection_mode").bind("Replace"),
-		Callable(self, "_set_selection_mode").bind("Add"),
-		Callable(self, "_set_selection_mode").bind("Subtract"),
-		Callable(self, "_set_selection_mode").bind("Intersect")])
+	top_bar.add_menu_spec("Selection", ["Selection mode", "Drop moved pixels",
+		"Cancel floating Move", "Deselect"],
+		[Callable(), Callable(self, "_drop_floating_move"), Callable(self, "_cancel_floating_move"),
+		Callable(self, "_deselect")], {1: KEY_ENTER, 2: KEY_ESCAPE, 3: KEY_MASK_CTRL | KEY_D})
+	top_bar.add_radio_submenu("Selection", 0, SELECTION_MODES, Callable(self, "_set_selection_mode"))
+	top_bar.set_radio_submenu_selected("Selection", 0, 0)
 	top_bar.add_menu_spec("Window", ["Minimize/expand panel dock", "Reset panel width",
-		"Show document tabs", "Next tab  Ctrl+Tab", "Previous tab  Ctrl+Shift+Tab",
-		"Float selected dock group", "Show hidden floating panels", "Reset workspace layout",
-		"Asset Browser…"],
+		"Show document tabs", "Next tab", "Previous tab",
+		"Show hidden floating panels", "Reset workspace layout"],
 		[Callable(self, "_toggle_dock"), Callable(self, "_reset_dock_width"),
 		Callable(self, "_toggle_document_tabs"), Callable(self, "_cycle_tab").bind(1),
 		Callable(self, "_cycle_tab").bind(-1),
-		Callable(self, "_float_selected_dock_group"), Callable(self, "show_hidden_floating_hosts"),
-		Callable(self, "reset_workspace_layout"), Callable(self, "_ask_asset_browser")])
+		Callable(self, "show_hidden_floating_hosts"),
+		Callable(self, "reset_workspace_layout")],
+		{3: KEY_MASK_CTRL | KEY_TAB, 4: KEY_MASK_CTRL | KEY_MASK_SHIFT | KEY_TAB})
 	top_bar.set_menu_checked("Window", 2, show_document_tabs)
+	top_bar.add_menu_spec("Text", ["Text Options", "Edit selected text", "Apply text", "Cancel text", "Style", "Alignment", "Increase size", "Decrease size"],
+		[Callable(self, "_show_text_options"), Callable(self, "_edit_selected_text"), Callable(self, "_confirm_text"),
+		Callable(self, "_cancel_text"), Callable(), Callable(), Callable(self, "_adjust_text_size").bind(1), Callable(self, "_adjust_text_size").bind(-1)], {2: KEY_MASK_CTRL | KEY_ENTER, 3: KEY_ESCAPE})
+	top_bar.add_radio_submenu("Text", 4, TEXT_STYLE_LABELS, Callable(self, "_text_style_from_menu"))
+	top_bar.add_radio_submenu("Text", 5, TEXT_ALIGNMENT_LABELS, Callable(self, "_text_alignment_from_menu"))
 	top_bar.add_menu_spec("Help", ["About Drawing workspace"],
 		[Callable(self, "_show_about_workspace")])
 	width_spin = SpinBox.new()
@@ -314,18 +341,64 @@ func _build_interface() -> void:
 		_select_brush_preset(str(brush_preset_control.get_item_metadata(index))))
 	brush_preset_control.gui_input.connect(func(event: InputEvent) -> void:
 		top_bar.consume_option_wheel(event, brush_preset_control))
-	snap_toggle = CheckButton.new()
-	snap_toggle.text = "Snap (8 px)"
-	snap_toggle.tooltip_text = "Snap only Drawing edit tools; grid visibility is separate (View menu)"
-	snap_toggle.toggled.connect(_set_snap_enabled)
+	bucket_tolerance_control = SpinBox.new()
+	bucket_tolerance_control.name = "BucketTolerance"
+	bucket_tolerance_control.prefix = "Tolerance"
+	bucket_tolerance_control.suffix = "%"
+	bucket_tolerance_control.max_value = 100
+	bucket_tolerance_control.custom_minimum_size.x = 150
+	bucket_tolerance_control.tooltip_text = "Contiguous fill of the active layer; 0% matches exact RGBA8. Transparent space requires a finite frame or selection."
+	bucket_tolerance_control.value_changed.connect(func(value: float) -> void:
+		canvas.bucket_tolerance = value / 100.0)
+	bucket_tolerance_control.gui_input.connect(func(event: InputEvent) -> void:
+		top_bar.consume_option_wheel(event, bucket_tolerance_control))
+	shape_kind_control = OptionButton.new()
+	shape_kind_control.name = "ShapeKind"
+	shape_kind_control.tooltip_text = "Rectangle/Ellipse: drag. Polygon: click vertices; Enter or click the first vertex to finish. Backspace removes a vertex. Escape cancels."
+	for kind: String in ["Rectangle", "Ellipse", "Polygon"]:
+		shape_kind_control.add_item(kind)
+	shape_kind_control.item_selected.connect(func(index: int) -> void:
+		canvas.shape_kind = shape_kind_control.get_item_text(index)
+		_update_status())
+	shape_style_control = OptionButton.new()
+	shape_style_control.name = "ShapeStyle"
+	shape_style_control.tooltip_text = "Fill the interior or draw a closed outline"
+	for style: String in ["Fill", "Stroke"]:
+		shape_style_control.add_item(style)
+	shape_style_control.item_selected.connect(func(index: int) -> void:
+		canvas.shape_style = shape_style_control.get_item_text(index)
+		shape_width_control.editable = index == 1)
+	shape_color_control = OptionButton.new()
+	shape_color_control.name = "ShapeColor"
+	shape_color_control.tooltip_text = "Pigment for the current fill or stroke (captured when the shape starts)"
+	shape_color_control.add_item("FG color")
+	shape_color_control.add_item("BG color")
+	shape_color_control.item_selected.connect(func(index: int) -> void:
+		canvas.shape_use_background = index == 1)
+	shape_width_control = SpinBox.new()
+	shape_width_control.name = "ShapeWidth"
+	shape_width_control.prefix = "Width"
+	shape_width_control.suffix = "px"
+	shape_width_control.min_value = 1
+	shape_width_control.max_value = 96
+	shape_width_control.value = 1
+	shape_width_control.editable = false
+	shape_width_control.custom_minimum_size.x = 120
+	shape_width_control.tooltip_text = "Shape stroke width in artwork pixels"
+	shape_width_control.value_changed.connect(func(value: float) -> void:
+		canvas.shape_width = value)
+	shape_width_control.gui_input.connect(func(event: InputEvent) -> void:
+		if shape_width_control.editable or (event is InputEventMouseButton and (event.shift_pressed \
+				or event.button_index in [MOUSE_BUTTON_WHEEL_LEFT, MOUSE_BUTTON_WHEEL_RIGHT])):
+			top_bar.consume_option_wheel(event, shape_width_control))
 	selection_mode_control = OptionButton.new()
 	selection_mode_control.tooltip_text = "Marquee combine mode; select without changing document pixels"
-	for option: String in ["Replace", "Add", "Subtract", "Intersect"]:
+	for option: String in SELECTION_MODES:
 		selection_mode_control.add_item(option)
 	selection_mode_control.item_selected.connect(func(index: int) -> void:
 		_set_selection_mode(selection_mode_control.get_item_text(index)))
 	# Inactive options also need an owner before their tool is first selected.
-	for option: Control in [brush_preset_control, width_spin, snap_toggle, selection_mode_control]:
+	for option: Control in [brush_preset_control, width_spin, selection_mode_control, bucket_tolerance_control, shape_kind_control, shape_style_control, shape_color_control, shape_width_control]:
 		top_bar._unused_options.add_child(option)
 	_refresh_tool_options()
 	tabs_line = HBoxContainer.new()
@@ -336,6 +409,9 @@ func _build_interface() -> void:
 	tab_bar.tab_close_display_policy = TabBar.CLOSE_BUTTON_SHOW_ALWAYS
 	tab_bar.tab_close_pressed.connect(_request_close_tab)
 	tab_bar.clip_tabs = true
+	# A long inactive filename must not make the entire canvas/dock wider than
+	# a narrow HiDPI viewport. Godot clips the text and retains the close target.
+	tab_bar.max_tab_width = 180
 	tabs_line.add_child(tab_bar)
 	dock_split = HSplitContainer.new()
 	dock_split.name = "WorkspaceSplit"
@@ -352,7 +428,7 @@ func _build_interface() -> void:
 	# Keep the tool rail compact; the SVGs are 16px and do not need 44px-wide buttons.
 	rail.custom_minimum_size.x = 42
 	edit_region.add_child(rail)
-	for name: String in ["Brush", "Eraser", "Select", "Move", "Text", "Pan"]:
+	for name: String in ["Brush", "Eraser", "Bucket", "Shapes", "Select", "Move", "Text", "Pan"]:
 		var button: Button = Button.new()
 		button.name = name + "Tool"
 		button.icon = load("res://addons/drawing/icons/%s.svg" % name.to_lower()) as Texture2D
@@ -394,11 +470,14 @@ func _build_interface() -> void:
 	canvas.resized.connect(_maybe_fit_image_frame)
 	canvas.resized.connect(_layout_dock_flyout)
 	canvas.text_requested.connect(_edit_text_at)
+	canvas.object_drop_check = _check_object_drop
+	canvas.object_drop_commit = _commit_object_drop
 	canvas.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventMouseMotion:
 			_update_status())
 	editor_column.add_child(canvas)
 	canvas.color_rgba = _pack_color(active_color)
+	canvas.background_rgba = _pack_color(color_background)
 	canvas.brush_width = brush_width_value
 	canvas.brush_preset = selected_brush_preset
 	canvas.brush_opacity = brush_opacity_value
@@ -477,8 +556,11 @@ func _build_interface() -> void:
 		layer_actions.add_child(action)
 	layer_search = LineEdit.new()
 	layer_search.placeholder_text = "Find layers and text labels…"
+	layer_search.tooltip_text = "Search includes collapsed descendants and their ancestors; clear to resume folding."
 	layer_search.text_changed.connect(func(_value: String) -> void:
 		layer_page = 0
+		if _value.strip_edges().is_empty():
+			_reveal_selected_layer()
 		_refresh_layers())
 	layer_pane.add_child(layer_search)
 	var pages: HBoxContainer = HBoxContainer.new()
@@ -494,10 +576,13 @@ func _build_interface() -> void:
 		layer_icons[icon_name] = load("res://addons/drawing/icons/%s.svg" % icon_name) as Texture2D
 	layers = Tree.new()
 	layers.hide_root = true
+	layers.add_theme_icon_override("arrow", load("res://addons/drawing/icons/layer_expanded.svg") as Texture2D)
+	layers.add_theme_icon_override("arrow_collapsed", load("res://addons/drawing/icons/layer_collapsed.svg") as Texture2D)
 	# Fixed viewport for the tree: the dock scrolls as a whole, and the tree
 	# keeps its own row scrolling without expanding indefinitely.
 	layers.custom_minimum_size.y = 230
 	layers.item_selected.connect(_layer_selected)
+	layers.item_collapsed.connect(_layer_item_collapsed)
 	# Tree.button_clicked is not emitted reliably for synthetic and some
 	# forwarded GUI pointer sequences; resolve the row/icon on mouse-down.
 	layers.gui_input.connect(_layer_tree_input)
@@ -546,6 +631,7 @@ func _build_interface() -> void:
 			if dock_layout.attach_panel(panel_id, "right", panel_id):
 				dock_views[panel_id] = view
 				dock_stash.add_child(view)
+	_build_text_panel()
 	_render_dock()
 	resized.connect(_clamp_floating_hosts)
 	status = Label.new()
@@ -569,6 +655,14 @@ func _build_interface() -> void:
 	save_dialog = _make_dialog(FileDialog.FILE_MODE_SAVE_FILE)
 	save_dialog.file_selected.connect(_save_dialog_selected)
 	save_dialog.canceled.connect(_save_dialog_cancelled)
+	export_dialog = DrawingExportDialog.new()
+	add_child(export_dialog)
+	export_dialog.confirmed.connect(_choose_export_file)
+	export_dialog.canceled.connect(_cancel_export)
+	export_file_dialog = _make_dialog(FileDialog.FILE_MODE_SAVE_FILE)
+	export_file_dialog.title = "Export raster image (not Save Drawing)"
+	export_file_dialog.file_selected.connect(_export_file_selected)
+	export_file_dialog.canceled.connect(_cancel_export)
 	object_open_dialog = _make_dialog(FileDialog.FILE_MODE_OPEN_FILE)
 	object_open_dialog.title = "Open portable Object source in its own editor tab"
 	object_open_dialog.file_selected.connect(_open_object_file)
@@ -678,7 +772,6 @@ func _build_interface() -> void:
 	variant_form.add_child(variant_name)
 	variant_dialog.confirmed.connect(_variant_dialog_confirmed)
 	variant_dialog.canceled.connect(_variant_dialog_cancelled)
-	_build_text_dialog()
 
 
 ## Register one existing panel Control against the T-078 model; no parallel ownership list.
@@ -750,10 +843,6 @@ func _layout_dock_flyout() -> void:
 	dock_flyout.size = Vector2(width, maxf(100.0, canvas.size.y - 8.0))
 
 
-func _dock_icon(panel_id: String) -> Texture2D:
-	return DrawingDockIcons.for_panel(panel_id)
-
-
 ## The same half-circle belongs to the dock in both states. The minimized
 ## rail owns a real VBox slot; the expanded dock overlays its left gutter.
 func _make_dock_toggle() -> void:
@@ -813,7 +902,7 @@ func _layout_dock_toggle() -> void:
 func _panel_button(panel_id: String, rail_button: bool) -> Button:
 	var button: Button = Button.new()
 	button.name = ("Rail_" if rail_button else "Edge_") + panel_id
-	button.icon = _dock_icon(panel_id)
+	DrawingDockIcons.apply_to(button, panel_id)
 	button.expand_icon = true
 	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	button.custom_minimum_size = Vector2(42, 42)
@@ -839,7 +928,7 @@ func _panel_button(panel_id: String, rail_button: bool) -> Button:
 func _flyout_panel_button(panel_id: String, active: bool) -> Button:
 	var tab: Button = Button.new()
 	tab.name = "Tab_" + panel_id
-	tab.icon = _dock_icon(panel_id)
+	DrawingDockIcons.apply_to(tab, panel_id)
 	tab.expand_icon = true
 	tab.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tab.custom_minimum_size = Vector2(42, 42)
@@ -1149,10 +1238,10 @@ func _render_dock(focus_key: String = "") -> void:
 		if not flyout_group_id.is_empty():
 			var group: Dictionary = dock_layout.group_info(flyout_group_id)
 			for panel_id: String in group["panels"]:
-				if not dock_views.has(panel_id):
+				if not dock_views.has(panel_id) or not dock_layout.is_panel_visible(panel_id):
 					continue
 				dock_flyout_tabs.add_child(_flyout_panel_button(panel_id, panel_id == String(group["active"])))
-			if dock_views.has(String(group["active"])):
+			if dock_views.has(String(group["active"])) and dock_layout.is_panel_visible(String(group["active"])):
 				(dock_views[String(group["active"])] as Control).reparent(dock_flyout_body)
 	inspector.custom_minimum_size.x = 48 if minimized else EXPANDED_DOCK_MIN_WIDTH
 	dock_panels.visible = not minimized
@@ -1167,6 +1256,7 @@ func _render_dock(focus_key: String = "") -> void:
 	_layout_dock_toggle()
 	_layout_dock_flyout()
 	_render_floating_hosts()
+	_sync_window_panels()
 	if not focus_key.is_empty():
 		call_deferred("_restore_dock_focus", focus_key)
 	_schedule_layout_save()
@@ -1237,6 +1327,7 @@ func hide_floating_host(host_id: String) -> void:
 	var host: DrawingFloatingHost = floating_hosts.get(host_id) as DrawingFloatingHost
 	if host != null:
 		host.hide()
+		_sync_window_panels()
 		_schedule_layout_save()
 
 
@@ -1246,33 +1337,82 @@ func show_floating_host(host_id: String) -> void:
 		host.show()
 		host.clamp_to_client()
 		host.raise_host()
+		_sync_window_panels()
 		_schedule_layout_save()
 
 
 func show_hidden_floating_hosts() -> void:
-	# Window menu recovery: hiding never changes group ownership or view state.
+	# Explicit bulk recovery is retained, but individual menu commands never
+	# call it. Preserve host/group ownership and restore all floating tabs.
 	for host_id: String in floating_hosts:
+		for group: Dictionary in dock_layout.container_info(host_id)["groups"]:
+			for panel_id: String in group["panels"]:
+				dock_layout.set_panel_visible(panel_id, true)
 		show_floating_host(host_id)
+	_render_dock()
 
 
-func _float_selected_dock_group() -> void:
-	var focus: Control = get_viewport().gui_get_focus_owner()
-	var group_id: String = ""
-	for panel_id: String in dock_tab_buttons:
-		if focus == dock_tab_buttons[panel_id]:
-			group_id = dock_layout.group_of(panel_id)
-	for panel_id: String in dock_rail_buttons:
-		if focus == dock_rail_buttons[panel_id]:
-			group_id = dock_layout.group_of(panel_id)
-	for id: String in dock_group_handles:
-		if focus == dock_group_handles[id]:
-			group_id = id
-	if group_id.is_empty():
-		var groups: Array = dock_layout.container_info("right")["groups"]
-		if not groups.is_empty():
-			group_id = groups[0]["id"]
-	if not group_id.is_empty():
-		float_group(group_id)
+func _sync_window_panels() -> void:
+	var ids: Array[String] = []
+	for panel_id: String in dock_views:
+		ids.append(panel_id)
+	# The browser is lazily created, but is always discoverable in Window.
+	if not ids.has("asset_browser"):
+		ids.append("asset_browser")
+	var labels: Array[String] = []
+	var handlers: Array[Callable] = []
+	for panel_id: String in ids:
+		labels.append(panel_id.capitalize())
+		handlers.append(_reveal_workspace_panel.bind(panel_id))
+	var first: int = top_bar.set_checkable_menu_section("Window", "Panels", labels, handlers)
+	if first < 0:
+		return
+	for index: int in range(ids.size()):
+		var panel_id: String = ids[index]
+		var owner: String = dock_layout.owner_of(panel_id)
+		var available: bool = dock_layout.is_panel_visible(panel_id)
+		if floating_hosts.has(owner):
+			available = available and (floating_hosts[owner] as Control).visible
+		top_bar.set_menu_checked("Window", first + index, available)
+
+
+## Checked entries indicate available tabs, not that every tab body is drawn.
+## Selecting an entry always reveals/focuses it; only the host close hides it.
+func _reveal_workspace_panel(panel_id: String, expand_dock: bool = false) -> void:
+	if panel_id == "asset_browser" and not _ensure_asset_browser():
+		return
+	var owner: String = dock_layout.owner_of(panel_id)
+	var group_id: String = dock_layout.group_of(panel_id)
+	if owner.is_empty() or group_id.is_empty():
+		return
+	var host: DrawingFloatingHost = floating_hosts.get(owner) as DrawingFloatingHost
+	if host != null and not host.visible:
+		# A closed host can contain several previously available tabs. Restore
+		# only the requested tab without moving any of the hidden peers.
+		for peer_id: String in dock_layout.group_info(group_id)["panels"]:
+			dock_layout.set_panel_visible(peer_id, peer_id == panel_id)
+	dock_layout.set_panel_visible(panel_id, true)
+	dock_layout.select_panel(panel_id)
+	dock_layout.set_group_collapsed(group_id, false)
+	if host != null:
+		show_floating_host(owner)
+	elif owner == "right":
+		if expand_dock and bool(dock_layout.container_info("right")["minimized"]):
+			_toggle_dock()
+		var state: Dictionary = dock_layout.container_info("right")
+		if bool(state["minimized"]) and state["flyout_group"] != group_id:
+			dock_layout.activate_from_rail("right", panel_id)
+	_render_dock()
+	if owner == "right":
+		call_deferred("_scroll_workspace_panel", panel_id)
+
+
+func _scroll_workspace_panel(panel_id: String) -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var panel: Control = dock_views.get(panel_id) as Control
+	if panel != null and panel.is_visible_in_tree() and inspector.is_ancestor_of(panel):
+		inspector.ensure_control_visible(panel)
 
 
 func _clamp_floating_hosts() -> void:
@@ -1283,6 +1423,10 @@ func _clamp_floating_hosts() -> void:
 func _render_floating_hosts() -> void:
 	for host: DrawingFloatingHost in floating_hosts.values():
 		host.render()
+		# A drag can move the last available tab out of a partially restored
+		# group. Keep the hidden peers in their owner without empty chrome.
+		if dock_layout.rail_icons(host.host_id).is_empty():
+			host.hide()
 
 
 ## Drag/drop uses a single model transaction. The UI never mutates group arrays.
@@ -1376,13 +1520,25 @@ func _input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		if get_viewport().gui_is_dragging() and not _link_drag.is_empty():
+			get_viewport().gui_cancel_drag()
+			_link_drag.clear()
+			get_viewport().set_input_as_handled()
+			return
 		if dock_drag.is_dragging() or not _drag_candidate_id.is_empty():
 			_suppress_drag_release = not _drag_candidate_id.is_empty()
 			_cancel_cross_drop(true)
 			get_viewport().set_input_as_handled()
+		elif _authoring_dialog_targets.has("text"):
+			_cancel_text()
+			get_viewport().set_input_as_handled()
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if dock_drag.is_dragging() or not _drag_candidate_id.is_empty():
+			return
+		if _authoring_dialog_targets.has("text") and event.keycode in [KEY_ENTER, KEY_KP_ENTER] and (event.ctrl_pressed or event.meta_pressed):
+			_confirm_text()
+			get_viewport().set_input_as_handled()
 			return
 		# Shift+F10 / Menu opens the focused panel's or group's menu
 		# without changing the active tab or its collapsed state.
@@ -1443,10 +1599,15 @@ func _reset_dock_pointer_gesture() -> void:
 
 
 func _notification(what: int) -> void:
+	if what == NOTIFICATION_DRAG_END:
+		_link_drag.clear()
 	if what == NOTIFICATION_WM_CLOSE_REQUEST and _window_quit_guard_enabled:
 		_request_window_quit()
 		return
 	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		if not _link_drag.is_empty() and get_viewport().gui_is_dragging():
+			get_viewport().gui_cancel_drag()
+			_link_drag.clear()
 		if _color_edit_pending:
 			if _color_edit_pointer_down:
 				_cancel_interrupted_color_pointer()
@@ -1761,8 +1922,14 @@ func _dock_target_at(position: Vector2) -> Dictionary:
 			"rect": Rect2(frame_rect.position, Vector2(frame_rect.size.x, minf(frame_rect.size.y, 44.0)))}
 	if groups.is_empty():
 		return _dock_group_gap(0, dock_panels.global_position.y)
-	var first: VBoxContainer = dock_group_frames.get(String(groups[0]["id"])) as VBoxContainer
-	var last: VBoxContainer = dock_group_frames.get(String(groups[-1]["id"])) as VBoxContainer
+	var first: VBoxContainer = null
+	var last: VBoxContainer = null
+	for group: Dictionary in groups:
+		var visible_frame: VBoxContainer = dock_group_frames.get(String(group["id"])) as VBoxContainer
+		if visible_frame != null:
+			if first == null:
+				first = visible_frame
+			last = visible_frame
 	if first != null and position.y <= first.global_position.y:
 		return _dock_group_gap(0, first.global_position.y)
 	if last != null and position.y >= last.get_global_rect().end.y:
@@ -1990,9 +2157,16 @@ func _dock_keyboard_command(event: InputEventKey) -> bool:
 		for group_id: String in dock_group_handles:
 			if focused == dock_group_handles[group_id]:
 				var group_index: int = _dock_group_position(group_id)
-				var count: int = dock_layout.container_info("right")["groups"].size()
-				var target_index: int = group_index - 1 if event.keycode == KEY_UP else group_index + 2
-				if target_index >= 0 and target_index <= count:
+				var groups: Array = dock_layout.container_info("right")["groups"]
+				var direction: int = -1 if event.keycode == KEY_UP else 1
+				var neighbor: int = group_index + direction
+				while neighbor >= 0 and neighbor < groups.size() and not dock_group_frames.has(groups[neighbor]["id"]):
+					neighbor += direction
+				var target_index: int = neighbor if direction < 0 else neighbor + 1
+				if direction > 0:
+					while target_index < groups.size() and not dock_group_frames.has(groups[target_index]["id"]):
+						target_index += 1
+				if neighbor >= 0 and neighbor < groups.size():
 					_dock_apply(DrawingDockDrag.GROUP, group_id, {"kind": DrawingDockDrag.GROUP_SLOT,
 						"container": "right", "index": target_index}, "drag-group:" + group_id)
 				return true
@@ -2294,7 +2468,9 @@ func _set_background(value: Color, record_recent: bool = true) -> void:
 	if record_recent:
 		_remember_recent(color_background)
 	color_background = canonical
-	# Background is a UI pigment, not a paint target or document operation.
+	if canvas != null:
+		canvas.background_rgba = _pack_color(canonical)
+	# Background remains a UI pigment; changing it does not edit the document.
 	_refresh_color_controls()
 	if record_recent:
 		_save_color_history()
@@ -2641,11 +2817,6 @@ func new_object() -> void:
 	_update_status()
 
 
-func _ask_asset_browser() -> void:
-	# Existing Window command remains a shortcut to the discoverable browser.
-	_show_asset_browser_empty()
-
-
 func _ensure_asset_browser() -> bool:
 	if asset_browser != null:
 		return true
@@ -2653,6 +2824,7 @@ func _ensure_asset_browser() -> bool:
 	asset_browser.open_requested.connect(_open_object_file)
 	asset_browser.choose_root_requested.connect(_choose_objects_root)
 	asset_browser.recent_root_requested.connect(_use_recent_objects_root)
+	asset_browser.source_index_changed.connect(_refresh_link_sources)
 	if not dock_layout.register_panel("asset_browser") or \
 			not dock_layout.attach_panel("asset_browser", "right", "asset_browser"):
 		asset_browser.queue_free()
@@ -2666,7 +2838,7 @@ func _ensure_asset_browser() -> bool:
 
 func _show_asset_browser_empty() -> void:
 	if _ensure_asset_browser():
-		_render_dock()
+		_reveal_workspace_panel("asset_browser")
 		call_deferred("_reveal_asset_browser")
 		# The browser owns the explanation and root-chooser buttons. No file is
 		# scanned and no previously remembered Atlas project is silently opened.
@@ -2707,13 +2879,110 @@ func show_asset_browser(objects_root: String) -> bool:
 	if not _ensure_asset_browser():
 		return false
 	var result: DrawingResult = asset_browser.set_objects_root(objects_root)
-	_render_dock()
+	_reveal_workspace_panel("asset_browser")
 	if result.ok:
 		call_deferred("_reveal_asset_browser")
 	if not result.ok:
 		_show_error("Cannot open Object source folder: " + result.message +
 			". Select an existing absolute Objects/ directory, not a .drawing file or project root.")
 	return result.ok
+
+
+## Files never infer a catalog from their own path. Reopening without an
+## explicit catalog preserves the stable record and displays NULL.
+func _link_index() -> DrawingAssetBrowserIndex:
+	return asset_browser.index if asset_browser != null and not asset_browser.atlas_host_mode else null
+
+
+func _refresh_document_links(document: DrawingDocument) -> void:
+	if document.linked_records().is_empty() and document.linked_sources.is_empty() and document.linked_source_error.is_empty():
+		return
+	var resolved: DrawingResult = DrawingLinkedObjects.resolve(document, _link_index())
+	document.set_linked_sources(resolved.value if resolved.ok else {}, "" if resolved.ok else resolved.message)
+	if canvas.document == document:
+		canvas.queue_redraw()
+
+
+func _refresh_link_sources() -> void:
+	_link_drag.clear()
+	for tab: Dictionary in tabs:
+		_refresh_document_links(tab["document"])
+	_update_status()
+
+
+func _drop_target_available() -> bool:
+	if active_tab < 0 or current_document() == null or current_document().external_history or \
+			canvas.has_pending_stroke() or canvas.has_floating_move() or canvas.dragging or canvas.panning or \
+			current_document().has_unpublished_edit() or _authoring_dialog_targets.has("text"):
+		return false
+	if current_object() != null:
+		# Hosted source publication belongs to the Atlas registry. A local tab
+		# opened from an immutable revision is not a portable parent either.
+		if not bool(tabs[active_tab].get("local_object", false)):
+			return false
+		var path: String = tabs[active_tab].get("path", "")
+		if not path.is_empty() and (_link_index() == null or path.get_base_dir() != _link_index().root_path):
+			return false
+	var selected: String = selected_layer_node()
+	return (selected.is_empty() or (current_document().has_node(selected) and current_document()._editable(selected))) \
+		and current_document()._editable(_insertion_target()["parent"])
+
+
+func _check_object_drop(token: Dictionary, anchor: Vector2i) -> Rect2i:
+	if not _drop_target_available():
+		return Rect2i()
+	var index: DrawingAssetBrowserIndex = _link_index()
+	var document: DrawingDocument = current_document()
+	var record: Dictionary = {"kind": DrawingDocument.LINK_KIND, "source_id": token.get("id", ""), "position": anchor}
+	if not DrawingDocument.valid_link(record) or document.linked_records().size() >= DrawingDocument.MAX_LINKS:
+		return Rect2i()
+	# Authorize once per drag/target revision, not every mouse motion. Release
+	# independently resolves the exact token and entire dependency graph.
+	if _link_drag.get("document") != document or _link_drag.get("revision") != document.revision \
+			or _link_drag.get("token") != token or _link_drag.get("selected") != selected_layer_node():
+		if not _link_drag.is_empty() or DrawingLinkedObjects.entry_for_token(index, token).is_empty():
+			return Rect2i()
+		var authorized: DrawingResult = DrawingLinkedObjects.resolve(document, index, record)
+		_link_drag = {"document": document, "revision": document.revision, "token": token.duplicate(true),
+			"selected": selected_layer_node(), "result": authorized}
+	var authorized: DrawingResult = _link_drag["result"]
+	if not authorized.ok:
+		return Rect2i()
+	var translated: DrawingResult = DrawingLinkedObjects._translated(record, authorized.value[token["id"]])
+	if not translated.ok:
+		return Rect2i()
+	var area: Rect2i = translated.value
+	var source: Dictionary = authorized.value[token["id"]]
+	var frame: Rect2i = source["bounds"]
+	if frame.has_area():
+		var frame_record: Dictionary = source.duplicate()
+		frame_record["coverage"] = frame
+		var frame_area: DrawingResult = DrawingLinkedObjects._translated(record, frame_record)
+		if frame_area.ok:
+			area = frame_area.value
+	return area if area.has_area() else Rect2i(anchor - Vector2i(4, 4), Vector2i(8, 8))
+
+
+func _commit_object_drop(token: Dictionary, anchor: Vector2i) -> void:
+	var document: DrawingDocument = current_document()
+	if not _drop_target_available() or _link_drag.get("document") != document or \
+			_link_drag.get("revision") != document.revision or _link_drag.get("selected") != selected_layer_node() or \
+			DrawingLinkedObjects.entry_for_token(_link_index(), token).is_empty():
+		_show_error("Object drop rejected: finish the edit and refresh the authorized source")
+		return
+	var before: DrawingHistoryContext = _capture_context()
+	var target: Dictionary = _insertion_target()
+	var added: DrawingResult = document.commit_linked_object(token, _link_index(), anchor,
+		target["parent"], target["index"], document.revision)
+	if not added.ok:
+		_show_error(added.message)
+		return
+	_select_layer_node(String(added.value), false)
+	document.annotate_latest_gesture(before, _capture_context())
+	_reveal_selected_layer()
+	_after_edit()
+	status.text = "Placed linked Object: %s @ %d,%d" % [token["name"], anchor.x, anchor.y]
+	_link_drag.clear()
 
 
 func _ask_open_object() -> void:
@@ -2748,6 +3017,23 @@ func _local_publish(session: DrawingObjectEditorSession, as_variant: bool) -> Dr
 	if path.is_empty() or (as_variant and path == tabs[index].get("path", "")):
 		return DrawingResult.failure("PATH", "Choose a different target path for Save As")
 	var source: DrawingDocument = session.document
+	if not source.linked_records().is_empty():
+		if as_variant:
+			return DrawingResult.failure("NESTED_SAVE_AS", "Nested Object Save As requires an explicit link/copy policy")
+		var catalog: DrawingAssetBrowserIndex = _link_index()
+		if catalog == null or path.get_base_dir() != catalog.root_path or not DrawingAssetBrowserIndex.path_has_no_links(path):
+			return DrawingResult.failure("LINK_ROOT", "Save a linked Object directly inside its authorized standalone Objects/ folder")
+		if FileAccess.file_exists(path):
+			var existing: Dictionary = {}
+			for entry: Dictionary in catalog.entries:
+				if entry["path"] == path and entry["id"] == source.id and entry["revision"] == session.source_revision:
+					existing = entry
+					break
+			if existing.is_empty() or not catalog.safe_to_open(existing):
+				return DrawingResult.failure("LINK_STALE", "Cannot overwrite a different or changed Object source")
+		var checked: DrawingResult = DrawingLinkedObjects.resolve(source, catalog)
+		if not checked.ok:
+			return checked
 	if as_variant:
 		var copied: DrawingDocument = DrawingDocument.new(DrawingDocument.new_id(),
 			source.tile_stride, source.density_numerator, source.density_denominator)
@@ -2865,6 +3151,9 @@ func _save_as_named_object() -> void:
 ## intentional: synchronous draining on Save would stall the input loop.
 ## The user can Save or Close again after normal frame-budgeted commit.
 func _can_persist_or_close(action: String) -> bool:
+	if _authoring_dialog_targets.has("text") and (action.begins_with("Save") or action.begins_with("Close")):
+		_show_error("Apply or cancel the text draft before " + action)
+		return false
 	if not canvas.has_pending_stroke():
 		return true
 	if _close_after_save:
@@ -2958,6 +3247,7 @@ func _close_index(index: int) -> void:
 	if tabs.is_empty():
 		canvas.document = null
 		canvas.layer_id = ""
+		_layer_items.clear()
 		layers.clear()
 		status.text = "No document open"
 	else:
@@ -2988,6 +3278,7 @@ func _sync_object_tab() -> void:
 		tabs[active_tab]["layer"] = _first_editable(session.document, DrawingDocument.ROOT_ID)
 		tabs[active_tab]["selected_node"] = current_layer()
 	canvas.document = session.document
+	_refresh_document_links(session.document)
 	canvas.layer_id = current_layer()
 	canvas.asset_origin = session.origin
 	canvas.asset_bounds = session.bounds
@@ -3009,9 +3300,16 @@ func _activate(index: int) -> void:
 	if active_tab >= 0 and active_tab < tabs.size() and active_tab != index:
 		tabs[active_tab]["camera"] = canvas.camera
 		tabs[active_tab]["zoom"] = canvas.zoom
+		tabs[active_tab]["layer_page"] = layer_page
+	if index != active_tab and _authoring_dialog_targets.has("text"):
+		_cancel_text()
+	if index != active_tab:
+		layer_page = int(tabs[index].get("layer_page", 0))
 	active_tab = index
 	tab_bar.current_tab = index
 	canvas.document = current_document()
+	if not current_document().linked_records().is_empty() and current_document().linked_sources.is_empty():
+		_refresh_document_links(current_document())
 	var chosen: String = selected_layer_node()
 	if not current_document().has_node(chosen):
 		chosen = _first_editable(current_document(), DrawingDocument.ROOT_ID)
@@ -3021,13 +3319,12 @@ func _activate(index: int) -> void:
 	var object_session: DrawingObjectEditorSession = current_object()
 	canvas.asset_origin = object_session.origin if object_session != null else Vector2i.ZERO
 	canvas.asset_bounds = object_session.bounds if object_session != null else Rect2i()
+	canvas.object_backdrop = object_session != null
 	canvas.image_bounds = tabs[index].get("frame", Rect2i()) as Rect2i
 	canvas.show_grid = bool(tabs[index].get("show_grid", false))
-	canvas.snap_to_grid = bool(tabs[index].get("snap", false))
+	canvas.snap_to_grid = false
 	canvas.grid_spacing = int(tabs[index].get("grid_spacing", 8))
 	canvas.grid_origin = tabs[index].get("grid_origin", Vector2i.ZERO) as Vector2i
-	snap_toggle.set_pressed_no_signal(canvas.snap_to_grid)
-	snap_toggle.text = "Snap (%d px)" % canvas.grid_spacing
 	top_bar.set_menu_checked("View", 3, canvas.show_grid)
 	canvas.camera = tabs[index].get("camera", Vector2.ZERO) as Vector2
 	canvas.zoom = float(tabs[index].get("zoom", 4.0))
@@ -3040,23 +3337,60 @@ func _activate(index: int) -> void:
 	_update_status()
 
 
-func _flatten_layer_ids(parent: String, depth: int, output: Array[Dictionary]) -> void:
+## Disclosure belongs to the live tab, not the saved document or its history.
+func _collapsed_layer_groups() -> Dictionary:
+	if not tabs[active_tab].has("collapsed_layer_groups"):
+		tabs[active_tab]["collapsed_layer_groups"] = {}
+	return tabs[active_tab]["collapsed_layer_groups"]
+
+
+func _flatten_layer_ids(parent: String, output: Array[Dictionary],
+		include_collapsed: bool = false) -> void:
+	var collapsed: Dictionary = _collapsed_layer_groups()
 	for node_id: String in current_document().list_children(parent):
 		var info: Dictionary = current_document().node_metadata(node_id)
-		output.append({"id": node_id, "depth": depth, "info": info})
-		if info["kind"] == DrawingLayerNode.GROUP:
-			_flatten_layer_ids(node_id, depth + 1, output)
+		output.append({"id": node_id, "info": info})
+		if info["kind"] == DrawingLayerNode.GROUP and (include_collapsed or not collapsed.has(node_id)):
+			_flatten_layer_ids(node_id, output, include_collapsed)
 
 
-func _refresh_layers() -> void:
+## A page contains up to ROW_PAGE matching rows. Ancestors of those rows are
+## included as context even if they do not match or belong to another page.
+## Native TreeItem parenting supplies real indentation, folding and hit tests.
+func _ensure_layer_item(node_id: String, root: TreeItem) -> TreeItem:
+	if _layer_items.has(node_id):
+		return _layer_items[node_id]
+	var info: Dictionary = current_document().node_metadata(node_id)
+	var parent_id: String = info["parent"]
+	var parent: TreeItem = root if parent_id == DrawingDocument.ROOT_ID else _ensure_layer_item(parent_id, root)
+	var item: TreeItem = layers.create_item(parent)
+	_layer_items[node_id] = item
+	var kind_marker: String = "" if info["kind"] == DrawingLayerNode.GROUP else ("T " if info["kind"] == DrawingLayerNode.TEXT else "◉ ")
+	item.set_text(0, kind_marker + info["name"])
+	item.set_tooltip_text(0, "%s · %s%s" % [info["name"], info["kind"],
+		" · inherited visibility/lock applies" if parent_id != DrawingDocument.ROOT_ID else ""])
+	item.set_metadata(0, node_id)
+	item.add_button(0, layer_icons["layer_visible"] if info["visible"] else layer_icons["layer_hidden"], ROW_EYE,
+		false, "Hide this row/group" if info["visible"] else "Show this row/group")
+	item.add_button(0, layer_icons["layer_locked"] if info["locked"] else layer_icons["layer_unlocked"], ROW_LOCK,
+		false, "Unlock this row/group" if info["locked"] else "Lock this row/group")
+	return item
+
+
+func _refresh_layers(focus_id: String = "") -> void:
+	_refreshing_layers = true
+	_layer_items.clear()
 	layers.clear()
 	var root: TreeItem = layers.create_item()
 	if current_document() == null:
+		_refreshing_layers = false
 		return
-	var all_rows: Array[Dictionary] = []
-	_flatten_layer_ids(DrawingDocument.ROOT_ID, 0, all_rows)
-	var matches: Array[Dictionary] = []
 	var query: String = layer_search.text.strip_edges().to_lower()
+	if query.is_empty():
+		_expand_selected_ancestors()
+	var all_rows: Array[Dictionary] = []
+	_flatten_layer_ids(DrawingDocument.ROOT_ID, all_rows, not query.is_empty())
+	var matches: Array[Dictionary] = []
 	for row: Dictionary in all_rows:
 		var info: Dictionary = row["info"]
 		var content: String = ""
@@ -3066,26 +3400,75 @@ func _refresh_layers() -> void:
 		if query.is_empty() or String(info["name"]).to_lower().contains(query) or content.to_lower().contains(query):
 			matches.append(row)
 	var page_count: int = maxi(1, ceili(float(matches.size()) / ROW_PAGE))
+	# Folding an ancestor presented as page context may move it to an earlier
+	# page. Keep the clicked group reachable instead of jumping away from it.
+	if not focus_id.is_empty():
+		for index: int in range(matches.size()):
+			if matches[index]["id"] == focus_id:
+				layer_page = index / ROW_PAGE
+				break
 	layer_page = clampi(layer_page, 0, page_count - 1)
 	layer_page_label.text = "%d/%d · %d" % [layer_page + 1, page_count, matches.size()]
-	layer_page_label.tooltip_text = "%d matching layers/labels" % matches.size()
+	layer_page_label.tooltip_text = "%d matching layers/labels (plus ancestor context)" % matches.size()
 	var first: int = layer_page * ROW_PAGE
 	for index: int in range(first, mini(first + ROW_PAGE, matches.size())):
-		var row: Dictionary = matches[index]
-		var info: Dictionary = row["info"]
-		var item: TreeItem = layers.create_item(root)
-		var kind_marker: String = "▸ " if info["kind"] == DrawingLayerNode.GROUP else ("T " if info["kind"] == DrawingLayerNode.TEXT else "◉ ")
-		item.set_text(0, "  ".repeat(mini(int(row["depth"]), 12)) + kind_marker + info["name"])
-		item.set_tooltip_text(0, "%s · %s%s" % [info["name"], info["kind"],
-			" · inherited visibility/lock applies" if int(row["depth"]) > 0 else ""])
-		item.set_metadata(0, row["id"])
-		item.add_button(0, layer_icons["layer_visible"] if info["visible"] else layer_icons["layer_hidden"], ROW_EYE,
-			false, "Hide this row/group" if info["visible"] else "Show this row/group")
-		item.add_button(0, layer_icons["layer_locked"] if info["locked"] else layer_icons["layer_unlocked"], ROW_LOCK,
-			false, "Unlock this row/group" if info["locked"] else "Lock this row/group")
-		if row["id"] == selected_layer_node():
-			item.select(0)
-			layers.scroll_to_item(item)
+		_ensure_layer_item(matches[index]["id"], root)
+	var collapsed: Dictionary = _collapsed_layer_groups()
+	for node_id: String in _layer_items:
+		var item: TreeItem = _layer_items[node_id]
+		if current_document().node_metadata(node_id)["kind"] != DrawingLayerNode.GROUP:
+			continue
+		# The native arrow is drawn only for a group with a visible child.
+		# A nonselectable placeholder is hidden by the collapsed parent; on
+		# a page boundary it explains why children aren't on this page.
+		if query.is_empty() and item.get_first_child() == null and not current_document().list_children(node_id).is_empty():
+			var sentinel: TreeItem = layers.create_item(item)
+			sentinel.set_selectable(0, false)
+			sentinel.set_text(0, "Children on another page")
+			sentinel.set_custom_color(0, layers.get_theme_color("font_disabled_color"))
+		item.set_disable_folding(not query.is_empty())
+		item.collapsed = query.is_empty() and collapsed.has(node_id)
+	var selected: TreeItem = _layer_items.get(selected_layer_node())
+	if selected != null:
+		selected.select(0)
+	var focus: TreeItem = _layer_items.get(focus_id, selected)
+	if focus != null:
+		layers.scroll_to_item(focus)
+	_refreshing_layers = false
+
+
+func _layer_item_collapsed(item: TreeItem) -> void:
+	if _refreshing_layers or item == null or active_tab < 0 or item.get_metadata(0) == null:
+		return
+	# Rebuild after the native Tree finishes dispatching the fold click.
+	call_deferred("_set_layer_group_collapsed", current_document(), String(item.get_metadata(0)), item.collapsed)
+
+
+func _set_layer_group_collapsed(document: DrawingDocument, node_id: String, collapse: bool) -> void:
+	if document != current_document() or not layer_search.text.strip_edges().is_empty():
+		return
+	if document.node_metadata(node_id).get("kind") != DrawingLayerNode.GROUP or document.list_children(node_id).is_empty():
+		return
+	var collapsed: Dictionary = _collapsed_layer_groups()
+	if collapse == collapsed.has(node_id):
+		return
+	if collapse:
+		# Do not leave the paint target hidden in the view. Selection relocation
+		# is view-only, not a history event, and cannot interrupt a queued edit.
+		var ancestor: String = selected_layer_node()
+		while not ancestor.is_empty() and ancestor != DrawingDocument.ROOT_ID:
+			ancestor = String(document.node_metadata(ancestor).get("parent", ""))
+			if ancestor == node_id:
+				if not _can_persist_or_close("Collapse Layer Group"):
+					_refresh_layers(node_id)
+					return
+				_select_layer_node(node_id, false)
+				_last_selection_context = _capture_context()
+				break
+		collapsed[node_id] = true
+	else:
+		collapsed.erase(node_id)
+	_refresh_layers(node_id)
 
 
 func _change_layer_page(direction: int) -> void:
@@ -3103,13 +3486,12 @@ func _select_layer_node(node_id: String, record_context: bool = true) -> void:
 	# Switching source layers invalidates a queued Brush stroke even without
 	# changing document pixels. Restore the Tree selection if a click is refused.
 	if node_id != selected_layer_node() and not _can_persist_or_close("Change Layer"):
-		var item: TreeItem = layers.get_root().get_first_child() if layers.get_root() != null else null
-		while item != null:
-			if String(item.get_metadata(0)) == selected_layer_node():
-				item.select(0)
-				break
-			item = item.get_next()
+		var item: TreeItem = _layer_items.get(selected_layer_node())
+		if item != null:
+			item.select(0)
 		return
+	if node_id != selected_layer_node() and _authoring_dialog_targets.has("text"):
+		_cancel_text()
 	var before: DrawingHistoryContext = _capture_context() if record_context else null
 	var kind: String = String(current_document().node_metadata(node_id).get("kind", ""))
 	tabs[active_tab]["selected_node"] = node_id
@@ -3121,9 +3503,16 @@ func _select_layer_node(node_id: String, record_context: bool = true) -> void:
 
 
 func _layer_selected() -> void:
+	if _refreshing_layers or active_tab < 0:
+		return
 	var selected_item: TreeItem = layers.get_selected()
-	if selected_item != null:
-		_select_layer_node(String(selected_item.get_metadata(0)))
+	if selected_item != null and selected_item.get_metadata(0) != null:
+		var node_id: String = selected_item.get_metadata(0)
+		# Native collapse may move selection from a hidden child to the group.
+		# The pending fold owns that relocation, not selection history.
+		if current_document().node_metadata(node_id).get("kind") == DrawingLayerNode.GROUP and layer_search.text.strip_edges().is_empty() and selected_item.collapsed != _collapsed_layer_groups().has(node_id):
+			return
+		_select_layer_node(node_id)
 
 
 ## Keyboard-accessible row actions operate only when the layer Tree has focus;
@@ -3135,7 +3524,7 @@ func _layer_tree_input(event: InputEvent) -> void:
 			return
 		var row: TreeItem = layers.get_item_at_position(mouse.position)
 		var action: int = layers.get_button_id_at_position(mouse.position)
-		if row == null or action not in [ROW_EYE, ROW_LOCK]:
+		if row == null or row.get_metadata(0) == null or action not in [ROW_EYE, ROW_LOCK]:
 			return
 		# Defer tree rebuild until the GUI dispatch finishes: never free its
 		# currently hit-tested TreeItem while Godot is processing that event.
@@ -3145,7 +3534,18 @@ func _layer_tree_input(event: InputEvent) -> void:
 	if not event is InputEventKey:
 		return
 	var key: InputEventKey = event as InputEventKey
-	if not key.pressed or key.echo or not (key.ctrl_pressed or key.meta_pressed) or not key.alt_pressed:
+	if not key.pressed or key.echo:
+		return
+	if active_tab < 0:
+		return
+	if not key.ctrl_pressed and not key.meta_pressed and not key.alt_pressed and not key.shift_pressed and key.keycode in [KEY_LEFT, KEY_RIGHT]:
+		var node_id: String = selected_layer_node()
+		if _layer_items.has(node_id) and current_document().node_metadata(node_id).get("kind") == DrawingLayerNode.GROUP:
+			if layer_search.text.strip_edges().is_empty():
+				call_deferred("_set_layer_group_collapsed", current_document(), node_id, key.keycode == KEY_LEFT)
+			layers.accept_event()
+			return
+	if not (key.ctrl_pressed or key.meta_pressed) or not key.alt_pressed:
 		return
 	match key.keycode:
 		KEY_UP: _move_selected_layer(-1)
@@ -3207,14 +3607,23 @@ func _add_layer() -> void:
 	_create_selected_layer(DrawingLayerNode.RASTER)
 
 
+func _expand_selected_ancestors() -> void:
+	var collapsed: Dictionary = _collapsed_layer_groups()
+	var ancestor: String = selected_layer_node()
+	while not ancestor.is_empty() and ancestor != DrawingDocument.ROOT_ID:
+		ancestor = String(current_document().node_metadata(ancestor).get("parent", ""))
+		collapsed.erase(ancestor)
+
+
 func _reveal_selected_layer() -> void:
 	if active_tab < 0:
 		return
 	# A new/moved item must not disappear behind an old filter/page.
 	if not layer_search.text.is_empty():
 		layer_search.text = ""
+	_expand_selected_ancestors()
 	var rows: Array[Dictionary] = []
-	_flatten_layer_ids(DrawingDocument.ROOT_ID, 0, rows)
+	_flatten_layer_ids(DrawingDocument.ROOT_ID, rows)
 	for index: int in range(rows.size()):
 		if rows[index]["id"] == selected_layer_node():
 			layer_page = index / ROW_PAGE
@@ -3332,95 +3741,243 @@ func _commit_layer_rename() -> void:
 	_apply_structure(current_document().rename_layer(selected_layer_node(), name, true), before, true)
 
 
-func _build_text_dialog() -> void:
-	text_dialog = ConfirmationDialog.new()
-	text_dialog.title = "Editable text (one element per layer)"
-	text_dialog.size = Vector2i(470, 350)
-	add_child(text_dialog)
-	var form: VBoxContainer = VBoxContainer.new()
-	text_dialog.add_child(form)
-	var font_label: Label = Label.new()
-	font_label.text = "Bundled Lato · OFL 1.1"
-	form.add_child(font_label)
+func _build_text_panel() -> void:
+	text_panel = VBoxContainer.new()
+	text_panel.name = "TextOptions"
+	assert(dock_layout.register_panel("text_options"))
+	assert(dock_layout.attach_panel("text_options", "right", "text_options"))
+	dock_layout.set_group_collapsed("text_options", true)
+	dock_layout.set_panel_visible("text_options", false)
+	dock_views["text_options"] = text_panel
+	dock_stash.add_child(text_panel)
+	var title: Label = Label.new()
+	title.text = "Text Options · Lato"
+	text_panel.add_child(title)
+	text_edit = TextEdit.new()
+	text_edit.placeholder_text = "Click the canvas with Text to start…"
+	text_edit.tooltip_text = "Ctrl+Enter applies; Escape cancels. Enter inserts a new line."
+	text_edit.custom_minimum_size.y = 88
+	text_edit.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+	text_panel.add_child(text_edit)
+	var controls: GridContainer = GridContainer.new()
+	controls.columns = 2
+	text_panel.add_child(controls)
 	text_font = OptionButton.new()
 	for entry: String in ["Regular", "Bold", "Italic"]:
 		text_font.add_item(entry)
-	form.add_child(text_font)
-	text_edit = TextEdit.new()
-	text_edit.custom_minimum_size = Vector2(420, 110)
-	form.add_child(text_edit)
-	var controls: HBoxContainer = HBoxContainer.new()
-	form.add_child(controls)
+	_text_option(controls, "Style", text_font)
 	text_size = SpinBox.new()
 	text_size.min_value = 6
 	text_size.max_value = 256
 	text_size.value = 24
-	text_size.prefix = "Size"
-	controls.add_child(text_size)
+	text_size.suffix = "px"
+	_text_option(controls, "Size", text_size)
 	text_angle = SpinBox.new()
-	text_angle.min_value = -360
-	text_angle.max_value = 360
-	text_angle.prefix = "Angle °"
-	controls.add_child(text_angle)
+	text_angle.min_value = -5760
+	text_angle.max_value = 5760
+	text_angle.step = 0.0
+	text_angle.suffix = "°"
+	_text_option(controls, "Angle", text_angle)
 	text_alignment = OptionButton.new()
-	for name: String in ["left", "center", "right"]:
+	for name: String in TEXT_ALIGNMENTS:
 		text_alignment.add_item(name.capitalize())
-	controls.add_child(text_alignment)
+	_text_option(controls, "Align", text_alignment)
 	text_color = ColorPickerButton.new()
 	text_color.text = "Color"
-	form.add_child(text_color)
-	text_dialog.confirmed.connect(_confirm_text)
-	text_dialog.canceled.connect(_cancel_authoring_dialog.bind("text"))
+	_text_option(controls, "Pigment", text_color)
+	var actions: HBoxContainer = HBoxContainer.new()
+	text_panel.add_child(actions)
+	text_apply = Button.new()
+	text_apply.text = "Apply"
+	text_apply.pressed.connect(_confirm_text)
+	actions.add_child(text_apply)
+	text_cancel = Button.new()
+	text_cancel.text = "Cancel"
+	text_cancel.pressed.connect(_cancel_text)
+	actions.add_child(text_cancel)
+	text_notice = Label.new()
+	text_notice.clip_text = true
+	text_notice.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	text_panel.add_child(text_notice)
+	text_edit.text_changed.connect(_refresh_text_preview)
+	text_font.item_selected.connect(func(_index: int) -> void: _refresh_text_preview())
+	text_size.value_changed.connect(func(_value: float) -> void: _refresh_text_preview())
+	text_angle.value_changed.connect(func(_value: float) -> void: _refresh_text_preview())
+	text_alignment.item_selected.connect(func(_index: int) -> void: _refresh_text_preview())
+	text_color.color_changed.connect(func(_value: Color) -> void: _refresh_text_preview())
+	_set_text_controls_active(false)
 
 
-func _edit_text_at(point: Vector2i) -> void:
+func _text_option(grid: GridContainer, label: String, control: Control) -> void:
+	var caption: Label = Label.new()
+	caption.text = label
+	grid.add_child(caption)
+	control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_child(control)
+
+
+func _set_text_controls_active(active: bool) -> void:
+	text_edit.editable = active
+	text_font.disabled = not active
+	text_size.editable = active
+	text_angle.editable = active
+	text_alignment.disabled = not active
+	text_color.disabled = not active
+	text_apply.disabled = not active
+	text_cancel.disabled = not active
+	text_notice.text = "Preview · Apply or Cancel" if active else "Choose Text and click canvas"
+	text_notice.tooltip_text = text_notice.text
+
+
+func _show_text_options() -> void:
+	# Text authoring keeps the preview canvas visible beside the controls.
+	_reveal_workspace_panel("text_options", true)
+
+
+func _scroll_text_panel() -> void:
+	await _scroll_workspace_panel("text_options")
+
+
+func _edit_selected_text() -> void:
 	if active_tab < 0:
 		return
 	var node: DrawingLayerNode = current_document().inspect_node(current_layer())
+	if node == null or node.kind != DrawingLayerNode.TEXT:
+		_show_error("Select an editable text layer first")
+		return
+	_change_tool("Text")
+	_edit_text_at(node.text_element.position)
+
+
+func _text_style_from_menu(style: String) -> void:
+	if not _authoring_dialog_targets.has("text"):
+		_show_error("Start a text draft first")
+		return
+	text_font.select(["Regular", "Bold", "Italic"].find(style))
+	_refresh_text_preview()
+
+
+func _text_alignment_from_menu(alignment: String) -> void:
+	if not _authoring_dialog_targets.has("text"):
+		_show_error("Start a text draft first")
+		return
+	text_alignment.select(TEXT_ALIGNMENTS.find(alignment.to_lower()))
+	_refresh_text_preview()
+
+
+func _adjust_text_size(delta: int) -> void:
+	if _authoring_dialog_targets.has("text"):
+		text_size.value += delta
+
+
+func _text_target_current() -> bool:
+	var target: Dictionary = _authoring_dialog_targets.get("text", {})
+	return _save_target_is_current(target) and current_document().revision == int(target["revision"]) \
+		and current_layer() == target["layer"] and selected_layer_node() == target["selected_node"]
+
+
+func _edit_text_at(point: Vector2i) -> void:
+	if active_tab < 0 or not _can_persist_or_close("Start Text"):
+		return
+	if _text_target_current():
+		_show_text_options()
+		text_edit.grab_focus()
+		return
+	_cancel_text()
+	var node: DrawingLayerNode = current_document().inspect_node(current_layer())
 	text_target = current_layer() if node != null and node.kind == DrawingLayerNode.TEXT else ""
-	text_position = point
+	_text_parent = node.parent_id if node != null else String(_insertion_target()["parent"])
+	if not current_document()._editable(text_target if not text_target.is_empty() else _text_parent):
+		_show_error("Text target or group is locked or hidden")
+		return
 	var existing: DrawingTextElement = node.text_element if not text_target.is_empty() else null
+	_text_loading = true
+	text_position = existing.position if existing != null else point
+	_text_scale = existing.scale if existing != null else Vector2.ONE
+	_text_original_angle = existing.angle if existing != null else 0.0
+	_text_source_bounds = Rect2i()
+	if existing != null:
+		var measured: DrawingResult = DrawingTextRaster.bounds(existing)
+		if measured.ok:
+			_text_source_bounds = measured.value as Rect2i
 	text_edit.text = existing.content if existing != null else ""
-	text_font.select(["lato-regular-v1", "lato-bold-v1", "lato-italic-v1"].find(existing.font_id) if existing != null else 0)
+	text_font.select(TEXT_FONTS.find(existing.font_id) if existing != null else 0)
 	text_size.value = existing.font_size if existing != null else 24
 	text_angle.value = rad_to_deg(existing.angle) if existing != null else 0.0
-	text_alignment.select(["left", "center", "right"].find(existing.alignment) if existing != null else 0)
-	text_color.color = Color8(32, 40, 64) if existing == null else Color(
-		float(existing.color_rgba & 255) / 255.0,
-		float((existing.color_rgba >> 8) & 255) / 255.0,
-		float((existing.color_rgba >> 16) & 255) / 255.0,
-		float((existing.color_rgba >> 24) & 255) / 255.0)
-	if existing != null:
-		text_position = existing.position
+	text_alignment.select(TEXT_ALIGNMENTS.find(existing.alignment) if existing != null else 0)
+	text_color.color = active_color if existing == null else Color8(existing.color_rgba & 255,
+		(existing.color_rgba >> 8) & 255, (existing.color_rgba >> 16) & 255, (existing.color_rgba >> 24) & 255)
 	_capture_authoring_dialog_target("text")
-	text_dialog.popup_centered()
+	_text_loading = false
+	_set_text_controls_active(true)
+	_show_text_options()
+	_refresh_text_preview()
 	text_edit.grab_focus()
+
+
+func _text_draft() -> DrawingTextElement:
+	var draft: DrawingTextElement = DrawingTextElement.new()
+	draft.content = text_edit.text
+	draft.font_id = TEXT_FONTS[text_font.selected] if text_font.selected >= 0 else ""
+	draft.position = text_position
+	draft.scale = _text_scale
+	draft.font_size = int(text_size.value)
+	draft.angle = _text_original_angle if text_angle.value == rad_to_deg(_text_original_angle) else deg_to_rad(text_angle.value)
+	draft.alignment = TEXT_ALIGNMENTS[text_alignment.selected]
+	draft.color_rgba = _pack_color(text_color.color)
+	return draft
+
+
+func _refresh_text_preview() -> void:
+	if _text_loading or not _text_target_current():
+		return
+	var draft: DrawingTextElement = _text_draft()
+	top_bar.set_radio_submenu_selected("Text", 4, text_font.selected)
+	top_bar.set_radio_submenu_selected("Text", 5, text_alignment.selected)
+	var valid: DrawingResult = draft.validated()
+	var measured: DrawingResult = DrawingTextRaster.bounds(draft) if valid.ok else valid
+	text_apply.disabled = not measured.ok
+	text_notice.text = "Preview · Apply or Cancel" if measured.ok and measured.code != "GLYPH_FALLBACK" else measured.message
+	text_notice.tooltip_text = text_notice.text
+	if not measured.ok and (draft.content.length() > DrawingTextElement.MAX_CHARS or not draft.content.strip_edges().is_empty()):
+		canvas.set_text_preview({})
+		return
+	# Empty content replaces old text with an empty preview, but cannot commit.
+	canvas.set_text_preview({"document": current_document(), "revision": current_document().revision,
+		"layer": text_target, "parent": _text_parent, "element": draft if measured.ok else null,
+		"bounds": measured.value if measured.ok else Rect2i(), "source_bounds": _text_source_bounds})
+
+
+func _cancel_text() -> void:
+	_cancel_authoring_dialog("text")
+	if canvas != null:
+		canvas.set_text_preview({})
+	if text_panel != null:
+		_text_loading = true
+		text_edit.clear()
+		_text_loading = false
+		_set_text_controls_active(false)
 
 
 func _commit_text_dialog() -> void:
 	if active_tab < 0 or not _can_persist_or_close("Commit Text"):
 		return
+	if not _text_target_current():
+		_cancel_text()
+		_show_error("Text draft belongs to another document, layer or revision; reopen it")
+		return
 	var document: DrawingDocument = current_document()
-	var draft: DrawingTextElement = DrawingTextElement.new()
-	draft.content = text_edit.text
-	draft.font_id = ["lato-regular-v1", "lato-bold-v1", "lato-italic-v1"][text_font.selected]
-	draft.position = text_position
-	draft.font_size = int(text_size.value)
-	draft.angle = deg_to_rad(text_angle.value)
-	draft.alignment = ["left", "center", "right"][text_alignment.selected]
-	draft.color_rgba = _pack_color(text_color.color)
-	var selected_node: DrawingLayerNode = document.inspect_node(current_layer())
-	var parent: String = selected_node.parent_id if selected_node != null else DrawingDocument.ROOT_ID
+	var draft: DrawingTextElement = _text_draft()
 	var before: DrawingHistoryContext = _capture_context()
-	var committed: DrawingResult = document.commit_text(text_target, draft, document.revision, parent)
+	var revision: int = document.revision
+	var committed: DrawingResult = document.commit_text(text_target, draft, revision, _text_parent)
 	if not committed.ok:
 		_show_error(committed.message)
 		return
-	# Text creation is also a structural row insertion. Keep the selected Tree
-	# row and paint target in sync, including Object Editor tabs; otherwise a
-	# subsequent Tree rebuild can silently retarget the old raster layer.
+	_cancel_text()
 	_select_layer_node(String(committed.value), false)
-	document.annotate_latest_gesture(before, _capture_context())
+	if document.revision != revision:
+		document.annotate_latest_gesture(before, _capture_context())
 	_reveal_selected_layer()
 	_after_edit()
 
@@ -3470,6 +4027,8 @@ func _toggle_visibility() -> void:
 
 
 func _change_tool(name: String) -> void:
+	if name != "Text" and _authoring_dialog_targets.has("text"):
+		_cancel_text()
 	if canvas.has_floating_move() and not canvas.confirm_floating_move():
 		return
 	active_tool = name
@@ -3581,21 +4140,23 @@ func _refresh_tool_options() -> void:
 	if active_tool in ["Brush", "Eraser"]:
 		controls.append(brush_preset_control)
 		controls.append(width_spin)
-	if active_tool in ["Brush", "Eraser", "Select", "Move", "Text"]:
-		controls.append(snap_toggle)
+	if active_tool == "Bucket":
+		controls.append(bucket_tolerance_control)
+	if active_tool == "Shapes":
+		controls.append_array([shape_kind_control, shape_style_control, shape_color_control, shape_width_control])
 	if active_tool == "Select":
 		controls.append(selection_mode_control)
 	top_bar.set_tool_controls(active_tool, controls)
 
 
 func _set_selection_mode(mode: String) -> void:
-	if canvas.has_floating_move() and not canvas.confirm_floating_move():
-		return
-	canvas.selection_mode = mode
-	for index: int in range(selection_mode_control.item_count):
-		if selection_mode_control.get_item_text(index) == mode:
-			selection_mode_control.select(index)
-			break
+	# This configures the next marquee, never implicitly publishes a floating Move.
+	# Do not change the meaning of a rectangle already being dragged.
+	if mode in SELECTION_MODES and not canvas.selecting:
+		canvas.selection_mode = mode
+	var index: int = SELECTION_MODES.find(canvas.selection_mode)
+	selection_mode_control.select(index)
+	top_bar.set_radio_submenu_selected("Selection", 0, index)
 	_update_status()
 
 
@@ -3889,7 +4450,7 @@ func _restore_context(context: DrawingHistoryContext) -> void:
 		canvas.layer_id = ""
 	canvas.set_selection_mask(context.selection_mask if context.selection_mask != null else
 		DrawingSelection.new(context.selected_rect, context.selected_rect.has_area()), false)
-	if context.editor_mode in ["Brush", "Eraser", "Select", "Move", "Text", "Pan"]:
+	if context.editor_mode in ["Brush", "Eraser", "Bucket", "Shapes", "Select", "Move", "Text", "Pan"]:
 		_change_tool(context.editor_mode)
 	_last_selection_context = _capture_context()
 	_reveal_selected_layer()
@@ -3905,6 +4466,8 @@ func _canvas_changed(_result: DrawingResult) -> void:
 
 
 func _after_edit() -> void:
+	if _authoring_dialog_targets.has("text") and not _text_target_current():
+		_cancel_text()
 	_refresh_layers()
 	_update_status()
 	canvas.queue_redraw()
@@ -3932,25 +4495,24 @@ func _update_status() -> void:
 	var guide: String = " | image %d×%d @ %d,%d" % [canvas.image_bounds.size.x,
 		canvas.image_bounds.size.y, canvas.image_bounds.position.x,
 		canvas.image_bounds.position.y] if canvas.image_bounds.has_area() else ""
-	var grid_info: String = " | grid %dpx @ %d,%d (%s, snap %s)" % [canvas.grid_spacing,
+	var grid_info: String = " | grid %dpx @ %d,%d (%s)" % [canvas.grid_spacing,
 		canvas.grid_origin.x, canvas.grid_origin.y,
-		"shown" if canvas.show_grid else "hidden", "on" if canvas.snap_to_grid else "off"]
+		"shown" if canvas.show_grid else "hidden"]
+	var tool_status: String = active_tool
+	if active_tool == "Shapes":
+		tool_status += " | Click vertices, Enter finish, Esc cancel" if canvas.shape_kind == "Polygon" else " | Drag, Esc cancel"
 	status.text = "%s | %s%s | cursor %d,%d | view %d×%d px | zoom %.0f%%%s%s | history %d/%d | %s" % [
-		tab_identity, source, active_tool, cursor.x, cursor.y, canvas_pixels.x, canvas_pixels.y,
+		tab_identity, source, tool_status, cursor.x, cursor.y, canvas_pixels.x, canvas_pixels.y,
 		canvas.zoom * 100.0, guide, grid_info, document.history_position(),
 		document.history_length(), "Unsaved changes" if dirty else "Saved"]
 	if canvas.has_floating_move():
 		status.text += " | Floating Move: Enter drop / Esc cancel"
+	if _authoring_dialog_targets.has("text"):
+		status.text += " | Text draft: Ctrl+Enter apply / Esc cancel"
+	if not document.linked_source_error.is_empty():
+		status.text += " | NULL: " + document.linked_source_error
 	status.tooltip_text = status.text
 	_refresh_history()
-
-
-func _set_snap_enabled(enabled: bool) -> void:
-	canvas.snap_to_grid = enabled
-	if active_tab >= 0:
-		tabs[active_tab]["snap"] = enabled
-	canvas.queue_redraw()
-	_update_status()
 
 
 func _toggle_grid() -> void:
@@ -3986,7 +4548,6 @@ func _apply_grid_settings() -> void:
 	canvas.grid_origin = Vector2i(int(grid_fields[1].value), int(grid_fields[2].value))
 	tabs[active_tab]["grid_spacing"] = canvas.grid_spacing
 	tabs[active_tab]["grid_origin"] = canvas.grid_origin
-	snap_toggle.text = "Snap (%d px)" % canvas.grid_spacing
 	canvas.queue_redraw()
 	_update_status()
 
@@ -4054,6 +4615,7 @@ func _undo() -> void:
 		return
 	var result: DrawingResult = current_document().undo()
 	if result.ok:
+		_refresh_document_links(current_document())
 		_restore_context(result.value as DrawingHistoryContext)
 		_after_edit()
 	else:
@@ -4070,6 +4632,7 @@ func _redo() -> void:
 		return
 	var result: DrawingResult = current_document().redo()
 	if result.ok:
+		_refresh_document_links(current_document())
 		_restore_context(result.value as DrawingHistoryContext)
 		_after_edit()
 	else:
@@ -4120,6 +4683,106 @@ func _open_raster_file(path: String) -> void:
 	_activate(tabs.size() - 1)
 
 
+## Export never commits pending gestures, floating pixels or a native savepoint.
+func _export_bounds() -> Rect2i:
+	var object: DrawingObjectEditorSession = current_object()
+	return object.bounds if object != null else canvas.image_bounds
+
+
+func _export_edit_pending() -> bool:
+	return canvas.has_pending_stroke() or canvas.has_floating_move() or canvas.dragging \
+		or _authoring_dialog_targets.has("text") or current_document().has_unpublished_edit()
+
+
+func _export_target_current() -> bool:
+	return _save_target_is_current(_export_target) and current_document().revision == int(_export_target["revision"]) \
+		and current_document().display_source_epoch == int(_export_target["epoch"]) \
+		and _export_bounds() == _export_target["bounds"] and not _export_edit_pending()
+
+
+func _ask_export() -> void:
+	if _authoring_dialog_targets.has("text"):
+		_show_error("Apply or cancel the text draft before Export")
+		return
+	_cancel_export()
+	if active_tab < 0:
+		return
+	if _export_edit_pending():
+		_show_error("Finish or cancel the pending edit before exporting")
+		return
+	var bounds: Rect2i = _export_bounds()
+	_export_target = _capture_save_target()
+	_export_target["revision"] = current_document().revision
+	_export_target["epoch"] = current_document().display_source_epoch
+	_export_target["bounds"] = bounds
+	var result: DrawingResult = DrawingRasterExport.render(current_document(), bounds)
+	if not result.ok or not _export_target_current():
+		_show_error(result.message if not result.ok else "Document changed during export; reopen Export")
+		_cancel_export()
+		return
+	_update_status()
+	export_dialog.prepare(result.value as Image, bounds, result.message)
+	if DisplayServer.get_name() == "headless":
+		export_dialog.show()
+	else:
+		var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+		export_dialog.set_compact_preview(viewport_size.y < 480.0)
+		var dialog_size: Vector2i = Vector2i(maxi(1, mini(420, floori(viewport_size.x) - 24)), maxi(1, mini(395, floori(viewport_size.y) - 56)))
+		export_dialog.popup_centered(dialog_size)
+
+
+func _choose_export_file() -> void:
+	if not _export_target_current():
+		_show_error("Export source changed; reopen Export")
+		_cancel_export()
+		return
+	var result: DrawingResult = export_dialog.encode_current()
+	if not result.ok:
+		return
+	_export_bytes = result.value as PackedByteArray
+	_export_format = export_dialog.selected_format()
+	var extensions: PackedStringArray = DrawingRasterExport.extensions(_export_format)
+	var filters: PackedStringArray = PackedStringArray()
+	for extension: String in extensions:
+		filters.append("*." + extension)
+	export_file_dialog.filters = PackedStringArray([", ".join(filters) + " ; " + _export_format.to_upper() + " image"])
+	var filename: String = String(tabs[active_tab].get("path", "")).get_file().get_basename()
+	if filename.is_empty():
+		filename = "Drawing"
+	export_file_dialog.current_file = filename + "." + extensions[0]
+	export_dialog.hide()
+	export_dialog.clear_snapshot()
+	if DisplayServer.get_name() == "headless":
+		export_file_dialog.show()
+	else:
+		export_file_dialog.popup_centered_ratio(0.85)
+
+
+func _export_file_selected(path: String) -> void:
+	if not _export_target_current() or _export_bytes.is_empty():
+		_show_error("Export source changed or was cancelled; reopen Export")
+		_cancel_export()
+		return
+	# FileDialog's save mode confirms existing destinations before emitting.
+	var result: DrawingResult = DrawingRasterExport.publish(path, _export_format, _export_bytes, true)
+	_cancel_export()
+	if result.ok:
+		status.text = "Exported: " + path.get_file()
+	else:
+		_show_error(result.message)
+
+
+func _cancel_export() -> void:
+	_export_target.clear()
+	_export_bytes = PackedByteArray()
+	_export_format = ""
+	if export_dialog != null:
+		export_dialog.hide()
+		export_dialog.clear_snapshot()
+	if export_file_dialog != null:
+		export_file_dialog.hide()
+
+
 func _ask_open() -> void:
 	if _can_persist_or_close("Open"):
 		open_dialog.popup_centered()
@@ -4161,8 +4824,7 @@ func _confirm_layer_rename() -> void:
 
 
 func _confirm_text() -> void:
-	if _authoring_dialog_is_current("text", true):
-		_commit_text_dialog()
+	_commit_text_dialog()
 
 
 func _confirm_object_rename() -> void:
@@ -4397,6 +5059,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	var key: InputEventKey = event
 	if not key.pressed or key.echo:
 		return
+	var text_focus: Control = get_viewport().gui_get_focus_owner()
+	if _authoring_dialog_targets.has("text") and (text_focus is TextEdit or text_focus is LineEdit):
+		return
 	if not key.ctrl_pressed and not key.meta_pressed:
 		if key.keycode in [KEY_BRACKETLEFT, KEY_BRACKETRIGHT] and not key.alt_pressed:
 			var focused: Control = get_viewport().gui_get_focus_owner()
@@ -4438,6 +5103,15 @@ func _restore_workspace_layout() -> void:
 	if layout_persistence_enabled:
 		var stored: Dictionary = DrawingDockPersistence.read_file(layout_settings_path)
 		if not stored.is_empty():
+			# Recreate a previously registered browser without authorizing or
+			# scanning any catalog. Its panel placement is a UI preference.
+			var saved_layout: Variant = stored.get("layout")
+			if saved_layout is Dictionary and saved_layout.get("panels") is Array:
+				for entry: Variant in saved_layout["panels"]:
+					if entry is Dictionary and entry.get("id") == "asset_browser" and asset_browser == null:
+						if _ensure_asset_browser():
+							dock_layout.set_panel_visible("asset_browser", false)
+						break
 			var restored: Dictionary = DrawingDockPersistence.recover(stored, dock_layout, layout_panel_aliases)
 			if not restored.is_empty() and dock_layout.restore(restored["layout"]):
 				layout_recovery_status = "repaired" if restored["recovered"] else "loaded"
@@ -4462,6 +5136,7 @@ func _restore_workspace_layout() -> void:
 				_render_dock()
 		elif FileAccess.file_exists(layout_settings_path):
 			layout_recovery_status = "invalid"
+	_sync_window_panels()
 	_layout_booted = true
 	call_deferred("_apply_saved_dock_geometry")
 
@@ -4522,11 +5197,16 @@ func reset_workspace_layout() -> void:
 	for panel_id: String in dock_views:
 		dock_layout.register_panel(panel_id)
 		dock_layout.attach_panel(panel_id, "right", panel_id)
+	var text_active: bool = _authoring_dialog_targets.has("text")
+	dock_layout.set_panel_visible("text_options", text_active)
+	dock_layout.set_group_collapsed("text_options", not text_active)
 	dock_drag = DOCK_DRAG_SCRIPT.new(dock_layout) as DrawingDockDrag
 	_expanded_dock_width = DEFAULT_DOCK_WIDTH
 	_expanded_scroll = 0
 	_render_dock()
 	call_deferred("_apply_saved_dock_geometry")
+	if text_active:
+		call_deferred("_scroll_text_panel")
 	_schedule_layout_save()
 
 

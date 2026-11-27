@@ -94,8 +94,10 @@ func run() -> void:
 	var second: PackedByteArray = tile_bytes(doc, layer)
 	check(second != original and not second.is_empty(),
 		"new text source differs from previously parked pixels")
-	check(not doc._native_source_identities.has(layer + ":0,0"),
-		"old native Godot source identity is released")
+	check(doc._native_source_identities.has(layer + ":0,0") and
+		is_same(doc._native_source_identities[layer + ":0,0"], doc._nodes[layer].tiles["0,0"]) and
+		(store.call("read_tile", layer, 0, 0, false) as Dictionary).get("bytes") == second,
+		"old native Godot source identity is replaced with the new glyph projection")
 	check(stroke(doc, layer, Vector2(25, 24)).ok,
 		"new glyph can be painted without a rebase or stale source import")
 	var painted_second: PackedByteArray = tile_bytes(doc, layer)

@@ -67,7 +67,7 @@ func run() -> void:
 	check(app.layout_recovery_status == "defaults", "missing settings migrate T-063 defaults")
 	check(app.dock_layout.rail_icons("right").map(func(e: Dictionary) -> String: return e["panel"]) ==
 		["colors", "layers", "history", "swatches", "gradients"], "default 3 built-in panels and two dynamically registered peers")
-	check(app.dock_views.size() == 6, "six unique views, five fixture-visible panels")
+	check(app.dock_views.size() == 7 and app.dock_views.has("text_options"), "seven unique views, five fixture-visible panels")
 	check(app.dock_layout.merge_groups("layers", "colors", 1), "group colors/layers")
 	check(app.dock_layout.merge_groups("gradients", "swatches", 1), "group swatches/gradients")
 	check(app.dock_layout.select_panel("layers"), "select nested panel")

@@ -50,6 +50,8 @@ jobs:
             2>&1 | tee /tmp/t269-atlas.log
           grep -Fxq 'T269_ATLAS: 27 checks; 0 failures' /tmp/t269-atlas.log
           python3 tools/check_godot_model_log.py /tmp/t269-atlas.log --marker T269_ATLAS_PASSED
+      - name: Verify T-311 native disclosure and private hosted view state
+        run: make verify-layer-disclosure TOOLCHAIN=system
       - name: Upload software-only diagnostics
         if: always()
         uses: actions/upload-artifact@v4

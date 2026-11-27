@@ -31,3 +31,7 @@
 ## Handoff after squash
 
 Read AGENTS.md, Index.md and TICKET_WORKFLOW.md, verify actual main/sprint SHA and CI, then implement one Ready ticket at a time. Keep current native Rust ownership and exact RGBA8/history guarantees. Reuse existing native tests and introduce fail-first state/transition/performance tests as needed; personally open actual UI screenshots before declaring visual work complete. Do not mark T-250 Done until explicit owner approval. Native T-148 through T-152, physical performance, Windows packaging and independent review remain open.
+
+## Engineering checkpoint — 2026-11-25
+
+T-302–T-312 are Done with individual evidence. T-250 has returned to Manual Review, not Done. The owner must still review the actual build; broader T-059, native consolidation, physical performance and portability gates remain open.

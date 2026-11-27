@@ -160,9 +160,9 @@ func run() -> void:
 	workspace._toggle_grid()
 	check(workspace.canvas.show_grid and not workspace.canvas.snap_to_grid,
 		"show grid does not enable snapping")
-	workspace._set_snap_enabled(true)
+	workspace.canvas.snap_to_grid = true
 	check(workspace.canvas.show_grid and workspace.canvas.snap_to_grid,
-		"snap toggle does not hide grid")
+		"programmatic snap API does not hide grid")
 	workspace.grid_fields[0].value = 12
 	workspace.grid_fields[1].value = -3
 	workspace.grid_fields[2].value = 5
@@ -172,7 +172,7 @@ func run() -> void:
 	var sample: Vector2 = workspace.canvas.pixel_to_position(Vector2(8.4, 8.1))
 	check(workspace.canvas.position_to_pixel(sample) == Vector2i(9, 5),
 		"edit coordinates snap to configured independent grid")
-	workspace._set_snap_enabled(false)
+	workspace.canvas.snap_to_grid = false
 	check(workspace.canvas.position_to_pixel(sample) == Vector2i(8, 8) and
 		workspace.canvas.show_grid, "snapping off leaves visible grid and raw edit coordinates")
 	workspace.image_frame_fields[0].value = -42
@@ -221,7 +221,7 @@ func run() -> void:
 	# position. A selection drag must not combine two coordinate mappings.
 	workspace.canvas.tool = "Select"
 	workspace.canvas.clear_selection()
-	workspace._set_snap_enabled(true)
+	workspace.canvas.snap_to_grid = true
 	var select_start: Vector2 = workspace.canvas.pixel_to_position(Vector2(-3, 40))
 	var select_end: Vector2 = workspace.canvas.pixel_to_position(Vector2(21, 64))
 	workspace.canvas.start_gesture(select_start)
@@ -244,7 +244,7 @@ func run() -> void:
 		"mouse-up after cancelled marquee cannot create a selection")
 	workspace.canvas.grid_spacing = 12
 	workspace.canvas.grid_origin = Vector2i(-3, 5)
-	workspace._set_snap_enabled(false)
+	workspace.canvas.snap_to_grid = false
 	# A host may turn standalone-style frame clipping on or off while input
 	# is queued. Neither direction may publish a stroke authorized by the
 	# old policy. Identical policy writes must not interrupt the gesture.

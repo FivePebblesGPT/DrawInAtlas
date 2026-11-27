@@ -52,6 +52,10 @@ application shell is implemented under T-053; see `drawing/README.md` for the in
 - `export_subtree` / `import_subtree` / `transfer_subtree` validate IDs and
   trees, deep-detach tiles and preserve IDs on moves but mint fresh IDs on
   copies. An inaccessible lazy tile blocks transfer instead of being dropped.
+  Native-supported imports publish all raster tiles atomically into Rust at
+  the new structural revision, without introducing a pixel-history entry.
+  Invalid tile storage, incompatible strides, pending edits and native budget
+  or revision rejection leave the destination unchanged.
 
 ## T-088 independent selection and clipboard layer
 
@@ -90,6 +94,13 @@ inside this package and the Atlas-owned `AtlasCampaignBundle` generation
 coordinator; see `docs/DRAWING_STORAGE_CONTRACT.md`. This paragraph describes
 the **logical** API, which remains usable without Atlas even though the host
 now implements portable multi-file saving.
+Physical `DrawingBundleManifest.decode()` now opts in to same-revision native
+source admission on first successful fetch (T-316). No pixel reads occur at
+Open. Portable `.drawing` decode still initializes all sources together
+(T-315). Sparse read-only admission consumes the native aggregate budget;
+rejection leaves the source pending. T-317 trims verified pristine source
+residency on quiescent renderer misses; source refs/digests are preserved
+and dirty, history-owned, changed and active-edit sources stay pinned.
 
 Undo/redo replays compact raster deltas for an independent document. Since
 T-054, `DrawingDocument` also owns an ordered local history with optional
@@ -132,10 +143,12 @@ scenes, autoloads, plugins or root `project.godot` are staged. See
 ## Standalone app integration (T-053)
 
 `DrawingFileIO` wraps the exact logical manifest and canonical per-tile bytes in
-`drawing-standalone-v1` `.drawing` single-file documents. It validates SHA-256
-and exact hidden-RGB pixels on reopen, maintains stable IDs and keeps signed
-chunk coordinates as strings to survive Godot JSON's floating numeric parser.
-It is a **standalone file codec**, distinct from the T-066 Atlas campaign generation format.
+versioned binary `.drawing` single-file documents (`DIADRAW2`, typed metadata,
+raw deduplicated RGBA8, bounded Zstandard compression). It validates SHA-256,
+exact hidden RGB and stable IDs. Legacy `drawing-standalone-v1` JSON/base64
+remains readable; explicit Save writes binary. The T-066 Atlas campaign and
+registry-owned revision encoding remain separate. See [file format and
+limits](../../docs/DRAWING_FILE_FORMAT.md).
 `tools/build_drawing_app.py` stages these canonical package files byte-for-byte
 into an independently runnable project. The untracked `drawing/addons/` staging
 folder must never be edited or committed. The `drawing_package_consumer` fixture
@@ -161,7 +174,7 @@ entries; undo/redo restores text editability and source layer ID. Missing fonts 
 unsupported glyphs use a visible replacement with an explicit warning.
 
 Standalone `DrawingFileIO` writes the referenced OFL Lato font binary, stable
-identity and SHA-256 inside the `.drawing` JSON envelope with the license;
+identity and SHA-256 inside the `.drawing` envelope with the license;
 reopen validates it before exposing the text. These files are relocatable as
 single documents. The multi-file campaign `Fonts/` contract is now supplied by T-066; this standalone file format remains independent, nor an instruction to embed unknown user-system font files without
 legal review. T-055 will integrate this same API with Atlas canvas; T-062 adds

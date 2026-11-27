@@ -147,12 +147,16 @@ func run() -> void:
 	var published: DrawingResult = library.begin_draft(asset_id)
 	check(published.ok and packed(published.value.document, layer, "-1,0") == left,
 		"new Object source draft reads exact native-authored tile bytes")
-	check(packed(tab.document, layer, "-1,0") == left and
-		tab.document._native_raster_store == null,
-		"published Object snapshot is detached from old native history")
+	var saved_store: Object = tab.document._native_raster_store
+	check(packed(tab.document, layer, "-1,0") == left and saved_store != null and
+		saved_store != store and int(saved_store.call("stats").get("undo", -1)) == 0 and
+		int(saved_store.call("stats").get("redo", -1)) == 0 and
+		bool(saved_store.call("has_source", layer, -1, 0, tab.document.revision)) and
+		saved_store.call("read_tile", layer, -1, 0, false).get("bytes") == left,
+		"published Object snapshot has new native ownership without old native history")
 	var second: DrawingResult = stroke(tab.document, layer, Vector2(12.5, 20.5))
 	check(second.ok and second.delta.native_history_token > 0,
-		"fresh native Brush stroke reauthorizes the saved Object draft")
+		"fresh native Brush stroke edits the already-authorized saved Object draft")
 	if not second.ok:
 		quit(1)
 		return

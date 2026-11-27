@@ -18,6 +18,19 @@ func has_packed_rgba8() -> bool:
 	return not _rgba8.is_empty()
 
 
+## Detached snapshots are caller-owned. Validate backing storage before any
+## encode_u32 or native descriptor construction, including hidden RGB.
+func has_canonical_storage() -> bool:
+	if stride <= 0 or stride > 2048:
+		return false
+	if has_packed_rgba8():
+		return _rgba8.size() == stride * stride * 4 and _pixels.is_empty()
+	for index: int in _pixels:
+		if index < 0 or index >= stride * stride or _pixels[index] <= 0 or _pixels[index] > 0xffffffff:
+			return false
+	return true
+
+
 func get_rgba(x: int, y: int) -> int:
 	assert(x >= 0 and y >= 0 and x < stride and y < stride)
 	var index: int = y * stride + x

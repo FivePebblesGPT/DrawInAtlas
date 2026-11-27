@@ -52,8 +52,8 @@ func run() -> void:
 	var file_labels: Array[String] = []
 	for i: int in range(file_menu.item_count):
 		file_labels.append(file_menu.get_item_text(i).split("  ")[0])
-	check(file_labels == ["New", "Open…", "Save", "Save As…", "Close Tab"],
-		"File exposes only the five approved actions and exact wording")
+	check(file_labels == ["New", "Open…", "Save", "Save As…", "Close Tab", "Export…"],
+		"File exposes six current actions and exact wording")
 	var object_labels: Array[String] = []
 	for i: int in range(object_menu.item_count):
 		object_labels.append(object_menu.get_item_text(i))

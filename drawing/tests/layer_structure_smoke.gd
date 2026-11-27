@@ -180,13 +180,13 @@ func run() -> void:
 	for index: int in range(205):
 		ws_doc.create_layer(DrawingLayerNode.RASTER, "Test %03d" % index, original_group)
 	workspace._refresh_layers()
-	check(workspace.layers.get_root().get_child_count() <= workspace.ROW_PAGE and
+	check(workspace._layer_items.size() <= workspace.ROW_PAGE and
 		workspace.layer_page_label.text.contains("/2"), "tree renders at most 200 rows per page")
 	workspace.layer_search.text = "Test 204"
 	workspace._refresh_layers() # Programmatic assignment does not emit LineEdit.text_changed.
-	check(workspace.layers.get_root().get_child_count() == 1 and
-		workspace.layers.get_root().get_child(0).get_text(0).contains("Test 204"),
-		"filtered deep tree shows only matching row")
+	check(workspace._layer_items.size() == 2 and
+		workspace.layers.get_root().get_child(0).get_child(0).get_text(0).contains("Test 204"),
+		"filtered deep tree shows matching row and its ancestor")
 	workspace._select_layer_node(new_group, false)
 	workspace._add_layer()
 	check(workspace.layer_search.text.is_empty() and workspace.selected_layer_node() != new_group,

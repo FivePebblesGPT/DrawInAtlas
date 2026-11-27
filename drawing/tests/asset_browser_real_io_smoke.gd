@@ -67,8 +67,8 @@ func _run() -> void:
 					"write real RGBA pixel into tile quadrant %d,%d" % [x, y])
 		_check(edit.commit().ok, "commit four nontransparent canonical tiles")
 	_check(DrawingObjectEditorFile.save(document, source, "Large disk-backed source",
-		Vector2i(5, 9), Rect2i(0, 0, 256, 256), 3).ok,
-		"write valid versioned Object payload")
+		Vector2i(5, 9), Rect2i(0, 0, 256, 256), 3, true).ok,
+		"write valid legacy Object payload for historical JSON I/O comparison")
 	var handle: FileAccess = FileAccess.open(source, FileAccess.READ)
 	var file_size: int = handle.get_length() if handle != null else 0
 	if handle != null:

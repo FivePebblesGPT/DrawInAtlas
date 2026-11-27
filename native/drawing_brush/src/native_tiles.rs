@@ -8,6 +8,9 @@ use godot::prelude::*;
 
 static NEXT_EDIT: AtomicU64 = AtomicU64::new(1);
 const MAX_ACTIVE_TILES: usize = 128;
+// Structural glyph imports may span thousands of small tiles. Bound both
+// descriptor count and resident bytes before copying any RGBA8 buffer.
+const MAX_STRUCTURAL_TILES: usize = 8192;
 const MAX_TILE_BYTES: usize = 2048 * 2048 * 4;
 const MAX_STORED_BYTES: usize = 256 * 1024 * 1024;
 const MAX_HISTORY: usize = 64;
@@ -56,6 +59,13 @@ struct Edit {
     /// Exactly changed rectangles in the most recently successful stage call.
     last_dirty: HashMap<TileId, Dirty>,
     batches: u64,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ExternalHistoryPolicy {
+    Record,
+    Invalidate,
+    Preserve,
 }
 
 struct History {
@@ -250,6 +260,31 @@ impl TileStore {
         self.bytes_imported += rgba.len() as u64;
         Ok(())
     }
+    /// Release only a pristine source that the document proves is reloadable.
+    /// The caller retains the verified physical descriptor, not these bytes.
+    /// This never changes revision, editability, or either history stack.
+    fn release_pristine_source(&mut self, id: &TileId, revision: u64, expected: &[u8]) -> bool {
+        if self.revision != revision
+            || self.active.is_some()
+            || self.parked_layers.contains(&id.layer)
+            || !self.authorized.contains(id)
+            || !self
+                .tiles
+                .get(id)
+                .is_some_and(|tile| tile.generation == 0 && tile.rgba == expected)
+            || self
+                .undo
+                .iter()
+                .chain(self.redo.iter())
+                .any(|event| event.before.contains_key(id) || event.after.contains_key(id))
+        {
+            return false;
+        }
+        self.tiles.remove(id);
+        self.authorized.remove(id);
+        true
+    }
+
     fn begin(
         &mut self,
         layer: &str,
@@ -629,6 +664,43 @@ impl TileStore {
         changes: Vec<(TileId, Vec<u8>, Vec<u8>)>,
         record_history: bool,
     ) -> Result<(i64, usize), &'static str> {
+        let policy = if record_history {
+            ExternalHistoryPolicy::Record
+        } else {
+            ExternalHistoryPolicy::Invalidate
+        };
+        self.apply_external_tiles_with_history(layer, revision, changes, policy)
+    }
+
+    /// Only the chronological command owner may request this variant. A
+    /// retained token must use ordinary token replay, never a snapshot bypass.
+    fn replay_ordered_detached(
+        &mut self,
+        layer: &str,
+        revision: u64,
+        token: i64,
+        changes: Vec<(TileId, Vec<u8>, Vec<u8>)>,
+    ) -> Result<usize, &'static str> {
+        if token < 0 || self.retains_history_token(token) {
+            return Err("Retained or invalid ordered detached history token");
+        }
+        self.apply_external_tiles_with_history(
+            layer,
+            revision,
+            changes,
+            ExternalHistoryPolicy::Preserve,
+        )
+        .map(|(_, count)| count)
+    }
+
+    fn apply_external_tiles_with_history(
+        &mut self,
+        layer: &str,
+        revision: u64,
+        changes: Vec<(TileId, Vec<u8>, Vec<u8>)>,
+        policy: ExternalHistoryPolicy,
+    ) -> Result<(i64, usize), &'static str> {
+        let record_history = policy == ExternalHistoryPolicy::Record;
         let len = self.stride_bytes()?;
         if self.revision != revision
             || self.active.is_some()
@@ -732,7 +804,7 @@ impl TileStore {
             if self.undo.len() > MAX_HISTORY {
                 self.undo.remove(0);
             }
-        } else {
+        } else if policy == ExternalHistoryPolicy::Invalidate {
             self.undo.clear();
             self.redo.clear();
         }
@@ -779,11 +851,10 @@ impl TileStore {
     /// removed/restored as a structural edit: no canonical tile or reversible
     /// history event belongs to it. Unlike an unconditional metadata advance,
     /// this fails closed for even an authorized *blank* tile and for redo.
-    fn advance_unreferenced_layers(
-        &mut self,
+    fn can_advance_unreferenced_layers(
+        &self,
         expected: u64,
         layers: &[String],
-        discard_redo: bool,
     ) -> Result<(), &'static str> {
         if self.active.is_some() || self.revision != expected || expected >= i64::MAX as u64 {
             return Err("Active edit, stale or overflowing structural revision");
@@ -821,7 +892,373 @@ impl TileStore {
         {
             return Err("Raster layer has native tile ownership or history");
         }
+        Ok(())
+    }
+
+    fn advance_unreferenced_layers(
+        &mut self,
+        expected: u64,
+        layers: &[String],
+        discard_redo: bool,
+    ) -> Result<(), &'static str> {
+        self.can_advance_unreferenced_layers(expected, layers)?;
         self.advance_metadata(expected, discard_redo)
+    }
+
+    /// Replay the creation of an empty raster, even after a stroke was
+    /// undone. Its blank canonical tiles and future Redo images are distinct
+    /// from an unreferenced layer; never discard those images just to remove
+    /// the empty node. Applied raster history or hidden RGB is not empty.
+    fn advance_empty_created_layer(
+        &mut self,
+        expected: u64,
+        layer: &str,
+        source_count: usize,
+        restore: bool,
+    ) -> Result<(), &'static str> {
+        if self.active.is_some() || self.revision != expected || expected >= i64::MAX as u64 {
+            return Err("Active edit, stale or overflowing creation revision");
+        }
+        self.check_empty_created_sources(layer, source_count)?;
+        let resident = source_count;
+        let ids = [layer.to_owned()];
+        let referenced = resident > 0
+            || self.parked_layers.contains(layer)
+            || self.redo.iter().any(|entry| entry.layer == layer);
+        if referenced {
+            self.advance_parked_layers(expected, &ids, restore, false)
+        } else {
+            self.advance_unreferenced_layers(expected, &ids, false)
+        }
+    }
+
+    fn check_empty_created_sources(
+        &self,
+        layer: &str,
+        source_count: usize,
+    ) -> Result<(), &'static str> {
+        if layer.is_empty() || self.undo.iter().any(|entry| entry.layer == layer) {
+            return Err("Created raster still has applied native history");
+        }
+        let mut resident = 0;
+        for (id, tile) in self.tiles.iter().filter(|(id, _)| id.layer == layer) {
+            if !self.authorized.contains(id) || tile.rgba.iter().any(|byte| *byte != 0) {
+                return Err("Created raster is not canonically empty");
+            }
+            resident += 1;
+        }
+        if resident != source_count
+            || self
+                .authorized
+                .iter()
+                .filter(|id| id.layer == layer)
+                .count()
+                != resident
+        {
+            return Err("Created raster source set differs from projection");
+        }
+        Ok(())
+    }
+
+    /// Once the local command owner discards an undone creation, its absent
+    /// blank source and future raster events can be released. This is history
+    /// reclamation, not a live content revision. An active edit on a different
+    /// layer cannot reference a parked source.
+    fn discard_empty_creation(
+        &mut self,
+        expected: u64,
+        layer: &str,
+        source_count: usize,
+    ) -> Result<(), &'static str> {
+        if self.revision != expected
+            || !self.parked_layers.contains(layer)
+            || self.active.as_ref().is_some_and(|edit| edit.layer == layer)
+        {
+            return Err("Stale or live created raster cannot be discarded");
+        }
+        self.check_empty_created_sources(layer, source_count)?;
+        self.tiles.retain(|id, _| id.layer != layer);
+        self.authorized.retain(|id| id.layer != layer);
+        self.redo.retain(|event| event.layer != layer);
+        self.parked_layers.remove(layer);
+        self.editable_layers.remove(layer);
+        Ok(())
+    }
+
+    /// Reclaim a parked source whose structural event has been abandoned.
+    /// The host verifies the retained snapshot; Rust independently requires
+    /// complete source cardinality and absence of any retained raster event.
+    fn discard_parked_source(&mut self, expected: u64, layer: &str, source_count: usize) -> bool {
+        if self.revision != expected
+            || !self.parked_layers.contains(layer)
+            || self.active.as_ref().is_some_and(|edit| edit.layer == layer)
+            || self.undo.iter().chain(self.redo.iter()).any(|event| {
+                event.layer == layer
+                    || event
+                        .before
+                        .keys()
+                        .chain(event.after.keys())
+                        .any(|id| id.layer == layer)
+            })
+            || self
+                .authorized
+                .iter()
+                .filter(|id| id.layer == layer)
+                .count()
+                != source_count
+            || self.tiles.keys().filter(|id| id.layer == layer).count() != source_count
+            || self
+                .tiles
+                .keys()
+                .any(|id| id.layer == layer && !self.authorized.contains(id))
+        {
+            return false;
+        }
+        self.tiles.retain(|id, _| id.layer != layer);
+        self.authorized.retain(|id| id.layer != layer);
+        self.parked_layers.remove(layer);
+        self.editable_layers.remove(layer);
+        true
+    }
+
+    fn can_publish_subtree(
+        &self,
+        expected: u64,
+        layers: &[String],
+        count: usize,
+    ) -> Result<(), &'static str> {
+        self.can_publish_subtree_sources(expected, layers, count, false)
+    }
+
+    fn can_publish_subtree_sources(
+        &self,
+        expected: u64,
+        layers: &[String],
+        count: usize,
+        transfer: bool,
+    ) -> Result<(), &'static str> {
+        if transfer {
+            self.can_retire_layers(expected, layers)?;
+            let names: HashSet<&str> = layers.iter().map(String::as_str).collect();
+            if self
+                .tiles
+                .keys()
+                .any(|id| names.contains(id.layer.as_str()))
+                || self
+                    .authorized
+                    .iter()
+                    .any(|id| names.contains(id.layer.as_str()))
+            {
+                return Err("Transfer destination already owns raster sources");
+            }
+        } else {
+            self.can_advance_unreferenced_layers(expected, layers)?;
+        }
+        if count > MAX_STRUCTURAL_TILES
+            || self.bytes_used().saturating_add(
+                self.stride_bytes()?
+                    .checked_mul(count)
+                    .ok_or("Subtree byte count overflow")?,
+            ) > MAX_STORED_BYTES
+        {
+            return Err("Structural subtree memory budget exceeded");
+        }
+        Ok(())
+    }
+
+    fn publish_subtree(
+        &mut self,
+        expected: u64,
+        layers: &[String],
+        entries: Vec<(TileId, Vec<u8>)>,
+    ) -> Result<(), &'static str> {
+        self.publish_subtree_with_history(expected, layers, entries, true, false)
+    }
+
+    /// History restoration is not a new branch: retain unrelated redo tokens.
+    /// A structural removal can adopt and park detached source bytes in the
+    /// same revision, with no intermediate visible native source.
+    fn publish_subtree_with_history(
+        &mut self,
+        expected: u64,
+        layers: &[String],
+        entries: Vec<(TileId, Vec<u8>)>,
+        discard_redo: bool,
+        park: bool,
+    ) -> Result<(), &'static str> {
+        self.publish_subtree_sources(expected, layers, entries, discard_redo, park, false)
+    }
+
+    fn publish_subtree_sources(
+        &mut self,
+        expected: u64,
+        layers: &[String],
+        entries: Vec<(TileId, Vec<u8>)>,
+        discard_redo: bool,
+        park: bool,
+        transfer: bool,
+    ) -> Result<(), &'static str> {
+        if transfer {
+            self.can_publish_subtree_sources(expected, layers, entries.len(), true)?;
+        } else {
+            self.can_publish_subtree(expected, layers, entries.len())?;
+        }
+        if park
+            && (entries.is_empty()
+                || self.parked_layers.len().saturating_add(layers.len()) > MAX_ACTIVE_TILES)
+        {
+            return Err("Invalid detached history parking request");
+        }
+        let names: HashSet<&str> = layers.iter().map(String::as_str).collect();
+        let len = self.stride_bytes()?;
+        let mut prepared = HashMap::with_capacity(entries.len());
+        for (id, rgba) in entries {
+            if !names.contains(id.layer.as_str())
+                || id.x.unsigned_abs() > SAFE_COORD as u64
+                || id.y.unsigned_abs() > SAFE_COORD as u64
+                || rgba.len() != len
+                || prepared.contains_key(&id)
+            {
+                return Err("Invalid or repeated subtree tile");
+            }
+            prepared.insert(
+                id,
+                Tile {
+                    rgba,
+                    generation: 0,
+                },
+            );
+        }
+        // Every retained token needs an authorized coordinate, including
+        // blank tiles omitted from the portable subtree snapshot.
+        if transfer
+            && self.undo.iter().chain(self.redo.iter()).any(|event| {
+                names.contains(event.layer.as_str())
+                    && event
+                        .before
+                        .keys()
+                        .chain(event.after.keys())
+                        .any(|id| !prepared.contains_key(id))
+            })
+        {
+            return Err("Transfer omits a retained history source");
+        }
+        self.advance_metadata(expected, discard_redo)?;
+        for (id, tile) in prepared {
+            self.bytes_imported += tile.rgba.len() as u64;
+            self.authorized.insert(id.clone());
+            self.tiles.insert(id, tile);
+        }
+        if park {
+            self.parked_layers.extend(layers.iter().cloned());
+        }
+        Ok(())
+    }
+
+    /// Reconcile a complete mixed source set without overwriting an existing
+    /// native tile or resurrecting a missing history-owned coordinate.
+    fn adopt_mixed_subtree(
+        &mut self,
+        expected: u64,
+        layers: &[String],
+        entries: Vec<(TileId, Vec<u8>, bool)>,
+        restore: bool,
+        discard_redo: bool,
+    ) -> Result<(), &'static str> {
+        if self.active.is_some() || self.revision != expected || expected >= i64::MAX as u64 {
+            return Err("Active edit, stale or overflowing mixed subtree revision");
+        }
+        let names: HashSet<&str> = layers.iter().map(String::as_str).collect();
+        let len = self.stride_bytes()?;
+        if layers.is_empty()
+            || layers.len() > MAX_ACTIVE_TILES
+            || names.len() != layers.len()
+            || names.contains("")
+            || entries.is_empty()
+            || entries.len() > MAX_STRUCTURAL_TILES
+            || self
+                .bytes_used()
+                .saturating_add(entries.len().saturating_mul(len))
+                > MAX_STORED_BYTES
+            || (!restore
+                && self.parked_layers.len().saturating_add(layers.len()) > MAX_ACTIVE_TILES)
+        {
+            return Err("Mixed subtree identity or memory budget rejected");
+        }
+        let referenced: HashSet<&str> = self
+            .authorized
+            .iter()
+            .chain(self.tiles.keys())
+            .map(|id| id.layer.as_str())
+            .chain(
+                self.undo
+                    .iter()
+                    .chain(self.redo.iter())
+                    .map(|entry| entry.layer.as_str()),
+            )
+            .collect();
+        for layer in layers {
+            let parked = self.parked_layers.contains(layer);
+            if (!restore && parked) || (restore && referenced.contains(layer.as_str()) && !parked) {
+                return Err("Wrong mixed subtree parked lifecycle");
+            }
+        }
+        let mut seen = HashSet::with_capacity(entries.len());
+        let mut prepared = Vec::new();
+        for (id, rgba, owned) in entries {
+            if !names.contains(id.layer.as_str())
+                || id.x.unsigned_abs() > SAFE_COORD as u64
+                || id.y.unsigned_abs() > SAFE_COORD as u64
+                || rgba.len() != len
+                || !seen.insert(id.clone())
+                || self.authorized.contains(&id) != owned
+            {
+                return Err("Invalid or repeated mixed subtree descriptor");
+            }
+            if owned {
+                if !self.tiles.get(&id).is_some_and(|tile| tile.rgba == rgba) {
+                    return Err("Mixed subtree native source differs");
+                }
+            } else {
+                if self.tiles.contains_key(&id)
+                    || self.undo.iter().chain(self.redo.iter()).any(|entry| {
+                        entry.before.contains_key(&id) || entry.after.contains_key(&id)
+                    })
+                {
+                    return Err("Mixed subtree source has surviving native ownership or history");
+                }
+                prepared.push((
+                    id,
+                    Tile {
+                        rgba,
+                        generation: 0,
+                    },
+                ));
+            }
+        }
+        if self
+            .authorized
+            .iter()
+            .chain(self.tiles.keys())
+            .any(|id| names.contains(id.layer.as_str()) && !seen.contains(id))
+        {
+            return Err("Mixed subtree omitted a native source");
+        }
+        // Everything has been validated; retain existing tiles and generations.
+        self.advance_metadata(expected, discard_redo)?;
+        for (id, tile) in prepared {
+            self.bytes_imported += tile.rgba.len() as u64;
+            self.authorized.insert(id.clone());
+            self.tiles.insert(id, tile);
+        }
+        for layer in layers {
+            if restore {
+                self.parked_layers.remove(layer);
+            } else {
+                self.parked_layers.insert(layer.clone());
+            }
+        }
+        Ok(())
     }
 
     /// An unrecorded structural removal has no future tree Undo to restore its
@@ -856,13 +1293,83 @@ impl TileStore {
         discard_redo: bool,
     ) -> Result<(), &'static str> {
         self.can_retire_layers(expected, layers)?;
+        self.retire_checked_layers(expected, layers, discard_redo);
+        Ok(())
+    }
+
+    // Permanent ancestor deletion invalidates applied removal events for
+    // absent descendants. Only this explicit path may retire parked IDs.
+    fn retire_orphaned_layers(
+        &mut self,
+        expected: u64,
+        live: &[String],
+        parked: &[(String, usize)],
+    ) -> Result<(), &'static str> {
+        if self.active.is_some() || self.revision != expected || expected >= i64::MAX as u64 {
+            return Err("Active edit, stale or overflowing orphan retirement");
+        }
+        if parked.is_empty() || live.len().saturating_add(parked.len()) > MAX_ACTIVE_TILES {
+            return Err("Invalid orphan retirement layer count");
+        }
+        let mut ids = HashSet::new();
+        for layer in live {
+            if layer.is_empty() || !ids.insert(layer.as_str()) || self.parked_layers.contains(layer)
+            {
+                return Err("Invalid live retirement layer");
+            }
+        }
+        for (layer, count) in parked {
+            if layer.is_empty()
+                || !ids.insert(layer.as_str())
+                || !self.parked_layers.contains(layer)
+                || self
+                    .authorized
+                    .iter()
+                    .filter(|id| id.layer == *layer)
+                    .count()
+                    != *count
+                || self.tiles.keys().filter(|id| id.layer == *layer).count() != *count
+                || self
+                    .tiles
+                    .keys()
+                    .any(|id| id.layer == *layer && !self.authorized.contains(id))
+            {
+                return Err("Invalid or incomplete parked retirement source");
+            }
+        }
+        let mut all = live.to_vec();
+        all.extend(parked.iter().map(|(layer, _)| layer.clone()));
+        self.retire_checked_layers(expected, &all, true);
+        Ok(())
+    }
+
+    // Release live sources without deleting the command owner's native tokens.
+    // A later visit explicitly re-admits the complete source set.
+    fn release_transfer_layers(
+        &mut self,
+        expected: u64,
+        layers: &[String],
+    ) -> Result<(), &'static str> {
+        self.can_retire_layers(expected, layers)?;
         let ids: HashSet<&str> = layers.iter().map(String::as_str).collect();
+        self.release_layer_sources(&ids);
+        self.revision = expected + 1;
+        Ok(())
+    }
+
+    fn release_layer_sources(&mut self, ids: &HashSet<&str>) {
+        self.parked_layers.retain(|id| !ids.contains(id.as_str()));
         self.tiles
             .retain(|tile, _| !ids.contains(tile.layer.as_str()));
         self.authorized
             .retain(|tile| !ids.contains(tile.layer.as_str()));
         self.editable_layers
             .retain(|id, _| !ids.contains(id.as_str()));
+    }
+
+    fn retire_checked_layers(&mut self, expected: u64, layers: &[String], discard_redo: bool) {
+        let ids: HashSet<&str> = layers.iter().map(String::as_str).collect();
+        self.release_layer_sources(&ids);
         self.undo.retain(|event| {
             !ids.contains(event.layer.as_str())
                 && !event
@@ -884,7 +1391,6 @@ impl TileStore {
             });
         }
         self.revision = expected + 1;
-        Ok(())
     }
 
     /// A text raster may be undone to its semantic source and then re-rendered
@@ -929,6 +1435,87 @@ impl TileStore {
         });
         self.redo.clear();
         self.revision = expected + 1;
+        Ok(())
+    }
+
+    /// Publish a newly derived raster source (or replace a parked version)
+    /// as one structural revision, without inserting a pixel Undo event.
+    /// Godot owns the semantic conversion event; Rust owns its raster bytes.
+    fn can_publish_structural_source(
+        &self,
+        layer: &str,
+        expected: u64,
+        count: usize,
+    ) -> Result<(), &'static str> {
+        if self.active.is_some() || self.revision != expected || expected >= i64::MAX as u64 {
+            return Err("Active edit, stale or overflowing structural source revision");
+        }
+        if layer.is_empty() || count > MAX_STRUCTURAL_TILES {
+            return Err("Invalid structural source identity or tile count");
+        }
+        let bytes = self
+            .stride_bytes()?
+            .checked_mul(count)
+            .ok_or("Structural source byte count overflow")?;
+        // Conservative peak: both the old parked source and new buffers
+        // can coexist until the entire replacement passes validation.
+        if self.bytes_used().saturating_add(bytes) > MAX_STORED_BYTES {
+            return Err("Structural source memory budget exceeded");
+        }
+        if !self.parked_layers.contains(layer)
+            && (self.authorized.iter().any(|id| id.layer == layer)
+                || self.tiles.keys().any(|id| id.layer == layer)
+                || self.undo.iter().chain(self.redo.iter()).any(|event| {
+                    event.layer == layer
+                        || event
+                            .before
+                            .keys()
+                            .chain(event.after.keys())
+                            .any(|id| id.layer == layer)
+                }))
+        {
+            return Err("Structural source cannot overwrite live native ownership");
+        }
+        Ok(())
+    }
+
+    fn publish_structural_source(
+        &mut self,
+        layer: &str,
+        expected: u64,
+        entries: Vec<(TileId, Vec<u8>)>,
+    ) -> Result<(), &'static str> {
+        self.can_publish_structural_source(layer, expected, entries.len())?;
+        let len = self.stride_bytes()?;
+        let mut prepared = HashMap::with_capacity(entries.len());
+        for (id, rgba) in entries {
+            if id.layer != layer
+                || id.x.unsigned_abs() > SAFE_COORD as u64
+                || id.y.unsigned_abs() > SAFE_COORD as u64
+                || rgba.len() != len
+                || prepared.contains_key(&id)
+            {
+                return Err("Invalid or duplicate structural source tile");
+            }
+            prepared.insert(
+                id,
+                Tile {
+                    rgba,
+                    generation: 0,
+                },
+            );
+        }
+        let ids = [layer.to_owned()];
+        if self.parked_layers.contains(layer) {
+            self.replace_parked_layers(expected, &ids)?;
+        } else {
+            self.advance_unreferenced_layers(expected, &ids, true)?;
+        }
+        for (id, tile) in prepared {
+            self.bytes_imported += tile.rgba.len() as u64;
+            self.authorized.insert(id.clone());
+            self.tiles.insert(id, tile);
+        }
         Ok(())
     }
 
@@ -991,8 +1578,36 @@ impl TileStore {
         Ok(())
     }
 
-    // Do not treat a retained but out-of-order token as detached. Detached
-    // replay discards the native history timeline, even for disjoint tiles.
+    /// The command owner has permanently discarded this event. Reclaim only
+    /// its exact globally unique token on the specified stack. This is not an
+    /// edit: canonical source, revisions and pending transactions stay intact.
+    fn forget_history_token(
+        &mut self,
+        expected: u64,
+        layer: &str,
+        token: i64,
+        applied: bool,
+    ) -> bool {
+        if expected != self.revision || token <= 0 || layer.is_empty() {
+            return false;
+        }
+        let stack = if applied {
+            &mut self.undo
+        } else {
+            &mut self.redo
+        };
+        let Some(index) = stack
+            .iter()
+            .rposition(|event| event.token == token && event.layer == layer)
+        else {
+            return false;
+        };
+        stack.remove(index);
+        true
+    }
+
+    // A retained but out-of-order token must never use either detached
+    // replay policy, even for disjoint tiles.
     fn retains_history_token(&self, token: i64) -> bool {
         token > 0
             && self
@@ -1007,9 +1622,14 @@ impl TileStore {
             return false;
         }
         let stack = if undo { &self.undo } else { &self.redo };
-        stack
-            .last()
-            .is_some_and(|event| event.token == token && !self.parked_layers.contains(&event.layer))
+        stack.last().is_some_and(|event| {
+            event.token == token
+                && !self.parked_layers.contains(&event.layer)
+                && event
+                    .before
+                    .keys()
+                    .all(|id| self.authorized.contains(id) && self.tiles.contains_key(id))
+        })
     }
 
     /// Validate the detached document history payload against the live Rust
@@ -1093,6 +1713,13 @@ impl TileStore {
         {
             return Err("History layer is locked/hidden");
         }
+        if entry
+            .before
+            .keys()
+            .any(|id| !self.authorized.contains(id) || !self.tiles.contains_key(id))
+        {
+            return Err("History layer source is absent");
+        }
         let entry = from.pop().expect("checked above");
         let (replacements, count) = if undo {
             (&entry.before, entry.before.len())
@@ -1161,6 +1788,7 @@ fn clear_invisible_rgb(crop: &mut [u8]) {
     }
 }
 
+// Canonical encoded-sRGB8 source-over with linear alpha; not a linear-light blend.
 fn blend(source: u32, dest: u32) -> u32 {
     let a = ((source >> 24) & 255) as f64;
     if a == 0.0 {
@@ -1270,6 +1898,59 @@ impl DrawingNativeTiles {
             .is_ok()
     }
 
+    /// Structural creation replay, checked against the complete empty raster
+    /// projection. Retains native Redo while the created layer is absent.
+    #[func]
+    fn advance_empty_created_layer_revision(
+        &mut self,
+        expected: i64,
+        layer: GString,
+        source_count: i64,
+        restore: bool,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        let (Ok(expected), Ok(source_count)) =
+            (u64::try_from(expected), usize::try_from(source_count))
+        else {
+            return false;
+        };
+        self.store
+            .advance_empty_created_layer(expected, &layer.to_string(), source_count, restore)
+            .is_ok()
+    }
+
+    /// Release only the absent blank raster of an abandoned local creation.
+    #[func]
+    fn discard_empty_creation_history(
+        &mut self,
+        expected: i64,
+        layer: GString,
+        source_count: i64,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        let (Ok(expected), Ok(source_count)) =
+            (u64::try_from(expected), usize::try_from(source_count))
+        else {
+            return false;
+        };
+        self.store
+            .discard_empty_creation(expected, &layer.to_string(), source_count)
+            .is_ok()
+    }
+
+    /// Release an abandoned parked source without advancing the revision.
+    #[func]
+    fn discard_parked_source(&mut self, expected: i64, layer: GString, source_count: i64) -> bool {
+        self.store.ffi_calls += 1;
+        let (Ok(expected), Ok(source_count)) =
+            (u64::try_from(expected), usize::try_from(source_count))
+        else {
+            return false;
+        };
+        self.store
+            .discard_parked_source(expected, &layer.to_string(), source_count)
+    }
+
     /// Read-only retire preflight for a source-side cross-document move.
     /// Mirrors the exact validation used by retire_layers_revision, including
     /// active edit, revision, ID limit and parked-layer checks.
@@ -1302,6 +1983,61 @@ impl DrawingNativeTiles {
             .is_ok()
     }
 
+    /// Reversible host transfer: release live sources, retain all tokens.
+    #[func]
+    fn release_transfer_layers_revision(
+        &mut self,
+        expected: i64,
+        layers: PackedStringArray,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        if expected < 0 || layers.is_empty() || layers.len() > MAX_ACTIVE_TILES {
+            return false;
+        }
+        let ids: Vec<String> = layers.as_slice().iter().map(|id| id.to_string()).collect();
+        self.store
+            .release_transfer_layers(expected as u64, &ids)
+            .is_ok()
+    }
+
+    /// Permanently retire live layers and explicitly orphaned parked sources.
+    #[func]
+    fn retire_orphaned_layers_revision(
+        &mut self,
+        expected: i64,
+        live: PackedStringArray,
+        parked: Array<VarDictionary>,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        if expected < 0
+            || parked.is_empty()
+            || live.len().saturating_add(parked.len()) > MAX_ACTIVE_TILES
+        {
+            return false;
+        }
+        let live: Vec<String> = live.as_slice().iter().map(|id| id.to_string()).collect();
+        let mut sources = Vec::with_capacity(parked.len());
+        for source in parked.iter_shared() {
+            let Some(layer) = source
+                .get("layer")
+                .and_then(|value| value.try_to::<GString>().ok())
+            else {
+                return false;
+            };
+            let Some(count) = source
+                .get("count")
+                .and_then(|value| value.try_to::<i64>().ok())
+                .and_then(|value| usize::try_from(value).ok())
+            else {
+                return false;
+            };
+            sources.push((layer.to_string(), count));
+        }
+        self.store
+            .retire_orphaned_layers(expected as u64, &live, &sources)
+            .is_ok()
+    }
+
     /// Quiescent structural removal/restoration of raster layers already
     /// owned by Rust. No bytes leave Rust; parked layers cannot be painted,
     /// imported or replayed until structural Undo restores the same IDs.
@@ -1323,9 +2059,9 @@ impl DrawingNativeTiles {
             .is_ok()
     }
 
-    /// Checked semantic re-rasterization of previously parked native IDs.
-    /// The next glyph source is produced by Godot and imported lazily only
-    /// after the obsolete Rust source/history is selectively retired.
+    /// Retire parked IDs at a structural revision without publishing new
+    /// source tiles. Text rasterization uses publish_structural_source_revision
+    /// to replace old and new glyph sources atomically.
     #[func]
     fn replace_parked_layers_revision(&mut self, expected: i64, layers: PackedStringArray) -> bool {
         self.store.ffi_calls += 1;
@@ -1336,6 +2072,283 @@ impl DrawingNativeTiles {
         self.store
             .replace_parked_layers(expected as u64, &ids)
             .is_ok()
+    }
+
+    /// Bounded atomic import of all newly derived source tiles. Validate
+    /// descriptors and total memory before cloning any packed byte buffers.
+    #[func]
+    fn publish_structural_source_revision(
+        &mut self,
+        layer: GString,
+        expected: i64,
+        tiles: Array<Dictionary<Variant, Variant>>,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        let layer = layer.to_string();
+        if expected < 0
+            || self
+                .store
+                .can_publish_structural_source(&layer, expected as u64, tiles.len())
+                .is_err()
+        {
+            return false;
+        }
+        let Ok(len) = self.store.stride_bytes() else {
+            return false;
+        };
+        let mut descriptors = Vec::with_capacity(tiles.len());
+        let mut seen = HashSet::with_capacity(tiles.len());
+        for entry in tiles.iter_shared() {
+            let (Some(x), Some(y), Some(rgba)) = (
+                entry.get("tile_x").and_then(|v| v.try_to::<i64>().ok()),
+                entry.get("tile_y").and_then(|v| v.try_to::<i64>().ok()),
+                entry
+                    .get("bytes")
+                    .and_then(|v| v.try_to::<PackedByteArray>().ok()),
+            ) else {
+                return false;
+            };
+            if x.unsigned_abs() > SAFE_COORD as u64
+                || y.unsigned_abs() > SAFE_COORD as u64
+                || rgba.len() != len
+                || !seen.insert((x, y))
+            {
+                return false;
+            }
+            descriptors.push((
+                TileId {
+                    layer: layer.clone(),
+                    x,
+                    y,
+                },
+                rgba,
+            ));
+        }
+        let entries = descriptors
+            .into_iter()
+            .map(|(id, bytes)| (id, bytes.as_slice().to_vec()))
+            .collect();
+        self.store
+            .publish_structural_source(&layer, expected as u64, entries)
+            .is_ok()
+    }
+
+    /// Adopt all raster layers of a new detached subtree in one revision.
+    #[func]
+    fn publish_subtree_revision(
+        &mut self,
+        expected: i64,
+        layers: PackedStringArray,
+        tiles: Array<Dictionary<Variant, Variant>>,
+    ) -> bool {
+        self.publish_subtree_descriptors(expected, layers, tiles, true, false, false)
+    }
+
+    /// Restore a previously unreferenced text raster without creating a new
+    /// native pixel event or invalidating unrelated redo tokens.
+    #[func]
+    fn publish_text_history_source_revision(
+        &mut self,
+        expected: i64,
+        layer: GString,
+        tiles: Array<Dictionary<Variant, Variant>>,
+        park: bool,
+    ) -> bool {
+        let mut layers = PackedStringArray::new();
+        layers.push(&layer);
+        self.publish_subtree_descriptors(expected, layers, tiles, false, park, false)
+    }
+
+    /// Reacquire a detached raster subtree during structural Undo/Redo.
+    /// Every ID must be unreferenced in this owner; existing parked history
+    /// uses the checked unpark path instead. Preserve unrelated redo tokens.
+    #[func]
+    fn publish_subtree_history_source_revision(
+        &mut self,
+        expected: i64,
+        layers: PackedStringArray,
+        tiles: Array<Dictionary<Variant, Variant>>,
+        park: bool,
+    ) -> bool {
+        self.publish_subtree_descriptors(expected, layers, tiles, false, park, false)
+    }
+
+    /// Source coordinates referenced by retained native tokens. The extra
+    /// entry beyond the structural limit signals an oversized transfer.
+    #[func]
+    fn transfer_history_source_keys(&self, layer: GString) -> PackedStringArray {
+        let layer = layer.to_string();
+        let mut keys = HashSet::new();
+        for event in self.store.undo.iter().chain(self.store.redo.iter()) {
+            if event.layer == layer {
+                for id in event.before.keys().chain(event.after.keys()) {
+                    keys.insert((id.x, id.y));
+                    if keys.len() > MAX_STRUCTURAL_TILES {
+                        break;
+                    }
+                }
+            }
+            if keys.len() > MAX_STRUCTURAL_TILES {
+                break;
+            }
+        }
+        let mut result = PackedStringArray::new();
+        for (x, y) in keys {
+            result.push(&GString::from(&format!("{x},{y}")));
+        }
+        result
+    }
+
+    /// Re-admit a transferred subtree without replacing or replaying its tokens.
+    #[func]
+    fn publish_transfer_subtree_revision(
+        &mut self,
+        expected: i64,
+        layers: PackedStringArray,
+        tiles: Array<Dictionary<Variant, Variant>>,
+    ) -> bool {
+        self.publish_subtree_descriptors(expected, layers, tiles, false, false, true)
+    }
+
+    /// Adopt missing mixed subtree coordinates and park/unpark the entire
+    /// checked source set. Existing ownership is never overwritten.
+    #[func]
+    fn adopt_mixed_subtree_revision(
+        &mut self,
+        expected: i64,
+        layers: PackedStringArray,
+        tiles: Array<Dictionary<Variant, Variant>>,
+        restore: bool,
+        discard_redo: bool,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        let Ok(len) = self.store.stride_bytes() else {
+            return false;
+        };
+        if expected < 0
+            || layers.is_empty()
+            || layers.len() > MAX_ACTIVE_TILES
+            || tiles.is_empty()
+            || tiles.len() > MAX_STRUCTURAL_TILES
+            || self
+                .store
+                .bytes_used()
+                .saturating_add(tiles.len().saturating_mul(len))
+                > MAX_STORED_BYTES
+        {
+            return false;
+        }
+        let ids: Vec<String> = layers.as_slice().iter().map(|id| id.to_string()).collect();
+        let mut descriptors = Vec::with_capacity(tiles.len());
+        for entry in tiles.iter_shared() {
+            let (Some(layer), Some(x), Some(y), Some(rgba), Some(owned)) = (
+                entry.get("layer").and_then(|v| v.try_to::<GString>().ok()),
+                entry.get("tile_x").and_then(|v| v.try_to::<i64>().ok()),
+                entry.get("tile_y").and_then(|v| v.try_to::<i64>().ok()),
+                entry
+                    .get("bytes")
+                    .and_then(|v| v.try_to::<PackedByteArray>().ok()),
+                entry.get("owned").and_then(|v| v.try_to::<bool>().ok()),
+            ) else {
+                return false;
+            };
+            if rgba.len() != len {
+                return false;
+            }
+            descriptors.push((
+                TileId {
+                    layer: layer.to_string(),
+                    x,
+                    y,
+                },
+                rgba,
+                owned,
+            ));
+        }
+        let entries = descriptors
+            .into_iter()
+            .map(|(id, bytes, owned)| (id, bytes.as_slice().to_vec(), owned))
+            .collect();
+        self.store
+            .adopt_mixed_subtree(expected as u64, &ids, entries, restore, discard_redo)
+            .is_ok()
+    }
+
+    fn publish_subtree_descriptors(
+        &mut self,
+        expected: i64,
+        layers: PackedStringArray,
+        tiles: Array<Dictionary<Variant, Variant>>,
+        discard_redo: bool,
+        park: bool,
+        transfer: bool,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        if expected < 0 || layers.is_empty() || layers.len() > MAX_ACTIVE_TILES {
+            return false;
+        }
+        if park
+            && (tiles.is_empty()
+                || self.store.parked_layers.len().saturating_add(layers.len()) > MAX_ACTIVE_TILES)
+        {
+            return false;
+        }
+        let ids: Vec<String> = layers.as_slice().iter().map(|id| id.to_string()).collect();
+        if self
+            .store
+            .can_publish_subtree_sources(expected as u64, &ids, tiles.len(), transfer)
+            .is_err()
+        {
+            return false;
+        }
+        let names: HashSet<&str> = ids.iter().map(String::as_str).collect();
+        let Ok(len) = self.store.stride_bytes() else {
+            return false;
+        };
+        let mut descriptors = Vec::with_capacity(tiles.len());
+        let mut seen = HashSet::with_capacity(tiles.len());
+        for entry in tiles.iter_shared() {
+            let (Some(layer), Some(x), Some(y), Some(rgba)) = (
+                entry.get("layer").and_then(|v| v.try_to::<GString>().ok()),
+                entry.get("tile_x").and_then(|v| v.try_to::<i64>().ok()),
+                entry.get("tile_y").and_then(|v| v.try_to::<i64>().ok()),
+                entry
+                    .get("bytes")
+                    .and_then(|v| v.try_to::<PackedByteArray>().ok()),
+            ) else {
+                return false;
+            };
+            let layer = layer.to_string();
+            if !names.contains(layer.as_str())
+                || x.unsigned_abs() > SAFE_COORD as u64
+                || y.unsigned_abs() > SAFE_COORD as u64
+                || rgba.len() != len
+            {
+                return false;
+            }
+            let id = TileId { layer, x, y };
+            if !seen.insert(id.clone()) {
+                return false;
+            }
+            descriptors.push((id, rgba));
+        }
+        let entries = descriptors
+            .into_iter()
+            .map(|(id, bytes)| (id, bytes.as_slice().to_vec()))
+            .collect();
+        if transfer {
+            self.store
+                .publish_subtree_sources(expected as u64, &ids, entries, false, false, true)
+                .is_ok()
+        } else if discard_redo && !park {
+            self.store
+                .publish_subtree(expected as u64, &ids, entries)
+                .is_ok()
+        } else {
+            self.store
+                .publish_subtree_with_history(expected as u64, &ids, entries, discard_redo, park)
+                .is_ok()
+        }
     }
 
     #[func]
@@ -1404,6 +2417,24 @@ impl DrawingNativeTiles {
         self.store.retains_history_token(transaction)
     }
 
+    /// Reclaim exactly one abandoned host-owned history event without changing
+    /// the content revision or dropping any other token.
+    #[func]
+    fn forget_history_token(
+        &mut self,
+        expected_revision: i64,
+        layer: GString,
+        token: i64,
+        applied: bool,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        let Ok(expected) = u64::try_from(expected_revision) else {
+            return false;
+        };
+        self.store
+            .forget_history_token(expected, &layer.to_string(), token, applied)
+    }
+
     /// Validate every packed descriptor before cloning *any* RGBA8 buffer.
     /// A malformed later entry must not allocate earlier full-tile spans.
     /// Empty byte arrays denote absent/transparent tiles in the v1 ABI.
@@ -1454,7 +2485,34 @@ impl DrawingNativeTiles {
         expected_revision: i64,
         tiles: Array<Dictionary<Variant, Variant>>,
     ) -> Dictionary<Variant, Variant> {
+        self.replay_detached_tiles(layer, expected_revision, tiles, None)
+    }
+
+    /// Chronological host/local replay of a bounded-out token (or old tokenless
+    /// event). The command owner checks chronology; Rust checks that the token
+    /// is absent and preserves both existing stacks without adding a new entry.
+    #[func]
+    fn replay_ordered_detached_history(
+        &mut self,
+        layer: GString,
+        expected_revision: i64,
+        token: i64,
+        tiles: Array<Dictionary<Variant, Variant>>,
+    ) -> Dictionary<Variant, Variant> {
+        self.replay_detached_tiles(layer, expected_revision, tiles, Some(token))
+    }
+
+    fn replay_detached_tiles(
+        &mut self,
+        layer: GString,
+        expected_revision: i64,
+        tiles: Array<Dictionary<Variant, Variant>>,
+        ordered_token: Option<i64>,
+    ) -> Dictionary<Variant, Variant> {
         self.store.ffi_calls += 1;
+        if ordered_token.is_some_and(|token| token < 0 || self.store.retains_history_token(token)) {
+            return err("Retained or invalid ordered detached history token");
+        }
         if expected_revision < 0 || tiles.is_empty() || tiles.len() > MAX_ACTIVE_TILES {
             return err("Invalid detached history revision or tile count");
         }
@@ -1475,10 +2533,16 @@ impl DrawingNativeTiles {
                 .saturating_add(before.len().saturating_add(after.len()) as u64);
             changes.push((id, before.as_slice().to_vec(), after.as_slice().to_vec()));
         }
-        match self
-            .store
-            .replay_detached(&layer, expected_revision as u64, changes)
-        {
+        let result = match ordered_token {
+            Some(token) => {
+                self.store
+                    .replay_ordered_detached(&layer, expected_revision as u64, token, changes)
+            }
+            None => self
+                .store
+                .replay_detached(&layer, expected_revision as u64, changes),
+        };
+        match result {
             Ok(count) => {
                 let mut result = Dictionary::new();
                 result.set("ok", true);
@@ -1586,6 +2650,30 @@ impl DrawingNativeTiles {
                 bytes.as_slice(),
             )
             .is_ok()
+    }
+
+    /// The physical source descriptor is owned by DrawingDocument. Require
+    /// exact committed bytes and reject all edited/parked/history-owned tiles.
+    #[func]
+    fn release_pristine_source(
+        &mut self,
+        layer: GString,
+        x: i64,
+        y: i64,
+        revision: i64,
+        expected: PackedByteArray,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        revision >= 0
+            && self.store.release_pristine_source(
+                &TileId {
+                    layer: layer.to_string(),
+                    x,
+                    y,
+                },
+                revision as u64,
+                expected.as_slice(),
+            )
     }
 
     #[func]
@@ -2028,6 +3116,288 @@ mod tests {
         };
         store.import(id, store.revision, &[]).unwrap();
     }
+    #[test]
+    fn discarded_history_tokens_release_only_the_requested_event() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let key = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let mut tokens = Vec::new();
+        for x in 0..3 {
+            let rev = store.revision;
+            let token = store.begin("ink", rev, false).unwrap();
+            store
+                .stage(
+                    token,
+                    rev,
+                    0,
+                    0,
+                    &[x, 1],
+                    false,
+                    0xff335577,
+                    false,
+                    Rect2i::new(Vector2i::ZERO, Vector2i::ZERO),
+                )
+                .unwrap();
+            store.commit(token, rev).unwrap();
+            tokens.push(token);
+        }
+        store.undo_or_redo(true).unwrap();
+        store.undo_or_redo(true).unwrap();
+        let rev = store.revision;
+        let bytes = store.read(&key, false).unwrap().rgba.clone();
+        let active = store.begin("ink", rev, false).unwrap();
+        let used = store.bytes_used();
+        assert!(!store.forget_history_token(rev - 1, "ink", tokens[2], false));
+        assert!(!store.forget_history_token(rev, "other", tokens[2], false));
+        assert!(!store.forget_history_token(rev, "ink", tokens[2], true));
+        assert!(!store.forget_history_token(rev, "ink", 0, false));
+        assert_eq!(store.bytes_used(), used);
+        assert!(store.forget_history_token(rev, "ink", tokens[2], false));
+        assert!(!store.retains_history_token(tokens[2]));
+        assert!(!store.forget_history_token(rev, "ink", tokens[2], false));
+        assert!(store.retains_history_token(tokens[0]));
+        assert!(store.retains_history_token(tokens[1]));
+        assert!(store.bytes_used() < used);
+        assert_eq!(store.revision, rev);
+        assert!(store.transaction_matches(active, i64::try_from(rev).unwrap(), "ink"));
+        assert_eq!(store.read(&key, false).unwrap().rgba, bytes);
+        assert!(store.forget_history_token(rev, "ink", tokens[0], true));
+        assert!(!store.retains_history_token(tokens[0]));
+        store.active = None;
+        assert!(store.history_matches(tokens[1], false));
+        store.undo_or_redo(false).unwrap();
+        assert!(store.history_matches(tokens[1], true));
+        store.undo_or_redo(true).unwrap();
+        assert_eq!(store.read(&key, false).unwrap().rgba, bytes);
+    }
+
+    #[test]
+    fn ordered_detached_replay_keeps_both_native_stacks() {
+        let mut store = initialized(16);
+        blank(&mut store, -1, 0);
+        let key = TileId {
+            layer: "ink".into(),
+            x: -1,
+            y: 0,
+        };
+        let mut images = vec![vec![0; 16 * 16 * 4]];
+        let mut tokens = Vec::new();
+        for value in 1..=3_u8 {
+            let mut next = images.last().unwrap().clone();
+            next[0] = value;
+            let (token, _) = store
+                .adopt_external(
+                    "ink",
+                    store.revision,
+                    vec![(key.clone(), images.last().unwrap().clone(), next.clone())],
+                )
+                .unwrap();
+            images.push(next);
+            tokens.push(token);
+        }
+        store.undo_or_redo(true).unwrap();
+        let rev = store.revision;
+        assert!(store.forget_history_token(rev, "ink", tokens[1], true));
+        let undo_middle = vec![(key.clone(), images[2].clone(), images[1].clone())];
+        let used = store.bytes_used();
+        for (revision, token, payload) in [
+            (rev, tokens[0], undo_middle.clone()),
+            (rev, tokens[2], undo_middle.clone()),
+            (rev - 1, tokens[1], undo_middle.clone()),
+            (rev, -1, undo_middle.clone()),
+            (
+                rev,
+                tokens[1],
+                vec![(key.clone(), images[3].clone(), images[1].clone())],
+            ),
+        ] {
+            assert!(
+                store
+                    .replay_ordered_detached("ink", revision, token, payload)
+                    .is_err()
+            );
+            assert_eq!(store.revision, rev);
+            assert_eq!(store.tiles[&key].rgba, images[2]);
+            assert_eq!(store.bytes_used(), used);
+            assert!(store.history_matches(tokens[0], true));
+            assert!(store.history_matches(tokens[2], false));
+        }
+        let active = store.begin("ink", rev, false).unwrap();
+        assert!(
+            store
+                .replay_ordered_detached("ink", rev, tokens[1], undo_middle.clone())
+                .is_err()
+        );
+        assert!(store.transaction_matches(active, rev as i64, "ink"));
+        store.active = None;
+        assert_eq!(
+            store
+                .replay_ordered_detached("ink", rev, tokens[1], undo_middle)
+                .unwrap(),
+            1
+        );
+        assert_eq!(store.tiles[&key].rgba, images[1]);
+        assert_eq!(store.bytes_used(), used);
+        assert!(store.history_matches(tokens[0], true));
+        assert!(store.history_matches(tokens[2], false));
+        store.undo_or_redo(true).unwrap();
+        assert_eq!(store.tiles[&key].rgba, images[0]);
+        store.undo_or_redo(false).unwrap();
+        assert_eq!(store.tiles[&key].rgba, images[1]);
+        store
+            .replay_ordered_detached(
+                "ink",
+                store.revision,
+                tokens[1],
+                vec![(key.clone(), images[1].clone(), images[2].clone())],
+            )
+            .unwrap();
+        assert!(store.history_matches(tokens[2], false));
+        store.undo_or_redo(false).unwrap();
+        assert_eq!(store.tiles[&key].rgba, images[3]);
+        assert_eq!(
+            store
+                .undo
+                .iter()
+                .map(|entry| entry.token)
+                .collect::<Vec<_>>(),
+            vec![tokens[0], tokens[2]]
+        );
+        assert!(store.redo.is_empty());
+    }
+
+    #[test]
+    fn abandoned_parked_source_checks_reservation_and_complete_cardinality() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let glyph = TileId {
+            layer: "glyph".into(),
+            x: -2,
+            y: 1,
+        };
+        let rgba = vec![17; 16 * 16 * 4];
+        store
+            .publish_structural_source("glyph", 0, vec![(glyph.clone(), rgba.clone())])
+            .unwrap();
+        assert!(!store.discard_parked_source(1, "glyph", 1));
+        store
+            .advance_parked_layers(1, &["glyph".into()], false, false)
+            .unwrap();
+        let used = store.bytes_used();
+        assert!(!store.discard_parked_source(1, "glyph", 1));
+        assert!(!store.discard_parked_source(2, "glyph", 0));
+        assert_eq!(store.tiles[&glyph].rgba, rgba);
+        assert_eq!(store.bytes_used(), used);
+        let active = store.begin("ink", 2, false).unwrap();
+        assert!(store.discard_parked_source(2, "glyph", 1));
+        assert!(!store.tiles.contains_key(&glyph));
+        assert!(!store.authorized.contains(&glyph));
+        assert!(!store.parked_layers.contains("glyph"));
+        assert!(store.bytes_used() < used);
+        assert_eq!(store.revision, 2);
+        assert!(store.transaction_matches(active, 2, "ink"));
+        assert!(!store.discard_parked_source(2, "glyph", 1));
+    }
+
+    #[test]
+    fn orphan_retirement_is_atomic_and_preserves_other_tokens() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let token = store.begin("ink", 0, false).unwrap();
+        store
+            .stage(
+                token,
+                0,
+                0,
+                0,
+                &[1, 1],
+                false,
+                0xff123456,
+                false,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO),
+            )
+            .unwrap();
+        store.commit(token, 0).unwrap();
+        let key = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let keep = store.tiles[&key].rgba.clone();
+        let mut retired = Vec::new();
+        for layer in ["child", "sibling", "live"] {
+            let id = TileId {
+                layer: layer.into(),
+                x: -2,
+                y: 0,
+            };
+            store
+                .publish_structural_source(
+                    layer,
+                    store.revision,
+                    vec![(id.clone(), vec![17; 16 * 16 * 4])],
+                )
+                .unwrap();
+            retired.push(id);
+        }
+        store
+            .advance_parked_layers(
+                store.revision,
+                &["child".into(), "sibling".into()],
+                false,
+                false,
+            )
+            .unwrap();
+        let rev = store.revision;
+        let used = store.bytes_used();
+        let live = ["live".into()];
+        assert!(
+            store
+                .retire_orphaned_layers(rev, &live, &[("child".into(), 1), ("sibling".into(), 0)])
+                .is_err()
+        );
+        assert!(
+            store
+                .retire_orphaned_layers(rev, &live, &[("child".into(), 1), ("live".into(), 1)])
+                .is_err()
+        );
+        assert!(
+            store
+                .retire_orphaned_layers(rev - 1, &live, &[("child".into(), 1)])
+                .is_err()
+        );
+        assert_eq!(store.bytes_used(), used);
+        assert_eq!(store.revision, rev);
+        assert_eq!(store.parked_layers.len(), 2);
+        let active = store.begin("ink", rev, false).unwrap();
+        assert!(
+            store
+                .retire_orphaned_layers(rev, &live, &[("child".into(), 1), ("sibling".into(), 1)])
+                .is_err()
+        );
+        assert!(store.transaction_matches(active, rev as i64, "ink"));
+        store.active = None;
+        store
+            .retire_orphaned_layers(rev, &live, &[("child".into(), 1), ("sibling".into(), 1)])
+            .unwrap();
+        assert_eq!(store.revision, rev + 1);
+        assert!(store.parked_layers.is_empty());
+        for id in retired {
+            assert!(!store.tiles.contains_key(&id));
+            assert!(!store.authorized.contains(&id));
+        }
+        assert!(store.bytes_used() < used);
+        assert_eq!(store.tiles[&key].rgba, keep);
+        assert!(store.retains_history_token(token));
+        store.undo_or_redo(true).unwrap();
+        store.undo_or_redo(false).unwrap();
+        assert_eq!(store.tiles[&key].rgba, keep);
+    }
+
     #[test]
     fn grouped_pigment_runs_match_per_pixel_reference_with_signed_revisits() {
         // Run across positive/signed tile boundaries, revisit a prior tile,
@@ -3022,6 +4392,731 @@ mod tests {
     }
 
     #[test]
+    fn structural_source_publication_is_atomic_and_keeps_unrelated_history() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let ink = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let mut ink_bytes = vec![0; 16 * 16 * 4];
+        ink_bytes[..4].copy_from_slice(&[17, 34, 51, 0]);
+        let (token, _) = store
+            .adopt_external("ink", 0, vec![(ink.clone(), vec![], ink_bytes.clone())])
+            .unwrap();
+        let glyph = TileId {
+            layer: "glyph".into(),
+            x: -2,
+            y: 1,
+        };
+        let other = TileId {
+            layer: "glyph".into(),
+            x: 1,
+            y: -1,
+        };
+        let mut glyph_bytes = vec![0; 16 * 16 * 4];
+        glyph_bytes[..4].copy_from_slice(&[64, 128, 192, 127]);
+        let memory = store.bytes_used();
+        let imported = store.bytes_imported;
+        assert!(
+            store
+                .publish_structural_source("glyph", 0, vec![(glyph.clone(), glyph_bytes.clone())])
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_structural_source("ink", 1, vec![(ink.clone(), glyph_bytes.clone())])
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_structural_source(
+                    "glyph",
+                    1,
+                    vec![
+                        (glyph.clone(), glyph_bytes.clone()),
+                        (other.clone(), vec![0; 1])
+                    ]
+                )
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_structural_source(
+                    "glyph",
+                    1,
+                    vec![
+                        (glyph.clone(), glyph_bytes.clone()),
+                        (glyph.clone(), glyph_bytes.clone())
+                    ]
+                )
+                .is_err()
+        );
+        assert_eq!(store.revision, 1);
+        assert_eq!(store.bytes_used(), memory);
+        assert_eq!(store.bytes_imported, imported);
+        assert!(!store.authorized.contains(&glyph));
+        assert!(store.history_matches(token, true));
+        store
+            .publish_structural_source("glyph", 1, vec![(glyph.clone(), glyph_bytes.clone())])
+            .unwrap();
+        assert_eq!(store.revision, 2);
+        assert_eq!(store.read(&glyph, false).unwrap().rgba, glyph_bytes);
+        assert!(store.authorized.contains(&glyph));
+        assert_eq!(store.undo.len(), 1);
+        assert!(store.history_matches(token, true));
+        store
+            .advance_parked_layers(2, &["glyph".into()], false, false)
+            .unwrap();
+        let active = store.begin("ink", 3, false).unwrap();
+        assert!(
+            store
+                .publish_structural_source("glyph", 3, vec![(other.clone(), glyph_bytes.clone())])
+                .is_err()
+        );
+        assert!(store.transaction_matches(active, 3, "ink"));
+        store.active = None;
+        assert!(
+            store
+                .publish_structural_source("glyph", 3, vec![(other.clone(), vec![1])])
+                .is_err()
+        );
+        assert!(store.parked_layers.contains("glyph"));
+        assert_eq!(store.read(&glyph, false).unwrap().rgba, glyph_bytes);
+        store
+            .publish_structural_source("glyph", 3, vec![(other.clone(), glyph_bytes.clone())])
+            .unwrap();
+        assert_eq!(store.revision, 4);
+        assert!(!store.parked_layers.contains("glyph"));
+        assert!(!store.authorized.contains(&glyph));
+        assert!(store.read(&glyph, false).is_none());
+        assert_eq!(store.read(&other, false).unwrap().rgba, glyph_bytes);
+        assert_eq!(store.read(&ink, false).unwrap().rgba, ink_bytes);
+        assert!(store.history_matches(token, true));
+        let wide = initialized(2048);
+        assert!(wide.can_publish_structural_source("large", 0, 16).is_ok());
+        assert!(wide.can_publish_structural_source("large", 0, 17).is_err());
+        assert!(
+            store
+                .can_publish_structural_source("large", 4, MAX_STRUCTURAL_TILES + 1)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn transferred_sources_release_and_readmit_retained_history() {
+        let mut store = initialized(16);
+        blank(&mut store, -1, 0);
+        let key = TileId {
+            layer: "ink".into(),
+            x: -1,
+            y: 0,
+        };
+        let ids = ["ink".into()];
+        let mut bytes = vec![0; 16 * 16 * 4];
+        bytes[..4].copy_from_slice(&[23, 34, 56, 0]);
+        let (token, _) = store
+            .adopt_external("ink", 0, vec![(key.clone(), vec![], bytes.clone())])
+            .unwrap();
+        let before = store.bytes_used();
+        assert!(store.release_transfer_layers(0, &ids).is_err());
+        let active = store.begin("ink", 1, false).unwrap();
+        assert!(store.release_transfer_layers(1, &ids).is_err());
+        assert!(store.transaction_matches(active, 1, "ink"));
+        store.active = None;
+        store.release_transfer_layers(1, &ids).unwrap();
+        assert_eq!(store.revision, 2);
+        assert!(store.retains_history_token(token));
+        assert!(!store.history_matches(token, true));
+        assert!(!store.authorized.contains(&key));
+        assert!(store.read(&key, false).is_none());
+        assert_eq!(store.bytes_used(), before - bytes.len());
+        store.editable_layers.insert("ink".into(), true);
+        assert!(store.undo_or_redo(true).is_err());
+        assert!(
+            store
+                .publish_subtree(2, &ids, vec![(key.clone(), bytes.clone())])
+                .is_err()
+        );
+        let remaining = store.bytes_used();
+        assert!(
+            store
+                .publish_subtree_sources(2, &ids, vec![], false, false, true)
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_subtree_sources(2, &ids, vec![(key.clone(), vec![0])], false, false, true)
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_subtree_sources(
+                    2,
+                    &ids,
+                    vec![(key.clone(), bytes.clone()), (key.clone(), bytes.clone())],
+                    false,
+                    false,
+                    true
+                )
+                .is_err()
+        );
+        assert_eq!((store.revision, store.bytes_used()), (2, remaining));
+        assert!(store.retains_history_token(token));
+        store
+            .publish_subtree_sources(
+                2,
+                &ids,
+                vec![(key.clone(), bytes.clone())],
+                false,
+                false,
+                true,
+            )
+            .unwrap();
+        assert!(store.history_matches(token, true));
+        assert!(
+            store
+                .publish_subtree_sources(
+                    3,
+                    &ids,
+                    vec![(key.clone(), bytes.clone())],
+                    false,
+                    false,
+                    true
+                )
+                .is_err()
+        );
+        store.undo_or_redo(true).unwrap();
+        assert!(
+            store
+                .read(&key, false)
+                .unwrap()
+                .rgba
+                .iter()
+                .all(|byte| *byte == 0)
+        );
+        store.release_transfer_layers(4, &ids).unwrap();
+        assert!(!store.history_matches(token, false));
+        assert!(store.retains_history_token(token));
+        store
+            .publish_subtree_sources(
+                5,
+                &ids,
+                vec![(key.clone(), vec![0; bytes.len()])],
+                false,
+                false,
+                true,
+            )
+            .unwrap();
+        store.editable_layers.insert("ink".into(), true);
+        assert!(store.history_matches(token, false));
+        store.undo_or_redo(false).unwrap();
+        assert_eq!(store.read(&key, false).unwrap().rgba, bytes);
+        assert_eq!(store.revision, 7);
+        store.advance_parked_layers(7, &ids, false, false).unwrap();
+        assert!(store.release_transfer_layers(8, &ids).is_err());
+        assert!(
+            store
+                .publish_subtree_sources(
+                    8,
+                    &ids,
+                    vec![(key.clone(), bytes.clone())],
+                    false,
+                    false,
+                    true
+                )
+                .is_err()
+        );
+        assert!(store.retains_history_token(token));
+    }
+
+    #[test]
+    fn subtree_publication_checks_complete_batch_before_any_mutation() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let ink = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let mut bytes = vec![0; 16 * 16 * 4];
+        bytes[..4].copy_from_slice(&[19, 33, 55, 0]);
+        let (token, _) = store
+            .adopt_external("ink", 0, vec![(ink.clone(), vec![], bytes.clone())])
+            .unwrap();
+        let a = TileId {
+            layer: "a".into(),
+            x: -1,
+            y: 2,
+        };
+        let b = TileId {
+            layer: "b".into(),
+            x: -1,
+            y: 2,
+        };
+        let ids = ["a".into(), "b".into(), "empty".into()];
+        let memory = store.bytes_used();
+        let imported = store.bytes_imported;
+        assert!(
+            store
+                .publish_subtree(
+                    1,
+                    &ids,
+                    vec![(a.clone(), bytes.clone()), (b.clone(), vec![0])]
+                )
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_subtree(
+                    1,
+                    &ids,
+                    vec![(a.clone(), bytes.clone()), (a.clone(), bytes.clone())]
+                )
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_subtree(
+                    1,
+                    &["a".into()],
+                    vec![(a.clone(), bytes.clone()), (b.clone(), bytes.clone())]
+                )
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_subtree(
+                    1,
+                    &["ink".into(), "a".into()],
+                    vec![(a.clone(), bytes.clone())]
+                )
+                .is_err()
+        );
+        assert!(store.publish_subtree(0, &ids, vec![]).is_err());
+        let active = store.begin("ink", 1, false).unwrap();
+        assert!(
+            store
+                .publish_subtree(1, &ids, vec![(a.clone(), bytes.clone())])
+                .is_err()
+        );
+        assert!(store.transaction_matches(active, 1, "ink"));
+        store.active = None;
+        assert_eq!(
+            (store.revision, store.bytes_used(), store.bytes_imported),
+            (1, memory, imported)
+        );
+        assert!(!store.authorized.contains(&a));
+        assert!(store.history_matches(token, true));
+        store
+            .publish_subtree(
+                1,
+                &ids,
+                vec![(a.clone(), bytes.clone()), (b.clone(), bytes.clone())],
+            )
+            .unwrap();
+        assert_eq!(store.revision, 2);
+        assert_eq!(store.read(&a, false).unwrap().rgba, bytes);
+        assert_eq!(store.read(&b, false).unwrap().rgba, bytes);
+        assert!(store.history_matches(token, true));
+        assert!(!store.parked_layers.contains("empty"));
+        assert_eq!(store.undo.len(), 1);
+        store
+            .advance_parked_layers(2, &["a".into()], false, false)
+            .unwrap();
+        assert!(store.publish_subtree(3, &ids, vec![]).is_err());
+        assert_eq!(store.revision, 3);
+        let wide = initialized(2048);
+        assert!(wide.can_publish_subtree(0, &ids, 16).is_ok());
+        assert!(wide.can_publish_subtree(0, &ids, 17).is_err());
+        assert!(
+            store
+                .can_publish_subtree(3, &["new".into()], MAX_STRUCTURAL_TILES + 1)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn detached_text_history_admission_preserves_unrelated_redo() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let ink = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let glyph = TileId {
+            layer: "glyph".into(),
+            x: -2,
+            y: 3,
+        };
+        let mut bytes = vec![0; 16 * 16 * 4];
+        bytes[..4].copy_from_slice(&[19, 33, 55, 0]);
+        let (token, _) = store
+            .adopt_external("ink", 0, vec![(ink.clone(), vec![], bytes.clone())])
+            .unwrap();
+        store.undo_or_redo(true).unwrap();
+        let ids = ["glyph".into()];
+        let baseline = (store.revision, store.bytes_used(), store.bytes_imported);
+        assert!(store.history_matches(token, false));
+        assert!(
+            store
+                .publish_subtree_with_history(2, &ids, vec![], false, true)
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_subtree_with_history(
+                    2,
+                    &ids,
+                    vec![
+                        (glyph.clone(), bytes.clone()),
+                        (glyph.clone(), bytes.clone())
+                    ],
+                    false,
+                    true
+                )
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_subtree_with_history(2, &ids, vec![(glyph.clone(), vec![1])], false, false)
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_subtree_with_history(
+                    1,
+                    &ids,
+                    vec![(glyph.clone(), bytes.clone())],
+                    false,
+                    true
+                )
+                .is_err()
+        );
+        let tx = store.begin("ink", 2, false).unwrap();
+        assert!(
+            store
+                .publish_subtree_with_history(
+                    2,
+                    &ids,
+                    vec![(glyph.clone(), bytes.clone())],
+                    false,
+                    true
+                )
+                .is_err()
+        );
+        assert!(store.transaction_matches(tx, 2, "ink"));
+        store.active = None;
+        assert_eq!(
+            baseline,
+            (store.revision, store.bytes_used(), store.bytes_imported)
+        );
+        assert!(store.history_matches(token, false));
+        assert!(!store.authorized.contains(&glyph));
+        store
+            .publish_subtree_with_history(
+                2,
+                &ids,
+                vec![(glyph.clone(), bytes.clone())],
+                false,
+                true,
+            )
+            .unwrap();
+        assert_eq!(store.revision, 3);
+        assert!(store.parked_layers.contains("glyph"));
+        assert_eq!(store.read(&glyph, false).unwrap().rgba, bytes);
+        assert!(store.history_matches(token, false));
+        assert!(
+            store
+                .publish_subtree_with_history(
+                    3,
+                    &ids,
+                    vec![(glyph.clone(), bytes.clone())],
+                    false,
+                    false
+                )
+                .is_err()
+        );
+        store.advance_parked_layers(3, &ids, true, false).unwrap();
+        assert!(!store.parked_layers.contains("glyph"));
+        assert!(store.history_matches(token, false));
+        store.undo_or_redo(false).unwrap();
+        assert_eq!(store.read(&ink, false).unwrap().rgba, bytes);
+        assert_eq!(store.read(&glyph, false).unwrap().rgba, bytes);
+        assert_eq!(store.revision, 5);
+    }
+
+    #[test]
+    fn detached_subtree_history_adopts_multiple_layers_atomically() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let ink = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let first = TileId {
+            layer: "first".into(),
+            x: -1,
+            y: 2,
+        };
+        let second = TileId {
+            layer: "second".into(),
+            x: 3,
+            y: -4,
+        };
+        let mut bytes = vec![0; 16 * 16 * 4];
+        bytes[..4].copy_from_slice(&[19, 33, 55, 0]);
+        let (token, _) = store
+            .adopt_external("ink", 0, vec![(ink.clone(), vec![], bytes.clone())])
+            .unwrap();
+        store.undo_or_redo(true).unwrap();
+        let ids = ["first".into(), "second".into(), "empty".into()];
+        let baseline = (store.revision, store.bytes_used(), store.bytes_imported);
+        assert!(store.history_matches(token, false));
+        assert!(
+            store
+                .publish_subtree_with_history(
+                    2,
+                    &ids,
+                    vec![(first.clone(), bytes.clone()), (second.clone(), vec![1])],
+                    false,
+                    true,
+                )
+                .is_err()
+        );
+        assert!(
+            store
+                .publish_subtree_with_history(
+                    2,
+                    &ids,
+                    vec![
+                        (first.clone(), bytes.clone()),
+                        (first.clone(), bytes.clone())
+                    ],
+                    false,
+                    true,
+                )
+                .is_err()
+        );
+        assert_eq!(
+            baseline,
+            (store.revision, store.bytes_used(), store.bytes_imported)
+        );
+        assert!(store.parked_layers.is_empty());
+        assert!(!store.authorized.contains(&first));
+        assert!(!store.authorized.contains(&second));
+        store
+            .publish_subtree_with_history(
+                2,
+                &ids,
+                vec![
+                    (first.clone(), bytes.clone()),
+                    (second.clone(), bytes.clone()),
+                ],
+                false,
+                true,
+            )
+            .unwrap();
+        assert_eq!(store.revision, 3);
+        assert!(ids.iter().all(|id| store.parked_layers.contains(id)));
+        assert!(store.history_matches(token, false));
+        assert_eq!(store.read(&first, false).unwrap().rgba, bytes);
+        assert_eq!(store.read(&second, false).unwrap().rgba, bytes);
+        assert!(
+            store
+                .publish_subtree_with_history(3, &ids, vec![], false, false)
+                .is_err()
+        );
+        store.advance_parked_layers(3, &ids, true, false).unwrap();
+        assert!(store.parked_layers.is_empty());
+        assert!(store.history_matches(token, false));
+        store.undo_or_redo(false).unwrap();
+        assert_eq!(store.revision, 5);
+        assert_eq!(store.read(&ink, false).unwrap().rgba, bytes);
+    }
+
+    #[test]
+    fn mixed_subtree_preserves_existing_generation_and_history() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let ink = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let extra = TileId {
+            layer: "ink".into(),
+            x: -2,
+            y: 3,
+        };
+        let second = TileId {
+            layer: "second".into(),
+            x: 4,
+            y: -5,
+        };
+        let blank_id = TileId {
+            layer: "second".into(),
+            x: 1,
+            y: 2,
+        };
+        let bytes = vec![19; 16 * 16 * 4];
+        let zero = vec![0; bytes.len()];
+        let (token, _) = store
+            .adopt_external("ink", 0, vec![(ink.clone(), Vec::new(), bytes.clone())])
+            .unwrap();
+        store.import(blank_id.clone(), 1, &[]).unwrap();
+        let original_generation = store.read(&ink, false).unwrap().generation;
+        let ids = ["ink".into(), "second".into(), "empty".into()];
+        let complete = vec![
+            (ink.clone(), bytes.clone(), true),
+            (extra.clone(), bytes.clone(), false),
+            (second.clone(), bytes.clone(), false),
+            (blank_id.clone(), zero.clone(), true),
+        ];
+        let baseline = (store.revision, store.bytes_used(), store.bytes_imported);
+        for invalid in [
+            vec![(extra.clone(), bytes.clone(), false)],
+            vec![(ink.clone(), bytes.clone(), false)],
+            vec![
+                (ink.clone(), zero.clone(), true),
+                (extra.clone(), bytes.clone(), false),
+                (blank_id.clone(), zero.clone(), true),
+            ],
+            vec![
+                (ink.clone(), bytes.clone(), true),
+                (extra.clone(), bytes.clone(), false),
+                (blank_id.clone(), zero.clone(), true),
+                (second.clone(), vec![1], false),
+            ],
+        ] {
+            assert!(
+                store
+                    .adopt_mixed_subtree(1, &ids, invalid, false, false)
+                    .is_err()
+            );
+            assert_eq!(
+                baseline,
+                (store.revision, store.bytes_used(), store.bytes_imported)
+            );
+            assert!(!store.authorized.contains(&extra));
+            assert!(store.parked_layers.is_empty());
+            assert!(store.history_matches(token, true));
+        }
+        assert!(
+            store
+                .adopt_mixed_subtree(1, &ids, complete.clone(), true, false)
+                .is_err()
+        );
+        store
+            .adopt_mixed_subtree(1, &ids, complete, false, true)
+            .unwrap();
+        assert_eq!(store.revision, 2);
+        assert!(ids.iter().all(|id| store.parked_layers.contains(id)));
+        assert_eq!(
+            store.read(&ink, false).unwrap().generation,
+            original_generation
+        );
+        assert_eq!(store.read(&extra, false).unwrap().rgba, bytes);
+        assert_eq!(store.read(&second, false).unwrap().rgba, bytes);
+        assert_eq!(store.read(&blank_id, false).unwrap().rgba, zero);
+        store.advance_parked_layers(2, &ids, true, false).unwrap();
+        assert!(store.history_matches(token, true));
+        store.undo_or_redo(true).unwrap();
+        assert_eq!(store.read(&ink, false).unwrap().rgba, zero);
+        assert_eq!(store.read(&extra, false).unwrap().rgba, bytes);
+        assert!(store.history_matches(token, false));
+    }
+
+    #[test]
+    fn empty_created_layer_replay_and_branch_reclamation_are_checked() {
+        let mut store = initialized(16);
+        let id = TileId {
+            layer: "ink".into(),
+            x: -1,
+            y: 0,
+        };
+        let other = TileId {
+            layer: "other".into(),
+            x: 0,
+            y: 0,
+        };
+        store.editable_layers.insert("other".into(), true);
+        let mut hidden = vec![0; 16 * 16 * 4];
+        hidden[..4].copy_from_slice(&[0x11, 0x22, 0x33, 0]);
+        let (other_token, _) = store
+            .adopt_external("other", 0, vec![(other.clone(), vec![], hidden.clone())])
+            .unwrap();
+        let (token, _) = store
+            .adopt_external("ink", 1, vec![(id.clone(), vec![], hidden.clone())])
+            .unwrap();
+        assert!(
+            store
+                .advance_empty_created_layer(2, "ink", 1, false)
+                .is_err()
+        );
+        assert!(store.history_matches(token, true));
+        store.undo_or_redo(true).unwrap();
+        let generation = store.read(&id, false).unwrap().generation;
+        let resident = store.bytes_used();
+        assert!(
+            store
+                .advance_empty_created_layer(2, "ink", 1, false)
+                .is_err()
+        );
+        assert!(
+            store
+                .advance_empty_created_layer(3, "ink", 0, false)
+                .is_err()
+        );
+        assert!(
+            store
+                .advance_empty_created_layer(3, "ink", 1, true)
+                .is_err()
+        );
+        assert!(store.discard_empty_creation(3, "ink", 1).is_err());
+        let transaction = store.begin("other", 3, false).unwrap();
+        assert!(
+            store
+                .advance_empty_created_layer(3, "ink", 1, false)
+                .is_err()
+        );
+        assert!(store.transaction_matches(transaction, 3, "other"));
+        store.active = None;
+        store
+            .advance_empty_created_layer(3, "ink", 1, false)
+            .unwrap();
+        assert!(store.parked_layers.contains("ink"));
+        assert!(store.retains_history_token(token));
+        assert!(store.history_matches(other_token, true));
+        assert_eq!(store.bytes_used(), resident);
+        assert_eq!(store.read(&id, false).unwrap().generation, generation);
+        assert!(store.undo_or_redo(false).is_err());
+        store
+            .advance_empty_created_layer(4, "ink", 1, true)
+            .unwrap();
+        assert!(store.history_matches(token, false));
+        store.undo_or_redo(false).unwrap();
+        assert_eq!(store.read(&id, false).unwrap().rgba, hidden);
+        store.undo_or_redo(true).unwrap();
+        store
+            .advance_empty_created_layer(7, "ink", 1, false)
+            .unwrap();
+        assert!(store.discard_empty_creation(8, "ink", 0).is_err());
+        let active = store.begin("other", 8, false).unwrap();
+        store.discard_empty_creation(8, "ink", 1).unwrap();
+        assert!(store.transaction_matches(active, 8, "other"));
+        assert_eq!(store.revision, 8);
+        assert!(!store.retains_history_token(token));
+        assert!(store.retains_history_token(other_token));
+        assert!(!store.authorized.contains(&id));
+        assert!(!store.parked_layers.contains("ink"));
+        assert_eq!(store.read(&other, false).unwrap().rgba, hidden);
+    }
+
+    #[test]
     fn parked_raster_layers_retain_history_and_reject_mutation_until_restored() {
         let mut store = initialized(16);
         blank(&mut store, 0, 0);
@@ -3462,6 +5557,63 @@ mod tests {
         assert_eq!(s.read(&id, false).unwrap().rgba[0..4], [0, 0, 0, 0]);
         assert_eq!(s.read(&other, false).unwrap().rgba[0..4], [0, 0, 0, 0]);
     }
+    #[test]
+    fn pristine_release_is_revision_and_history_fenced() {
+        let mut store = initialized(16);
+        let id = TileId {
+            layer: "ink".into(),
+            x: -1,
+            y: 2,
+        };
+        let other = TileId {
+            layer: "ink".into(),
+            x: 5,
+            y: -3,
+        };
+        let mut bytes = vec![0; 16 * 16 * 4];
+        bytes[..4].copy_from_slice(&0x00112233_u32.to_le_bytes());
+        store.import(id.clone(), 0, &bytes).unwrap();
+        store.import(other.clone(), 0, &bytes).unwrap();
+        assert!(!store.release_pristine_source(&id, 1, &bytes));
+        assert!(!store.release_pristine_source(&id, 0, &[]));
+        let tx = store.begin("ink", 0, false).unwrap();
+        assert!(!store.release_pristine_source(&id, 0, &bytes));
+        store.active = None;
+        let mut replacement = bytes.clone();
+        replacement[..4].copy_from_slice(&0xff987654_u32.to_le_bytes());
+        let (token, _) = store
+            .apply_external_tiles(
+                "ink",
+                0,
+                vec![(id.clone(), bytes.clone(), replacement.clone())],
+                true,
+            )
+            .unwrap();
+        assert_ne!(token, tx);
+        assert!(!store.release_pristine_source(&id, 1, &replacement));
+        // Independently prove that even a generation-zero descriptor pinned
+        // by history cannot be released.
+        store.tiles.get_mut(&id).unwrap().generation = 0;
+        assert!(!store.release_pristine_source(&id, 1, &replacement));
+        store.parked_layers.insert("ink".into());
+        assert!(!store.release_pristine_source(&other, 1, &bytes));
+        store.parked_layers.clear();
+        let before = store.bytes_used();
+        assert!(store.release_pristine_source(&other, 1, &bytes));
+        assert_eq!(store.bytes_used(), before - bytes.len());
+        assert!(!store.authorized.contains(&other));
+        assert!(store.read(&other, false).is_none());
+        assert_eq!(store.revision, 1);
+        assert!(store.history_matches(token, true));
+        store.import(other.clone(), 1, &bytes).unwrap();
+        assert_eq!(store.read(&other, false).unwrap().rgba, bytes);
+        store.undo_or_redo(true).unwrap();
+        assert_eq!(store.read(&id, false).unwrap().rgba, bytes);
+        assert!(store.history_matches(token, false));
+        store.undo_or_redo(false).unwrap();
+        assert_eq!(store.read(&id, false).unwrap().rgba, replacement);
+    }
+
     #[test]
     fn missing_source_masks_and_budget_fail_closed() {
         let mut s = initialized(16);

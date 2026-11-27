@@ -104,6 +104,51 @@ closed if an attached store lacks the expected probe. This fence covers
 attached native tile transactions, not arbitrary unrelated Atlas commands or
 GDScript-only sessions. [T-243 evidence](evidence/T-243-2026-11-22-active-history-handoff.md).
 
+## Structural source publication (T-313, 2026-11-25)
+
+`publish_structural_source_revision(layer, expected_revision, tiles)` accepts
+an array of `{tile_x: int, tile_y: int, bytes: PackedByteArray}` descriptors.
+A source is either unreferenced by any native tile/history or previously
+parked. The entire signed descriptor set is validated before buffer copies:
+no duplicate keys, full `stride² * 4` byte spans, no active edit or divergent
+revision, at most 8,192 descriptors, and a conservative resident-plus-new
+256 MiB ceiling. Publication advances one revision and adds no pixel-history
+token; the semantic tree event is the caller's reversible structural record.
+A parked replacement discards only the obsolete layer's resident source and
+Undo tokens plus branched Redo, preserving other layers. An empty source is
+legal and needs no new native tombstone. `rasterize_text` prebuilds its glyph
+projection and uses this entrypoint before installing the raster node; a first
+conversion configures a provisional store and attaches it only after success.
+Signed Godot projection bounds are checked by the caller. Stale stores and
+pending edits reject. Native-owned glyphs park/unpark without reimport on
+structural replay; a parked raster at a semantic text ID is excluded from the
+live Save/Copy projection. Godot continues shaping glyphs and owns the
+structural timeline; detached subtree source publication is addressed separately below.
+The model-only sub-native stride path is retained. See [T-313 evidence](evidence/T-313-2026-11-25-native-text-source.md).
+
+## Detached subtree source publication (T-314, 2026-11-25)
+
+`publish_subtree_revision(expected_revision, layers, tiles)` adopts new raster
+layers together, with `layers: PackedStringArray` and descriptors
+`{layer: String, tile_x: int, tile_y: int, bytes: PackedByteArray}`. It admits
+1–128 distinct previously unreferenced raster layer IDs, up to 8,192 distinct
+(layer, x, y) keys and 256 MiB resident-plus-incoming RGBA8/history bytes.
+Before buffer cloning, Rust checks the expected revision, transaction state,
+all identities, membership, signed coordinates and exact byte spans. A single
+revision publishes the entire batch, preserving unrelated Undo and clearing
+branched Redo. It creates no additional pixel-history token. Empty layers
+may be listed without creating source tiles or parked IDs at import.
+
+`DrawingDocument.import_subtree` additionally validates canonical storage and
+projection coordinates, matching strides and pending detached edit sessions
+before preparing detached copies. When the native class is available and the
+stride is supported, first use configures a provisional owner; neither it
+nor the tree is installed on rejection. A model-only/sub-native-stride path
+remains available. Native-owned imported bytes participate in the existing
+save/export guards and park/restore/retire paths without first paint. Existing
+untracked local import and Atlas Move/Copy command ownership are unchanged;
+this is not a two-document Rust transaction or a universal host-history bridge.
+
 ## Ownership, byte format and source identity
 
 - `DrawingNativeTiles` is a Godot `RefCounted` holding one Rust-authoritative `TileStore`; production constructs it once per `DrawingDocument` and retains it across gestures, with a checked external-revision rebase. Call `configure(storage_stride, initial_revision)` exactly once (`16 <= stride <= 2048`, `revision >= 0`). **Storage** tiles are not the Hokusai internal 64px tiles or the 128px display tile size; normal planned stride is **256**.
@@ -314,7 +359,7 @@ remain supported until T-150. See [T-171 evidence](evidence/T-171-2026-11-16-nat
 
 **T-239 host-history order fence (2026-11-22):** Tokenized Undo/Redo with a current native owner first checks `has_history_token(token, revision, direction)`; if false, it checks `has_retained_history_token(token)`. A retained but non-top token rejects with `HISTORY_ORDER` **before invoking lazy source providers**, and remains guarded after provider callbacks, rather than running `replay_detached_history` and clearing unrelated newer tokens. Missing/evicted tokens (including historical token-free deltas) still use the checked detached snapshot path. This does not give Rust ownership of Atlas's global command timeline; the host still chooses which snapshot to replay.
 
-**Versioning and lifetime:** The document's serialized `revision` is the one published global revision stamp. Native `TileStore.revision` is its transaction-checked mirror. Native Brush/Eraser gestures and eligible external pixel edits (through `_publish_edit`/`_publish_tile_edit`) each commit exactly one Rust transaction from `r` to `r+1` before the Godot document installs detached consumer tiles at `r+1`. For external raster edits, the document first resolves every source and checks tile-object identity; the Rust bridge verifies resident source **bytes** (or explicitly authorized new source), editability, bounds and memory, and either commits all tiles/history or none. `DrawingDelta.native_history_token` identifies a retained Rust entry on the one ordered timeline. Undo/Redo prevalidate the Godot projected source, then use matching live Rust tokens; older evicted/mixed events still have detached tile snapshots as a fallback. **Metadata bridge:** `advance_metadata_revision(expected_revision, discard_redo)` is a checked *single-step* `r → r+1` revision mirror for operations that leave raster source bytes and identities unchanged. It preserves canonical tiles, authorizations and Rust Undo tokens; a *new* metadata edit clears Rust redo to match Godot's branched history, while a metadata Undo/Redo advances the stamp without clearing redo. It rejects stale/overflow revisions or active strokes without side effects. GDScript then detaches a rejected or diverged store (retaining detached document history), rather than claiming synchronized native ownership. **Structural raster guard:** `advance_unreferenced_layers_revision` permits create/remove Undo/Redo and nested subtree delete/restore if all raster child IDs have **never entered** this Rust store; a resident/authorized tile (even blank), tokenized Undo *or* Redo, active edit, stale revision, repeated ID or more than 128 layers rejects atomically. Godot still advances its revision on rejection and later uses a checked external rebase. **Detached subtree import:** `DrawingDocument.import_subtree` now prebuilds detached nodes and remapped tile metadata before publication; copied raster layer IDs that are entirely new to Rust advance through the same bounded, checked `advance_unreferenced_layers_revision` guard. Semantic-only imports use `advance_metadata_revision`. This preserves unrelated native undo tokens and canonical authorized tiles without claiming that the transferred Godot pixels are already resident in Rust; the first stroke on an imported layer still performs explicit source import. Native parked ID collisions reject the import without changing the document. **T-169 import fence:** a rejected/stale/>128-layer native bridge now returns a typed failure **without publishing any Godot nodes, dirty tiles or revision**. It is not permission to commit only on the Godot side or silently discard native history later; direct removal uses the bounded retirement operation below after verifying native source parity. **Recorded native-owned subtree park/restore:** `advance_parked_layers_revision` holds resident bytes and tokens in a checked parked set across local structure Undo/Redo. Before park, Godot checks known imported source identities **and full RGBA8 parity with Rust**; before restore, detached saved tiles are compared with original sources. Only a byte-identical restore rebinds canonical source objects without reimport. Direct reads for save/debug are possible, but new native imports/Brush/history replay for parked layers fail; unrecorded removal intentionally does not park. **Text conversion guard:** `rasterize_text` prebuilds the text glyph RGBA8 projection before checked `advance_unreferenced_layers_revision` at the same stable layer ID. Undo/Redo of that text↔raster kind change uses the same guard with `discard_redo=false`. Rust preserves unrelated source/history only when the converted layer was never authorized or referenced by native Undo/Redo; it imports glyph tiles lazily on the first native Brush. A newly rendered text source at a **previously parked** ID now uses the checked `replace_parked_layers_revision` bridge to retire the obsolete source and its tokens while retaining unrelated Rust history; a currently owned unparked ID rejects instead of pretending to be unreferenced. Text-raster Undo/Redo of the original source still uses verified park/unpark. Native-ahead rejects before Godot publication, while already-behind stores retain the conservative rebase. The Godot text rasterizer still materializes glyph tiles; it is not a native glyph rasterizer. **Detached history replay bootstrap (2026-11-16):** When `DrawingDocument` has no attached `DrawingNativeTiles` or it is behind the document's current revision, history replay no longer publishes a Godot-only tile projection. The document first resolves and revalidates all lazy sources and exact detached RGBA8 snapshots. It then creates a **provisional** ABI-v1 tile store at `base_revision`, imports the 1–128 touched expected-source tiles (including explicit empty/zero source), enables the authorized layer, and sends the same bounded expected/replacement tile batch to Rust `replay_detached_history`. Only a successful Rust revision `base_revision + 1` replaces the attached store and invalidates previous `_native_source_identities`; Godot publishes its prebuilt display/save tiles afterward without further lazy callbacks. Failure to instantiate, import, or replay leaves the document and old store untouched. If Rust is **ahead** of the document, replay fails closed rather than replacing newer native authority. A current store still uses native token replay or checked in-sync detached replay. Newly attached native authority is **partial** until untouched layers are independently authorized on first use; the host still owns detached history snapshots, and no Rust history tokens are invented for them. This cold replay recovery is separate from the Brush hot path and does not transfer UI/history ownership.
+**Versioning and lifetime:** The document's serialized `revision` is the one published global revision stamp. Native `TileStore.revision` is its transaction-checked mirror. Native Brush/Eraser gestures and eligible external pixel edits (through `_publish_edit`/`_publish_tile_edit`) each commit exactly one Rust transaction from `r` to `r+1` before the Godot document installs detached consumer tiles at `r+1`. For external raster edits, the document first resolves every source and checks tile-object identity; the Rust bridge verifies resident source **bytes** (or explicitly authorized new source), editability, bounds and memory, and either commits all tiles/history or none. `DrawingDelta.native_history_token` identifies a retained Rust entry on the one ordered timeline. Undo/Redo prevalidate the Godot projected source, then use matching live Rust tokens; older evicted/mixed events still have detached tile snapshots as a fallback. **Metadata bridge:** `advance_metadata_revision(expected_revision, discard_redo)` is a checked *single-step* `r → r+1` revision mirror for operations that leave raster source bytes and identities unchanged. It preserves canonical tiles, authorizations and Rust Undo tokens; a *new* metadata edit clears Rust redo to match Godot's branched history, while a metadata Undo/Redo advances the stamp without clearing redo. It rejects stale/overflow revisions or active strokes without side effects. GDScript then detaches a rejected or diverged store (retaining detached document history), rather than claiming synchronized native ownership. **Structural raster guard:** `advance_unreferenced_layers_revision` permits create/remove Undo/Redo and nested subtree delete/restore if all raster child IDs have **never entered** this Rust store; a resident/authorized tile (even blank), tokenized Undo *or* Redo, active edit, stale revision, repeated ID or more than 128 layers rejects atomically. Godot still advances its revision on rejection and later uses a checked external rebase. **Detached subtree import:** `DrawingDocument.import_subtree` now prebuilds detached nodes and remapped tile metadata before publication; copied raster layer IDs that are entirely new to Rust advance through the same bounded, checked `advance_unreferenced_layers_revision` guard. Semantic-only imports use `advance_metadata_revision`. This preserves unrelated native undo tokens and canonical authorized tiles without claiming that the transferred Godot pixels are already resident in Rust; the first stroke on an imported layer still performs explicit source import. Native parked ID collisions reject the import without changing the document. **T-169 import fence:** a rejected/stale/>128-layer native bridge now returns a typed failure **without publishing any Godot nodes, dirty tiles or revision**. It is not permission to commit only on the Godot side or silently discard native history later; direct removal uses the bounded retirement operation below after verifying native source parity. **Recorded native-owned subtree park/restore:** `advance_parked_layers_revision` holds resident bytes and tokens in a checked parked set across local structure Undo/Redo. Before park, Godot checks known imported source identities **and full RGBA8 parity with Rust**; before restore, detached saved tiles are compared with original sources. Only a byte-identical restore rebinds canonical source objects without reimport. Direct reads for save/debug are possible, but new native imports/Brush/history replay for parked layers fail; unrecorded removal intentionally does not park. **Text conversion guard (T-313 supersedes the earlier lazy glyph import):** `rasterize_text` publishes the complete new derived source through `publish_structural_source_revision` before installing its detached raster projection, including atomic replacement of a parked version. Undo/Redo uses verified parking; stale native revisions reject. Godot still shapes glyphs and owns semantic tree history; see the structural source section above. **Detached history replay bootstrap (2026-11-16):** When `DrawingDocument` has no attached `DrawingNativeTiles` or it is behind the document's current revision, history replay no longer publishes a Godot-only tile projection. The document first resolves and revalidates all lazy sources and exact detached RGBA8 snapshots. It then creates a **provisional** ABI-v1 tile store at `base_revision`, imports the 1–128 touched expected-source tiles (including explicit empty/zero source), enables the authorized layer, and sends the same bounded expected/replacement tile batch to Rust `replay_detached_history`. Only a successful Rust revision `base_revision + 1` replaces the attached store and invalidates previous `_native_source_identities`; Godot publishes its prebuilt display/save tiles afterward without further lazy callbacks. Failure to instantiate, import, or replay leaves the document and old store untouched. If Rust is **ahead** of the document, replay fails closed rather than replacing newer native authority. A current store still uses native token replay or checked in-sync detached replay. Newly attached native authority is **partial** until untouched layers are independently authorized on first use; the host still owns detached history snapshots, and no Rust history tokens are invented for them. This cold replay recovery is separate from the Brush hot path and does not transfer UI/history ownership.
 
 **Remaining exceptions:** rejected/over-limit retirement, unbridged raster source producers and external host-history mutations can still advance the document without a native transaction and force a quiescent `rebase_external_revision(native_r, document_r)` that loses old Rust history. Changed text sources at already-parked IDs use T-155's selective bridge; unchanged T-154 history snapshots still use reversible parking. Universal revision ownership and removing the shadow history fallback remain T-148 work.
 
@@ -349,6 +394,22 @@ absent historical behavior remains until T-150. See
 ## Checked detached-history replay (2026-11-16 checkpoint)
 
 `DrawingNativeTiles.replay_detached_history(layer_id, expected_revision, tiles)` accepts 1–128 descriptors of `{tile_x: int64, tile_y: int64, expected: PackedByteArray, replacement: PackedByteArray}`; empty packed bytes represent an all-zero tile. Rust checks the active transaction, layer editability, parked status, signed coordinate range, duplicate IDs, source RGBA8 equality (including transparent hidden RGB), exact stride/length, changed bytes, memory budget, and the shared revision **before** installing any replacement. A previously unimported tile is explicitly authorized by its expected image. Successful replay updates native canonical tiles and generations and advances the common revision by one; any unrelated resident tiles remain untouched. It invalidates native Undo/Redo stacks rather than synthesizing an opaque Rust token outside the host history timeline. Failure changes neither canonical source nor revision/history.
+
+**T-328 chronological detached replay:** `replay_ordered_detached_history(layer_id,
+expected_revision, token, tiles)` accepts the same bounded descriptors and
+applies the same canonical-source, editability, revision and transaction checks.
+The local cursor or Atlas command owner must first establish chronology. Rust
+rejects a negative token or any token still present on either native stack;
+zero denotes an older tokenless event. A successful ordered replay advances
+source bytes/generations and revision exactly once, preserves both native
+history stacks unchanged, and does not invent a replacement history token.
+In particular, undoing a bounded-out older command after unwinding the newer
+64 entries leaves those newer entries available for native Redo. The ordinary
+`replay_detached_history` recovery method retains its invalidating behavior
+when the caller cannot establish chronology. The owner remains responsible for
+discarding real branches; ordered replay is not an independent Rust global
+command timeline or a substitute for retained snapshots of evicted events.
+
 
 `DrawingDocument._replay_native_tile_delta` uses this operation only when the previous token is unavailable **and** the attached native store's revision equals the document's. It preflights all lazy providers and immutable snapshot bytes, calls Rust once, then installs only detached display/save projections. A valid live token still uses `replay_history_token`'s stronger exact-native-event parity check. When the native store is absent or stale, existing detached snapshot replay remains a deliberately incomplete fallback until universal native authority is implemented. This operation does not serialize Rust's history stack, make GDScript snapshots disappear, or close T-148. See [detached replay evidence](evidence/T-148-2026-11-16-detached-native-replay.md).
 
@@ -611,3 +672,293 @@ than empty or precisely `stride² × 4` bytes. Only after the entire array
 passes do these entry points copy buffers into Rust `Vec<u8>`; rejected
 malformed batches do not account earlier full-tile byte copies. Native
 revisions/history are unchanged on rejection. [T-240 evidence](evidence/T-240-2026-11-22-ffi-payload-preflight.md).
+
+### Portable Open source initialization (T-315)
+
+`DrawingFileIO.decode` validates and materializes every referenced source
+before calling `_adopt_opened_raster_sources`. This clean-document boundary
+configures a provisional `DrawingNativeTiles` at the saved revision and
+calls existing same-revision `import_source` for each signed RGBA8 tile. All
+imports must succeed before attaching the store and corresponding source
+identities. No metadata revision, native token or dirty state is created.
+Binary, JSON and portable Object readers share this path; a fresh Object
+draft has its own store with no previous history. Sparse `open_manifest`
+remains lazy. The file's existing 128 MiB expanded raster limit bounds the
+new native source copy; actual process memory also includes Godot projection
+and codec buffers. See [T-315 evidence](evidence/T-315-2026-11-25-native-file-sources.md).
+
+
+### Physical sparse source admission (T-316)
+
+`DrawingBundleManifest.decode` opts the document into same-revision source
+admission on successful `_resolve_chunk`. Metadata-only Open still allocates
+no native store and invokes no raster provider. The existing reentrant
+revision/epoch/source checks and canonical digest validation precede
+`import_source`; first admission configures a provisional store and attaches
+it only on success. A rejected import keeps the pending descriptor, with no
+projection, edit, dirty marker or history event. Imports of unstaged IDs are
+allowed during a native stroke by the existing ABI. Native ownership now
+protects fetched bytes at Save/Copy even before first paint. When structural
+Undo restores a pending subtree, a subsequent Redo verifies any newly resolved
+source against the original digest and native authority, parks it, and only
+then promotes the event's pending descriptor to a detached resident snapshot.
+No ABI or sparse format version changes. The 256 MiB native aggregate cap
+also applies to read-only sparse admissions; T-317 adds a bounded renderer
+release path below. See [T-316 evidence](evidence/T-316-2026-11-25-native-sparse-sources.md).
+
+
+### Pristine physical source release (T-317)
+
+`release_pristine_source(layer, x, y, revision, expected_rgba8)` is an
+additive v1 method. Rust rejects stale revisions, active transactions, parked
+layers, nonzero generations, unauthorized/missing or byte-different sources,
+and every tile mentioned by retained Undo/Redo. Success erases only that
+source's bytes and authorization; no revision or history changes. Only the
+physical-document owner can establish that a durable ref and digest exist;
+this method alone is not a persistence guarantee.
+
+The document retains the verified provider/ref/digest with weak tile identity.
+Quiescent renderer misses above 192 MiB aggregate native bytes (including the
+incoming tile) scan up to 256 FIFO candidates toward 128 MiB. Dirty sources,
+changed refs, replaced identities and local structural snapshots are excluded.
+The Godot projection is removed only after Rust release; its original pending
+descriptor is restored for ordinary digest-checked re-admission. A failed
+release never hides a corrupted projection. No logical change occurs, and a
+frame-local immutable reference may continue displaying the verified bytes.
+This is not a hard 192 MiB cap: pinned/nonreloadable sources and the scan cap
+may prevent trimming. Non-render reads and active edits do not trim; the
+existing 256 MiB cap still rejects over-budget admissions. Godot projection,
+decoder, renderer frame cache and other process memory are not included.
+See [T-317 evidence](evidence/T-317-2026-11-25-sparse-eviction.md).
+
+### Detached text raster history source (T-318)
+
+`publish_text_history_source_revision(expected_revision, layer, tiles, park)`
+is an additive v1 method. Descriptors have the existing subtree fields
+`layer`, `tile_x`, `tile_y`, `bytes`; every descriptor must belong to the named
+layer and contain a complete RGBA8 tile. Like subtree publication it rejects
+stale/active/overflowing revisions, existing native ownership (including
+parked IDs and retained history), malformed or duplicate descriptors, more
+than 8,192 tiles, and more than 256 MiB of aggregate native data. Parking also
+requires at least one tile and space for another parked identity. Unlike new
+subtree publication, the atomic `r → r+1` history admission preserves unrelated
+native Redo as well as Undo and creates no pixel token. No intermediate live
+source is exposed when `park` is true.
+
+The text-tree replay consumer validates storage and signed projection before
+reading or packing it. Existing complete native sources use the original
+checked park/unpark path. For detached Undo it compares the live glyph tiles
+with the structural snapshot before admission; for detached Redo the saved
+snapshot is the source. A provisional owner is attached only on success and
+restored source identities are rebound to the installed projection. Stale
+attached owners fail closed; no automatic rebase/detachment is attempted.
+Unsupported synthetic strides retain their prior model-only path. This does
+not supply a native semantic-text history or authenticate an intentionally
+mutated detached Redo snapshot when the original native source is gone.
+See [T-318 evidence](evidence/T-318-2026-11-25-text-history-source.md).
+
+### Detached subtree removal history source (T-319)
+
+`publish_subtree_history_source_revision(expected_revision, layers, tiles, park)`
+uses the existing bounded subtree descriptor schema (`layer`, `tile_x`,
+`tile_y`, `bytes`) and the same all-ID unreferenced-source/history preflight
+as `publish_subtree_revision`. Unlike ordinary new subtree imports it does
+not discard native Redo. It advances exactly one revision and creates no
+pixel history token. All descriptors are validated before mutation; a late
+failure leaves every layer unchanged. `park=true` requires a nonempty tile
+batch and enough room for all IDs in the parked-layer set (up to 128 total),
+and admits and parks the entire subtree atomically. Empty siblings of a
+raster-bearing parked group are reserved consistently with the existing
+`advance_parked_layers_revision` lifecycle. Completely empty removals do not
+need to allocate an owner or parked IDs.
+
+The local structural replay consumer checks the retained hierarchy and full
+signed RGBA8 tile set before admission. Detached Redo compares the live
+bytes against the removal snapshot and retains unresolved pending descriptors
+without invoking providers. An old event's parked flag alone cannot establish
+ownership in a replacement store. Any surviving native source, parked ID or
+history token is protected by the Rust unreferenced-ID fence. A provisional
+owner is attached only after successful admission; restored identities are
+rebound to the installed Godot projection. Subsequent replay of newly adopted
+subtrees checks completeness, and previously supported physical sparse
+late-source promotion continues to use its digest fence. Logical-only lazy
+fixtures and unsupported synthetic strides retain their existing behavior.
+Mixed already-owned and unowned subtrees within one owner and general host
+history consolidation are not addressed by this additive admission method.
+See [T-319 evidence](evidence/T-319-2026-11-25-subtree-history-source.md).
+
+### Mixed retained raster subtree source admission (T-320)
+
+`adopt_mixed_subtree_revision(expected_revision, layers, tiles, restore, discard_redo)`
+accepts a complete bounded raster source set for the affected IDs. Each
+`layer`, `tile_x`, `tile_y`, `bytes` descriptor adds a required Boolean `owned`.
+An owned coordinate must already be authorized with exactly the supplied
+RGBA8; an unowned coordinate must have no canonical source or retained native
+history image. Every existing native source for the affected IDs must appear,
+including explicitly authorized blank tiles. Existing generations are kept.
+All descriptors are checked before any native state changes. `restore=false`
+parks all affected IDs, requiring that none is already parked; `restore=true`
+restores existing parked references and admits missing coordinates together,
+rejecting an already-live referenced layer. The operation advances exactly
+one revision without creating a pixel token. `discard_redo` is true for new
+recorded removal and false for structural replay. Maximum 128 layer IDs,
+8192 descriptors and a conservative 256 MiB resident-plus-batch peak apply.
+The host checks exact retained hierarchy, live bytes and pending sparse
+descriptors, and retains verified late-source promotion. Older mixed events
+can acquire missing bytes; already fully adopted events continue to fail
+closed on partial ownership loss. Entirely detached recovery remains T-319.
+This is not a new host timeline or a replacement for T-148 integration.
+See [T-320 evidence](evidence/T-320-2026-11-25-mixed-subtree-source.md).
+
+
+### Empty raster creation history and branch reclamation (T-321)
+
+`advance_empty_created_layer_revision(expected_revision, layer, source_count, restore)`
+advances exactly one revision and preserves both native history stacks. The
+host first verifies a structurally empty creation snapshot and, on Undo,
+matching empty live metadata, no pending/known source or unpublished edit,
+and all retained source identity/byte parity. Rust independently checks
+current revision, quiescence, absence of applied history for this layer,
+complete authorized/resident source count and zero **all-channel** RGBA8.
+Referenced blank layers are parked on Undo and unparked on Redo; never-owned
+IDs use the unreferenced bridge. Paint Redo is unavailable while parked.
+No new native pixel token is created. Detached empty layers need no source
+publication until detached paint replay.
+
+`discard_empty_creation_history(expected_revision, layer, source_count)` is
+reserved for the local command owner's abandoned creation branch. The layer
+must be absent from the host tree and parked, and its complete native source
+must remain blank with no applied history. It releases the layer's canonical
+sources, authorization, reservation, editability and layer-specific Redo
+entries at the unchanged content revision. An active edit on another layer
+is unaffected. Rejected reclamation does not change canonical data; the host
+must not erase its source identities unless the native call succeeds. This
+is not general history eviction or an external host timeline protocol.
+See [T-321 evidence](evidence/T-321-2026-11-25-raster-creation-history.md).
+
+
+### T-322: command-owner history reclamation
+
+`forget_history_token(expected_revision, layer, token, applied)` releases one
+exact history event from the native Undo stack (`applied=true`) or Redo stack
+(`applied=false`). Tokens are globally allocated by the process and must match
+both the named layer and stack at the exact native content revision. A stale
+revision, wrong stack/layer, nonpositive or unknown token returns false and
+retains every event. No source bytes, authorization, parking, generation,
+revision or active edit are modified. This is not a general history mutation
+API: the command owner invokes it only for an irreversibly discarded event.
+
+Local redo truncation releases its content tokens (including selection-only
+branches); Atlas's reserved timeline releases Drawing command tokens across
+all affected documents on redo truncation and both applied/undone events on
+explicit reset. Already detached/cleared tokens are harmless no-ops. Reset and
+branching use stack-tail order in the ordinary case. A stale attached native
+store deliberately remains untouched; reclamation does not silently rebase it.
+Parked structural sources and their structural snapshots retain the separate
+lifecycle rules documented above. See [T-322 evidence](evidence/T-322-2026-11-26-history-reclamation.md).
+
+### T-323: abandoned parked text sources
+
+`discard_parked_source(expected_revision, layer, source_count)` is a checked
+lifetime operation, not a content mutation. It requires an existing parked
+layer, current revision, matching complete resident/authorized source count,
+no active edit on that layer and no retained native history referencing it.
+It drops its tiles, authorization, parking and editability without changing
+revision, unrelated sources or an unrelated active edit. Rejection leaves
+all canonical data intact.
+
+The local command owner uses this only after permanently discarding an undone
+text-to-raster conversion and releasing its abandoned raster tokens. It must
+verify the retained raster snapshot, including any blank authorized sources,
+against the native bytes, and ensure the live layer is semantic text or absent.
+Only after successful reclamation may it remove matching projection identities.
+Corrupt/stale snapshots can leave unused sources resident; do not rebase or
+trust them to force reclamation. This is not general eviction of applied
+removed-layer snapshots or an external structural-history protocol.
+
+### T-324: permanent ancestor retirement of applied orphaned removals
+
+`retire_orphaned_layers_revision(expected_revision, live_layer_ids, parked_sources)`
+is a distinct irreversible operation for an abandoned *applied* structural
+removal, when its ancestor is permanently deleted. Each parked descriptor is
+`{"layer": String, "count": int}` giving the complete authorized/resident
+tile count (including blank authorizations). The combined list must contain
+1–128 distinct nonempty IDs with at least one parked source. Rust requires
+current revision, no active edit, live versus parked lifecycle, and exact
+parked source cardinality. No partial retirement occurs on failure. On
+success, retire both sets' canonical tiles, authorizations, park/editability
+entries and associated native history, invalidate native Redo and advance the
+revision once. Unrelated applied history and canonical RGBA8 remain unchanged.
+Ordinary `retire_layers_revision` still rejects parked IDs.
+
+The local command owner must prove affected snapshots are unreachable after
+ancestor deletion, their nodes are absent, their hierarchy and complete
+materialized sources match the native projection, and pending sparse sources
+are not resolved. It prepares surviving applied commands before native
+publication, drops the old redo tail (including abandoned structural source
+cleanup), and then installs the surviving history. This is not permission to
+evict reachable history or rewrite an external host timeline. See
+[T-324 evidence](evidence/T-324-2026-11-26-orphaned-subtree-reclamation.md).
+
+
+### T-325: external structural command replay and Redo ownership
+
+Atlas Move/Copy uses the existing `publish_subtree_history_source_revision`
+with `park=false`, `retire_layers_revision` with `discard_redo=false`, and
+metadata revision with `discard_redo=false`. Drawing's opt-in host replay
+policy requires external ownership, a quiescent document (including pending
+script sessions) and a matching native revision. Unrelated native Redo must
+survive structural replay; only the host's actual branch/reset abandons its
+command tokens (T-322). Direct local structural edits retain the ordinary
+branching policy. Retirement still drops tokens for the named layer(s);
+affected transfer replay uses detached source snapshots. No ABI addition or
+cross-document transaction guarantee. See [T-325 evidence](evidence/T-325-2026-11-26-transfer-redo-ownership.md).
+
+
+### T-326: transferred-layer native history between visits
+
+`release_transfer_layers_revision(expected_revision, layer_ids)` validates
+current revision, quiescence, 1–128 distinct nonempty IDs and no parked IDs,
+then releases their resident raster tiles, authorizations and editability,
+advancing one revision without removing native Undo/Redo tokens.
+`transfer_history_source_keys(layer_id)` returns retained token coordinates
+as canonical signed `x,y` strings (up to 8192 plus one overflow sentinel).
+`publish_transfer_subtree_revision(expected_revision, layer_ids, tiles)`
+accepts the usual complete `{layer, tile_x, tile_y, bytes}` descriptors,
+including explicit zero RGBA8 for absent snapshot coordinates referenced by
+retained tokens. It permits history-referenced absent IDs, but rejects live
+or parked sources, missing required history coordinates, malformed or
+repeated descriptors, stale/busy owners and admission over the native
+memory/descriptor limits. Publication neither consumes nor creates a raster
+history token. The ordinary subtree APIs retain their stricter unreferenced
+ID rules. Native history probes and replay refuse absent canonical sources.
+
+Drawing's existing opt-in host structural policy now uses these operations
+instead of irreversible native retirement and unreferenced history-source
+publication for reversible transfers. The host supplies the detached source
+snapshot at its chronological boundary and owns command reclamation (T-322).
+Normal creation/import may not reuse a history-reserved ID. Repeated moves
+back into a previously visited owner are supported; no live source is parked
+solely to retain a transferred token. Cross-document coordination and source
+snapshots are still host-owned. See [T-326 evidence](evidence/T-326-2026-11-26-transfer-source-history.md).
+
+
+### T-327: checked host structural transfer publication
+
+No new Rust ABI method. The host captures source and destination revisions
+before lazy export (and checks destination source epoch afterward). Before
+publishing the opposite document, it checks the outgoing materialized
+hierarchy, complete tile set, exact RGBA8, native authority and revision
+headroom without calling providers. A changed or unresolved source refuses
+the transfer; reconstruct the command after resolving it. Copy's first
+import optionally captures its remapped detached tree before native
+publication, and Move uses its one logical snapshot with the expected root
+parent adjusted per document. Ordered restoration inserts into the original
+sibling position as part of the single checked import revision, rather than
+a subsequent metadata revision. Copy Undo may remove a protected imported
+root only via the host path with exact retained-source and editable-parent
+checks; ordinary removal rules are unchanged. All T-326 token lifetime and
+admission bounds still apply. This is synchronous host coordination, not a
+single transaction spanning independent native stores; the defensive
+compensation branch remains for unexpected divergence. See
+[T-327 evidence](evidence/T-327-2026-11-26-transfer-publication-boundary.md).
